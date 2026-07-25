@@ -182,3 +182,36 @@ class Event(Base):
 
     voucher: Mapped[Voucher] = relationship(back_populates="events")
     actor: Mapped[User | None] = relationship(lazy="joined")
+
+
+class LoginToken(Base):
+    """One-time token behind the login link the bot sends."""
+
+    __tablename__ = "login_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # SHA-256 of the token: the database never holds anything replayable.
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Session(Base):
+    """A logged-in browser — the PWA's equivalent of Telegram's initData."""
+
+    __tablename__ = "sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

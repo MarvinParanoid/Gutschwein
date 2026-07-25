@@ -17,13 +17,14 @@ from typing import Annotated
 from urllib.parse import parse_qsl
 
 from aiogram.utils.web_app import check_webapp_signature
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Cookie, Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db import get_session
 from app.models import User, utcnow
+from app.sessions import resolve_session
 
 
 class TelegramUser(dict):
@@ -68,10 +69,25 @@ async def upsert_user(session: AsyncSession, tg: TelegramUser) -> User:
     return user
 
 
+def check_allowed(user: User) -> User:
+    """Membership is checked on every request, not only at login.
+
+    Removing someone from ALLOWED_TELEGRAM_IDS has to lock them out immediately,
+    including a browser session opened while they still had access.
+    """
+    if user.telegram_id not in settings.allowed_ids:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            f"Нет доступа. Передайте администратору свой Telegram ID: {user.telegram_id}",
+        )
+    return user
+
+
 async def get_current_user(
     session: Annotated[AsyncSession, Depends(get_session)],
     authorization: Annotated[str | None, Header()] = None,
     x_dev_user: Annotated[int | None, Header()] = None,
+    sparschwein_session: Annotated[str | None, Cookie()] = None,
 ) -> User:
     if settings.dev_mode and x_dev_user is not None:
         # Name includes the id so several fake members stay distinguishable locally.
@@ -79,10 +95,16 @@ async def get_current_user(
             session, TelegramUser({"id": x_dev_user, "first_name": f"Dev {x_dev_user}"})
         )
 
+    # Outside Telegram (the PWA) the identity comes from the session cookie.
+    if sparschwein_session:
+        user = await resolve_session(session, sparschwein_session)
+        if user is not None:
+            return check_allowed(user)
+
     if not authorization or not authorization.lower().startswith("tma "):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
-            "Нужен заголовок Authorization: tma <initData>",
+            "Нужен вход: откройте приложение через бота или войдите по ссылке из чата",
         )
     if not settings.bot_token:
         raise HTTPException(

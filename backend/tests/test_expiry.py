@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.expiry import Rule, default_expiry, rule_for
+from app.models import utcnow
 
 
 @pytest.mark.parametrize(
@@ -65,7 +66,9 @@ def test_card_created_today_gets_the_shop_rule(client: TestClient) -> None:
         json={"merchant": "Kaufland", "value_kind": "amount", "value_amount": "50"},
     ).json()
 
-    expected = default_expiry("Kaufland", date.today())
+    # utcnow(), not date.today(): around midnight the local date is already
+    # tomorrow while the server still counts from yesterday.
+    expected = default_expiry("Kaufland", utcnow().date())
     assert card["valid_until"] == expected.isoformat()
     # Flagged as a guess: the app must not present it as printed on the card.
     assert card["expiry_estimated"] is True

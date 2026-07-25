@@ -30,6 +30,7 @@ from app.models import EventKind, Voucher, VoucherStatus, utcnow
 from app.notify import notify
 from app.quickadd import QuickAdd, apply_quick_add, find_pending_draft, parse_quick_add
 from app.services import attach_barcode, format_amount, record_event, voucher_label
+from app.sessions import LOGIN_TOKEN_TTL, issue_login_token
 
 log = logging.getLogger(__name__)
 
@@ -77,6 +78,31 @@ def build_dispatcher() -> Dispatcher:
             log.warning("manual backup failed", exc_info=True)
             await message.answer(f"Не получилось: {exc}")
 
+    @dp.message(Command("login"))
+    async def cmd_login(message: Message) -> None:
+        """A one-time link that turns a browser into a logged-in device."""
+        if not allowed(message):
+            return
+        if message.chat.type != "private":
+            await message.answer("Ссылку для входа пришлю только в личку — напишите мне туда.")
+            return
+        if not settings.webapp_url.startswith("https://"):
+            await message.answer("WEBAPP_URL не настроен — ссылку сформировать не из чего.")
+            return
+
+        async with SessionLocal() as session:
+            user = await upsert_user(session, _telegram_user(message))
+            token = await issue_login_token(session, user)
+
+        minutes = int(LOGIN_TOKEN_TTL.total_seconds() // 60)
+        await message.answer(
+            f"Ссылка для входа в браузере (действует {minutes} минут, один раз):\n"
+            f"{settings.webapp_url}/login#{token}\n\n"
+            "Откройте её в браузере телефона и добавьте приложение на домашний экран. "
+            "Никому не пересылайте — она пускает в наши карты.",
+            disable_web_page_preview=True,
+        )
+
     @dp.message(Command("digest"))
     async def cmd_digest(message: Message, bot: Bot) -> None:
         """The weekly summary on demand — also the way to see what it looks like."""
@@ -103,7 +129,7 @@ def build_dispatcher() -> Dispatcher:
             "и она сразу появится в списке.\n\n"
             "Без подписи получится черновик: тогда просто напишите следом "
             "«Rewe 50» — или отдельно «Rewe», а потом «50».\n\n"
-            "Ещё умею /digest, /backup и /id."
+            "Ещё умею /login (вход в браузере), /digest, /backup и /id."
         )
         if keyboard is None:
             await message.answer(

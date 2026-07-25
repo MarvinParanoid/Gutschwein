@@ -24,6 +24,9 @@ function authHeaders(): Record<string, string> {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...init,
+    // Carries the PWA session cookie; inside Telegram there is none and the
+    // Authorization header below does the work.
+    credentials: 'same-origin',
     headers: {
       ...authHeaders(),
       ...(init.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
@@ -47,6 +50,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  /** Exchanges the one-time token from the bot's link for a session cookie. */
+  login: (token: string) =>
+    request<User>('/api/auth/login', { method: 'POST', body: JSON.stringify({ token }) }),
+  logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
+
   me: () => request<{ user: User; members: User[] }>('/api/me'),
 
   listVouchers: (status: VoucherStatus | 'all', q?: string, merchant?: string | null) => {

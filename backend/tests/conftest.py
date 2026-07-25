@@ -27,7 +27,9 @@ from app.main import app  # noqa: E402
 
 @pytest.fixture(scope="session")
 def client() -> Iterator[TestClient]:
-    with TestClient(app) as test_client:
+    # https, because the session cookie is Secure and a client will not send it
+    # over plain http — same as a real browser.
+    with TestClient(app, base_url="https://testserver") as test_client:
         test_client.headers["X-Dev-User"] = "1000"
         yield test_client
 

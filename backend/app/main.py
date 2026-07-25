@@ -12,11 +12,13 @@ from app import notify
 from app.config import settings
 from app.maintenance import maintenance_loop
 from app.migrations import upgrade_database
-from app.routers import barcodes, images, uploads, users, vouchers
+from app.routers import auth, barcodes, images, uploads, users, vouchers
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)-5.5s [%(name)s] %(message)s")
 log = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+# Paths the SPA handles itself; "login" is where the bot's link lands.
+CLIENT_ROUTES = {"", "index.html", "login"}
 
 
 def _report_bot_exit(task: asyncio.Task) -> None:
@@ -79,6 +81,7 @@ if settings.cors_origin_list:
         allow_headers=["*"],
     )
 
+app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(vouchers.router)
 app.include_router(uploads.router)
@@ -100,9 +103,8 @@ if (STATIC_DIR / "index.html").exists():
         candidate = (STATIC_DIR / path).resolve()
         if path and candidate.is_file() and candidate.is_relative_to(STATIC_DIR):
             return FileResponse(candidate)
-        # The Mini App has no client-side routes, so only the entry point falls
-        # back to index.html. Everything else is a 404 instead of a cheerful 200
-        # for every /.env and /.aws/credentials a scanner asks for.
-        if path in ("", "index.html"):
+        # Only known client routes fall back to index.html. Everything else is a
+        # 404 rather than a cheerful 200 for every /.env a scanner asks for.
+        if path in CLIENT_ROUTES:
             return FileResponse(STATIC_DIR / "index.html")
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")

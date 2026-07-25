@@ -8,6 +8,8 @@ import VoucherPage from './pages/VoucherPage'
 import { inTelegram, initTelegram } from './telegram'
 import type { User, VoucherStatus } from './types'
 import { useBackButton } from './useBackButton'
+import { useLogin } from './useLogin'
+import { useOnline } from './useOnline'
 
 type View =
   | { name: 'list' }
@@ -19,6 +21,8 @@ export default function App() {
   const [view, setView] = useState<View>({ name: 'list' })
   const [me, setMe] = useState<User | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
+  const login = useLogin()
+  const online = useOnline()
 
   // Tab, query and shop filter live here so they survive navigation into a
   // voucher and back — you pick Rewe, open a card, and come back to Rewe.
@@ -28,11 +32,14 @@ export default function App() {
 
   useEffect(() => {
     initTelegram()
+    // Wait for the login link to be redeemed, otherwise /api/me runs before the
+    // cookie exists and greets a legitimate visitor with "no access".
+    if (login.state === 'working') return
     api
       .me()
       .then((data) => setMe(data.user))
       .catch((error: Error) => setAuthError(error.message))
-  }, [])
+  }, [login.state])
 
   // Views are mirrored into the history stack, so Telegram's back button, the
   // Android system back gesture and the browser's back arrow all do the same
@@ -54,14 +61,20 @@ export default function App() {
   const goBack = useCallback(() => history.back(), [])
   useBackButton(view.name !== 'list', goBack)
 
-  if (authError) {
+  if (login.state === 'working') return <div className="spinner" />
+
+  if (login.state === 'failed' || authError) {
+    const message = login.error ?? authError
     return (
       <div className="app">
         <div className="empty">
           <span className="emoji">🔒</span>
-          <p>{authError}</p>
+          <p>{message}</p>
           {!inTelegram && (
-            <p className="muted">Откройте приложение через бота в Telegram.</p>
+            <p className="muted">
+              Откройте приложение через бота в Telegram — или пришлите боту команду
+              <b> /login</b>, он даст ссылку для входа в браузере.
+            </p>
           )}
         </div>
       </div>
@@ -72,6 +85,11 @@ export default function App() {
 
   return (
     <div className="app">
+      {!online && (
+        <div className="offline">
+          Нет сети — показываю последние загруженные данные. Изменения не сохранятся.
+        </div>
+      )}
       {view.name === 'list' && (
         <ListPage
           tab={tab}

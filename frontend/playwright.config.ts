@@ -26,6 +26,9 @@ export default defineConfig({
     extraHTTPHeaders: { 'X-Dev-User': '1000' },
     viewport: { width: 420, height: 900 },
     trace: 'retain-on-failure',
+    // The PWA service worker would serve cached responses mid-suite and make
+    // failures non-reproducible; its own spec checks that it is served at all.
+    serviceWorkers: 'block',
     screenshot: 'only-on-failure',
   },
 
@@ -42,6 +45,9 @@ export default defineConfig({
     stderr: 'pipe',
     env: {
       DEV_MODE: 'true',
+      // The dev user has to be a member: the whitelist is enforced on the
+      // cookie path too, not only at login.
+      ALLOWED_TELEGRAM_IDS: '1000',
       RUN_BOT: 'false',
       BOT_TOKEN: '',
       FAMILY_CHAT_ID: '',
