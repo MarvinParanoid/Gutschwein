@@ -2,6 +2,7 @@
 
 VPS ?= root@185.142.99.209
 REMOTE ?= /root/sparschwein
+URL ?= https://spar-schwein.duckdns.org
 # data/ holds the database and uploads. It is excluded, and rsync never deletes
 # excluded paths, so --delete cannot eat it.
 RSYNC_EXCLUDES := --exclude '.git' --exclude 'frontend/node_modules' \
@@ -42,4 +43,10 @@ deploy:
 deploy-vps:
 	rsync -a --delete $(RSYNC_EXCLUDES) $(CURDIR)/ $(VPS):$(REMOTE)/
 	ssh $(VPS) 'cd $(REMOTE) && docker compose up -d --build'
-	@echo "проверка:" && curl -s https://spar-schwein.duckdns.org/healthz && echo
+	@echo "ждём готовности $(URL) ..."
+	@for i in $$(seq 1 30); do \
+		curl -fsS $(URL)/healthz && echo " ✓ поднялся" && exit 0; \
+		sleep 2; \
+	done; \
+	echo "НЕ поднялся за минуту — смотрите: ssh $(VPS) 'cd $(REMOTE) && docker compose logs app'"; \
+	exit 1

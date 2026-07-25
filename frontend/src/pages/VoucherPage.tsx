@@ -120,30 +120,30 @@ export default function VoucherPage({ voucherId, me, onBack, onDeleted, onEdit }
               <span className="val value">{valueLabel(voucher)}</span>
             </div>
           )}
-          {giftCard && voucher.value_amount && (
-            <div className="row">
-              <span className="label">Номинал</span>
-              <span className="val">{money(voucher.value_amount, voucher.currency)}</span>
-            </div>
-          )}
+          {/* No «Номинал» row for gift cards: the balance panel above already
+              reads «32.65 EUR из 50 EUR». */}
           {voucher.title && voucher.merchant && (
             <div className="row">
               <span className="label">Название</span>
               <span className="val">{voucher.title}</span>
             </div>
           )}
-          <div className="row">
-            <span className="label">Срок</span>
-            <span className="val">
-              {formatDate(voucher.valid_until)}
-              {expiry && expiry.tone !== 'neutral' && (
-                <>
-                  {' '}
-                  <span className={`badge ${expiry.tone}`}>{expiry.text}</span>
-                </>
-              )}
-            </span>
-          </div>
+          {/* Most gift cards are added without a deadline; an empty row with a
+              dash is just noise. */}
+          {voucher.valid_until && (
+            <div className="row">
+              <span className="label">Срок</span>
+              <span className="val">
+                {formatDate(voucher.valid_until)}
+                {expiry && expiry.tone !== 'neutral' && (
+                  <>
+                    {' '}
+                    <span className={`badge ${expiry.tone}`}>{expiry.text}</span>
+                  </>
+                )}
+              </span>
+            </div>
+          )}
           {voucher.valid_from && (
             <div className="row">
               <span className="label">Действует с</span>

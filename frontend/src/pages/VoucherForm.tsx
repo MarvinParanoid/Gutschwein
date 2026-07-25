@@ -17,6 +17,27 @@ const VALUE_KINDS: { key: ValueKind; label: string }[] = [
   { key: 'other', label: 'Другое' },
 ]
 
+// Placeholders rotate on every open: they show the format and make a form nobody
+// wants to fill in slightly less of a chore.
+const NOTE_HINTS = [
+  'Не трогать! Это на новый пылесос',
+  'Лежит в бардачке под мандаринами',
+  'Потратишь — купи мне кофе',
+  'Спрятан за банкой с гречкой',
+  'Только на что-нибудь бесполезное и приятное',
+  'Папа, это не на инструменты',
+]
+
+const CONDITION_HINTS = [
+  'от 30 EUR и, конечно, не на алкоголь',
+  'кроме акционных товаров — как всегда',
+  'не суммируется ни с чем на свете',
+  'только по вторникам, спасибо, Rewe',
+  'один раз, одному человеку, в одном магазине',
+]
+
+const pick = (options: string[]) => options[Math.floor(Math.random() * options.length)]
+
 const EMPTY: VoucherDraft = {
   merchant: '',
   title: '',
@@ -35,6 +56,12 @@ const EMPTY: VoucherDraft = {
 export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
   const [draft, setDraft] = useState<VoucherDraft>(EMPTY)
   const [merchants, setMerchants] = useState<string[]>([])
+  const [showExtra, setShowExtra] = useState(false)
+  // Chosen once per mount, so the text does not shuffle while typing.
+  const [hints] = useState(() => ({
+    notes: pick(NOTE_HINTS),
+    conditions: pick(CONDITION_HINTS),
+  }))
   const [loading, setLoading] = useState(Boolean(voucherId))
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -48,7 +75,17 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
     if (!voucherId) return
     api
       .getVoucher(voucherId)
-      .then((voucher) =>
+      .then((voucher) => {
+        // Never hide data that is already there.
+        if (
+          voucher.title ||
+          voucher.code ||
+          voucher.valid_from ||
+          voucher.valid_until ||
+          voucher.conditions
+        ) {
+          setShowExtra(true)
+        }
         setDraft({
           merchant: voucher.merchant,
           title: voucher.title,
@@ -62,8 +99,8 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
           conditions: voucher.conditions,
           notes: voucher.notes,
           image_id: voucher.image_id,
-        }),
-      )
+        })
+      })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [voucherId])
@@ -162,16 +199,6 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
         </div>
 
         <div className="field">
-          <label htmlFor="title">Название</label>
-          <input
-            id="title"
-            value={draft.title}
-            placeholder="20% на бытовую химию"
-            onChange={(e) => set('title', e.target.value)}
-          />
-        </div>
-
-        <div className="field">
           <label>Тип скидки</label>
           <div className="segmented">
             {VALUE_KINDS.map((kind) => (
@@ -216,55 +243,76 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
         )}
 
         <div className="field">
-          <label htmlFor="code">Код</label>
-          <input
-            id="code"
-            value={draft.code}
-            placeholder="XK92-7741"
-            onChange={(e) => set('code', e.target.value)}
-          />
-        </div>
-
-        <div className="field-row">
-          <div className="field">
-            <label htmlFor="from">Действует с</label>
-            <input
-              id="from"
-              type="date"
-              value={draft.valid_from ?? ''}
-              onChange={(e) => set('valid_from', e.target.value || null)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="until">Действует до</label>
-            <input
-              id="until"
-              type="date"
-              value={draft.valid_until ?? ''}
-              onChange={(e) => set('valid_until', e.target.value || null)}
-            />
-          </div>
-        </div>
-
-        <div className="field">
-          <label htmlFor="conditions">Условия</label>
-          <input
-            id="conditions"
-            value={draft.conditions}
-            placeholder="от 30 EUR, кроме акционных товаров"
-            onChange={(e) => set('conditions', e.target.value)}
-          />
-        </div>
-
-        <div className="field">
           <label htmlFor="notes">Заметка для семьи</label>
           <textarea
             id="notes"
             value={draft.notes}
-            placeholder="Лежит в кошельке у Ани"
+            placeholder={hints.notes}
             onChange={(e) => set('notes', e.target.value)}
           />
         </div>
+
+        {/* Name, code, dates and conditions are the exception, not the rule: a
+            gift card is identified by the shop and the photo. They stay in the
+            model, just out of the way. */}
+        <button className="btn link disclosure" onClick={() => setShowExtra(!showExtra)}>
+          {showExtra ? 'Свернуть ▴' : 'Дополнительно ▾'}
+        </button>
+
+        {showExtra && (
+          <>
+            <div className="field">
+              <label htmlFor="title">Название</label>
+              <input
+                id="title"
+                value={draft.title}
+                placeholder="если отличается от магазина"
+                onChange={(e) => set('title', e.target.value)}
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="code">Код</label>
+              <input
+                id="code"
+                value={draft.code}
+                placeholder="если на фото его не видно"
+                onChange={(e) => set('code', e.target.value)}
+              />
+            </div>
+
+            <div className="field-row">
+              <div className="field">
+                <label htmlFor="from">Действует с</label>
+                <input
+                  id="from"
+                  type="date"
+                  value={draft.valid_from ?? ''}
+                  onChange={(e) => set('valid_from', e.target.value || null)}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="until">Действует до</label>
+                <input
+                  id="until"
+                  type="date"
+                  value={draft.valid_until ?? ''}
+                  onChange={(e) => set('valid_until', e.target.value || null)}
+                />
+              </div>
+            </div>
+
+            <div className="field">
+              <label htmlFor="conditions">Условия</label>
+              <input
+                id="conditions"
+                value={draft.conditions}
+                placeholder={hints.conditions}
+                onChange={(e) => set('conditions', e.target.value)}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       <div className="actions">

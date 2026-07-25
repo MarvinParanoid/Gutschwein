@@ -50,6 +50,16 @@ export interface VoucherDraft {
   status?: VoucherStatus
 }
 
+export interface Counts {
+  active: number
+  draft: number
+  used: number
+  archived: number
+  /** Money still left on archived gift cards. */
+  archived_balance: string
+  currency: string
+}
+
 export interface Comment {
   id: number
   text: string

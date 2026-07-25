@@ -12,7 +12,7 @@ import {
   primaryAmount,
 } from '../format'
 import { haptic, inTelegram } from '../telegram'
-import type { Voucher, VoucherStatus } from '../types'
+import type { Counts, Voucher, VoucherStatus } from '../types'
 
 interface Props {
   tab: VoucherStatus
@@ -30,6 +30,13 @@ const EMPTY_STATES: Record<VoucherStatus, { emoji: string; text: string }> = {
   archived: { emoji: '📦', text: 'Архив пуст.' },
 }
 
+const TAB_HINTS: Record<VoucherStatus, string> = {
+  active: 'есть чем платить',
+  draft: 'фото есть, поля не заполнены',
+  used: 'денег на них не осталось',
+  archived: 'убраны с глаз, деньги могли остаться',
+}
+
 export default function ListPage({
   tab,
   onTabChange,
@@ -41,6 +48,8 @@ export default function ListPage({
   const [vouchers, setVouchers] = useState<Voucher[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [debouncedQuery, setDebouncedQuery] = useState(query)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [counts, setCounts] = useState<Counts | null>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 250)
@@ -59,37 +68,53 @@ export default function ListPage({
     }
   }, [tab, debouncedQuery])
 
+  // Counters are only needed when the menu opens, and they change as vouchers move.
+  useEffect(() => {
+    if (!menuOpen) return
+    api.counts().then(setCounts).catch(() => undefined)
+  }, [menuOpen])
+
+  function selectTab(next: VoucherStatus) {
+    haptic()
+    setMenuOpen(false)
+    if (next === tab) return
+    onTabChange(next)
+    setVouchers(null)
+  }
+
   const empty = EMPTY_STATES[tab]
+  const currentLabel = STATUS_TABS.find((t) => t.key === tab)?.label ?? ''
 
   return (
     <>
-      {/* Telegram already shows the app name in its own header; only the browser
-          (and a future PWA) needs a title of our own. */}
-      {!inTelegram && (
-        <div className="topbar">
-          <h1>🐷 Sparschwein</h1>
-        </div>
-      )}
-
-      <div className="tabs">
-        {STATUS_TABS.map((item) => (
-          <button
-            key={item.key}
-            className={`tab ${item.key === tab ? 'active' : ''}`}
-            onClick={() => {
-              haptic()
-              onTabChange(item.key)
-              setVouchers(null)
-            }}
-          >
-            {item.label}
-          </button>
-        ))}
+      <div className="topbar">
+        {/* Inside Telegram the app name is already in its header, so this row
+            carries the current list instead of repeating the title. */}
+        <h1>{inTelegram ? currentLabel : `🐷 ${currentLabel}`}</h1>
+        <button
+          className="burger"
+          onClick={() => {
+            haptic()
+            setMenuOpen(true)
+          }}
+          aria-label="Меню"
+        >
+          ☰
+        </button>
       </div>
+
+      {menuOpen && (
+        <TabMenu
+          current={tab}
+          counts={counts}
+          onSelect={selectTab}
+          onClose={() => setMenuOpen(false)}
+        />
+      )}
 
       <input
         className="search"
-        placeholder="Поиск: магазин, код, условия…"
+        placeholder="Поиск: магазин, заметка…"
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
       />
@@ -127,6 +152,62 @@ export default function ListPage({
   )
 }
 
+/** Bottom sheet with the lists. Telegram's own ⋮ menu can hold a single
+    "Settings" item at most, so anything richer has to be drawn by the app. */
+function TabMenu({
+  current,
+  counts,
+  onSelect,
+  onClose,
+}: {
+  current: VoucherStatus
+  counts: Counts | null
+  onSelect: (tab: VoucherStatus) => void
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [])
+
+  const leftInArchive = counts && Number(counts.archived_balance) > 0
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-handle" />
+        {STATUS_TABS.map((item) => (
+          <button
+            key={item.key}
+            className={`sheet-item ${item.key === current ? 'active' : ''}`}
+            onClick={() => onSelect(item.key)}
+          >
+            <span className="sheet-label">
+              {item.label}
+              <span className="sheet-hint">{TAB_HINTS[item.key]}</span>
+            </span>
+            {counts && <span className="sheet-count">{counts[item.key]}</span>}
+          </button>
+        ))}
+
+        {leftInArchive && (
+          <p className="sheet-note">
+            💸 В архиве ещё {money(counts.archived_balance, counts.currency)} — возможно,
+            эти карты рано убрали
+          </p>
+        )}
+
+        <button className="btn" onClick={onClose}>
+          Закрыть
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function VoucherCard({ voucher, onClick }: { voucher: Voucher; onClick: () => void }) {
   const expiry = expiryInfo(voucher)
   const value = primaryAmount(voucher)
@@ -151,7 +232,9 @@ function VoucherCard({ voucher, onClick }: { voucher: Voucher; onClick: () => vo
           ) : (
             <span className="badge">без срока</span>
           )}
-          {voucher.status === 'used' && voucher.used_at && (
+          {/* Keyed off used_at, not the status: a spent voucher that was later
+              archived must not look like it was never used. */}
+          {voucher.used_at && (
             <span className="badge ok">потрачен {formatDate(voucher.used_at)}</span>
           )}
           {voucher.comments_count > 0 && (

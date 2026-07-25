@@ -1,5 +1,13 @@
 import { tg } from './telegram'
-import type { Comment, User, Voucher, VoucherDraft, VoucherEvent, VoucherStatus } from './types'
+import type {
+  Comment,
+  Counts,
+  User,
+  Voucher,
+  VoucherDraft,
+  VoucherEvent,
+  VoucherStatus,
+} from './types'
 
 export class ApiError extends Error {}
 
@@ -46,6 +54,7 @@ export const api = {
   },
   getVoucher: (id: number) => request<Voucher>(`/api/vouchers/${id}`),
   merchants: () => request<string[]>('/api/vouchers/merchants'),
+  counts: () => request<Counts>('/api/vouchers/counts'),
 
   createVoucher: (draft: VoucherDraft) =>
     request<Voucher>('/api/vouchers', { method: 'POST', body: JSON.stringify(draft) }),

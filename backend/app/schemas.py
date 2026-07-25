@@ -125,6 +125,18 @@ class EventOut(BaseModel):
     created_at: datetime
 
 
+class CountsOut(BaseModel):
+    """Per-tab counters for the menu, plus money still sitting in the archive."""
+
+    active: int = 0
+    draft: int = 0
+    used: int = 0
+    archived: int = 0
+    # Sum of remaining balances of archived gift cards — money not yet spent.
+    archived_balance: Decimal = Decimal("0")
+    currency: str = "EUR"
+
+
 class UploadOut(BaseModel):
     image_id: str
 

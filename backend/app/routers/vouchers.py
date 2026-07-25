@@ -2,7 +2,7 @@ from decimal import Decimal
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import storage
@@ -23,6 +23,7 @@ from app.schemas import (
     BalanceUpdate,
     CommentCreate,
     CommentOut,
+    CountsOut,
     EventOut,
     VoucherCreate,
     VoucherOut,
@@ -98,6 +99,20 @@ async def list_vouchers(
 
     vouchers = list((await session.execute(stmt)).unique().scalars().all())
     return await _serialize(session, vouchers)
+
+
+@router.get("/counts", response_model=CountsOut)
+async def counts(user: CurrentUser, session: Session) -> CountsOut:
+    rows = await session.execute(
+        select(Voucher.status, func.count(), func.coalesce(func.sum(Voucher.balance_amount), 0))
+        .group_by(Voucher.status)
+    )
+    result = CountsOut()
+    for status_value, count, balance in rows.all():
+        setattr(result, VoucherStatus(status_value).value, count)
+        if status_value == VoucherStatus.archived:
+            result.archived_balance = Decimal(balance or 0)
+    return result
 
 
 @router.get("/merchants", response_model=list[str])

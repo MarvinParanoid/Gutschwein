@@ -1,4 +1,5 @@
 import io
+from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
@@ -30,6 +31,22 @@ def test_blank_optional_env_values_are_unset() -> None:
 
     assert Settings(family_chat_id="").family_chat_id is None
     assert Settings(family_chat_id="-1001234567890").family_chat_id == -1001234567890
+
+
+def test_counts_feed_the_menu(client: TestClient) -> None:
+    before = client.get("/api/vouchers/counts").json()
+
+    card = make_voucher(
+        client, value_kind="amount", value_amount="40", valid_until=None, merchant="Kaufland"
+    )
+    client.post(f"/api/vouchers/{card['id']}/balance", json={"remaining": "15"})
+    client.post(f"/api/vouchers/{card['id']}/archive")
+
+    after = client.get("/api/vouchers/counts").json()
+    assert after["archived"] == before["archived"] + 1
+    # Money left on archived cards is what makes the archive worth opening.
+    expected = Decimal(before["archived_balance"]) + Decimal("15")
+    assert Decimal(after["archived_balance"]) == expected
 
 
 def test_unknown_paths_are_404_not_the_spa(client: TestClient) -> None:

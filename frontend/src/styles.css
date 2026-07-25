@@ -65,37 +65,104 @@ button {
   flex: 1;
 }
 
-.tabs {
-  display: flex;
-  gap: 4px;
+.burger {
+  border: 0;
   background: var(--bg);
-  border-radius: var(--radius);
-  padding: 4px;
-  margin-bottom: var(--gap);
-  overflow-x: auto;
+  color: var(--text);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
-.tab {
-  flex: 1;
+/* ---------- bottom sheet ---------- */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+}
+
+.sheet {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  background: var(--bg);
+  border-radius: 18px 18px 0 0;
+  padding: 10px 14px calc(14px + env(safe-area-inset-bottom));
+  animation: sheet-up 0.18s ease-out;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(12%);
+  }
+}
+
+.sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--secondary-bg);
+  margin: 0 auto 12px;
+}
+
+.sheet-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
   border: 0;
   background: transparent;
-  color: var(--hint);
-  padding: 8px 10px;
-  border-radius: 10px;
-  white-space: nowrap;
-  font-size: 14px;
+  color: var(--text);
+  text-align: left;
+  padding: 12px 10px;
+  border-radius: 12px;
+  font-size: 16px;
 }
 
-.tab.active {
-  background: var(--accent);
-  color: var(--accent-text);
+.sheet-item.active {
+  background: var(--secondary-bg);
   font-weight: 600;
 }
 
-.tab .count {
-  opacity: 0.7;
+.sheet-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sheet-hint {
   font-size: 12px;
-  margin-left: 4px;
+  color: var(--hint);
+  font-weight: 400;
+}
+
+.sheet-count {
+  color: var(--hint);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.sheet-note {
+  font-size: 13px;
+  color: var(--hint);
+  background: var(--secondary-bg);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+
+.sheet .btn {
+  width: 100%;
+  margin-top: 6px;
 }
 
 .search {
@@ -473,6 +540,14 @@ button {
   color: var(--link);
   padding: 4px;
   font-size: 14px;
+}
+
+.btn.link.disclosure {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 0;
+  margin-bottom: 4px;
 }
 
 /* ---------- comments & history ---------- */
