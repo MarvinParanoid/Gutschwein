@@ -5,6 +5,9 @@ REMOTE ?= /root/sparschwein
 URL ?= https://spar-schwein.duckdns.org
 # data/ holds the database and uploads. It is excluded, and rsync never deletes
 # excluded paths, so --delete cannot eat it.
+# --no-owner/--no-group: rsync run as root would otherwise stamp the remote files
+# with the local uid (1000), which git then rejects as "dubious ownership".
+RSYNC_FLAGS := -a --no-owner --no-group
 RSYNC_EXCLUDES := --exclude '.git' --exclude 'frontend/node_modules' \
 	--exclude 'backend/.venv' --exclude 'backend/static' --exclude 'data' \
 	--exclude '__pycache__' --exclude '.ruff_cache' --exclude '.pytest_cache' \
@@ -41,7 +44,7 @@ deploy:
 # $(CURDIR)/ pins the sync root to this directory: running rsync with a relative
 # './' from a subdirectory once mirrored frontend/ over the whole project.
 deploy-vps:
-	rsync -a --delete $(RSYNC_EXCLUDES) $(CURDIR)/ $(VPS):$(REMOTE)/
+	rsync $(RSYNC_FLAGS) --delete $(RSYNC_EXCLUDES) $(CURDIR)/ $(VPS):$(REMOTE)/
 	ssh $(VPS) 'cd $(REMOTE) && docker compose up -d --build'
 	@echo "ждём готовности $(URL) ..."
 	@for i in $$(seq 1 30); do \

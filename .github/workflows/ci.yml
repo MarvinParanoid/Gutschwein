@@ -101,3 +101,31 @@ jobs:
       - name: Container logs
         if: always()
         run: docker logs app
+
+  deploy:
+    name: deploy to VPS
+    needs: [backend, frontend, docker]
+    # Only main, and never from a fork: secrets must not be reachable from a PR.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          test -n "$DEPLOY_HOST" || { echo "секрет DEPLOY_HOST не задан"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          # Host key is pinned in the repo (hostname hashed), so no blind TOFU here.
+          cp .github/ssh_known_hosts ~/.ssh/known_hosts
+          # The key is locked to /root/deploy.sh by a forced command, so whatever
+          # we pass is ignored — the server decides what "deploy" means.
+          ssh -i ~/.ssh/deploy -o BatchMode=yes -o ConnectTimeout=15 \
+            "root@$DEPLOY_HOST" deploy
