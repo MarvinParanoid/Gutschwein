@@ -26,6 +26,7 @@ from app.schemas import (
     CountsOut,
     EventOut,
     MerchantStat,
+    StatsOut,
     VoucherCreate,
     VoucherOut,
     VoucherUpdate,
@@ -36,6 +37,7 @@ from app.services import (
     record_event,
     voucher_label,
 )
+from app.stats import collect_stats
 
 router = APIRouter(prefix="/api/vouchers", tags=["vouchers"])
 
@@ -100,6 +102,11 @@ async def list_vouchers(
 
     vouchers = list((await session.execute(stmt)).unique().scalars().all())
     return await _serialize(session, vouchers)
+
+
+@router.get("/stats", response_model=StatsOut)
+async def stats(user: CurrentUser, session: Session) -> StatsOut:
+    return await collect_stats(session)
 
 
 @router.get("/counts", response_model=CountsOut)

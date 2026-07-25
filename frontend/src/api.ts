@@ -3,6 +3,7 @@ import type {
   Comment,
   Counts,
   MerchantStat,
+  Stats,
   User,
   Voucher,
   VoucherDraft,
@@ -57,6 +58,7 @@ export const api = {
   getVoucher: (id: number) => request<Voucher>(`/api/vouchers/${id}`),
   merchants: () => request<string[]>('/api/vouchers/merchants'),
   counts: () => request<Counts>('/api/vouchers/counts'),
+  stats: () => request<Stats>('/api/vouchers/stats'),
   merchantStats: (status: VoucherStatus | 'all') =>
     request<MerchantStat[]>(`/api/vouchers/merchants/stats?status=${status}`),
 

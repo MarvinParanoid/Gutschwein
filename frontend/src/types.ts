@@ -50,6 +50,22 @@ export interface VoucherDraft {
   status?: VoucherStatus
 }
 
+export interface Stats {
+  currency: string
+  on_cards: string
+  cards_active: number
+  expiring_soon: string
+  expiring_soon_days: number
+  expired_balance: string
+  archived_balance: string
+  spent_total: string
+  spent_this_month: string
+  spent_prev_month: string
+  by_merchant: { merchant: string; spent: string; on_cards: string }[]
+  by_member: { name: string; spent: string; payments: number }[]
+  monthly: { month: string; spent: string }[]
+}
+
 export interface MerchantStat {
   merchant: string
   count: number

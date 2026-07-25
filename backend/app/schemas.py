@@ -125,6 +125,46 @@ class EventOut(BaseModel):
     created_at: datetime
 
 
+class MerchantSpend(BaseModel):
+    merchant: str
+    spent: Decimal = Decimal("0")
+    on_cards: Decimal = Decimal("0")
+
+
+class MemberSpend(BaseModel):
+    name: str
+    spent: Decimal = Decimal("0")
+    payments: int = 0
+
+
+class MonthSpend(BaseModel):
+    month: str  # YYYY-MM
+    spent: Decimal = Decimal("0")
+
+
+class StatsOut(BaseModel):
+    currency: str = "EUR"
+
+    # What is available right now.
+    on_cards: Decimal = Decimal("0")
+    cards_active: int = 0
+
+    # Money at risk of quietly evaporating.
+    expiring_soon: Decimal = Decimal("0")
+    expiring_soon_days: int = 30
+    expired_balance: Decimal = Decimal("0")
+    archived_balance: Decimal = Decimal("0")
+
+    # What has been spent.
+    spent_total: Decimal = Decimal("0")
+    spent_this_month: Decimal = Decimal("0")
+    spent_prev_month: Decimal = Decimal("0")
+
+    by_merchant: list[MerchantSpend] = []
+    by_member: list[MemberSpend] = []
+    monthly: list[MonthSpend] = []
+
+
 class MerchantStat(BaseModel):
     """One shop chip on the main screen."""
 

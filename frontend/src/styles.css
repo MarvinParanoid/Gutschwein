@@ -599,6 +599,159 @@ button {
   margin-bottom: 4px;
 }
 
+/* ---------- statistics ----------
+   Single hue on purpose: the palette validator puts the accent and the success
+   green only ΔE 3.2 apart under deuteranopia, so hue never carries identity —
+   length carries magnitude and the label carries the name. */
+
+/* Primary ink, not the accent: --tg-theme-button-color is whatever the user's
+   theme says, and a pale one would make a 40px number unreadable. */
+.stat-hero {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--text);
+  /* Proportional figures on purpose: tabular digits read loose at display size.
+     They belong in the bar/axis columns below, where numbers align vertically. */
+}
+
+.stat-hero-caption {
+  color: var(--hint);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.kpi {
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.kpi-value {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.kpi-label {
+  color: var(--hint);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.kpi-delta {
+  color: var(--hint);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bar-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 15px;
+  margin-bottom: 5px;
+}
+
+.bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-value {
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* Recessive track, thin mark, 4px rounded data-end. */
+.bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--secondary-bg);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+}
+
+.bar-note {
+  color: var(--hint);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.columns {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 150px;
+}
+
+.column {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.column-value {
+  font-size: 11px;
+  color: var(--hint);
+  font-variant-numeric: tabular-nums;
+  min-height: 14px;
+}
+
+.column-plot {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 4px;
+}
+
+.column-fill {
+  width: 100%;
+  background: var(--accent);
+  border-radius: 4px 4px 0 0;
+}
+
+/* Highlight the slot, not the bar: a zero month has no bar to outline. */
+.column.picked .column-plot {
+  background: var(--secondary-bg);
+}
+
+.column.picked .column-label {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.column-label {
+  font-size: 11px;
+  color: var(--hint);
+}
+
 /* ---------- comments & history ---------- */
 
 .comment {

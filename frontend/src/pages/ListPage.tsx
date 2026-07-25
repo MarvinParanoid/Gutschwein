@@ -24,6 +24,7 @@ interface Props {
   onMerchantChange: (merchant: string | null) => void
   onOpen: (id: number) => void
   onCreate: () => void
+  onStats: () => void
 }
 
 const EMPTY_STATES: Record<VoucherStatus, { emoji: string; text: string }> = {
@@ -49,6 +50,7 @@ export default function ListPage({
   onMerchantChange,
   onOpen,
   onCreate,
+  onStats,
 }: Props) {
   const [vouchers, setVouchers] = useState<Voucher[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -128,6 +130,11 @@ export default function ListPage({
           current={tab}
           counts={counts}
           onSelect={selectTab}
+          onStats={() => {
+            haptic()
+            setMenuOpen(false)
+            onStats()
+          }}
           onClose={() => setMenuOpen(false)}
         />
       )}
@@ -214,11 +221,13 @@ function TabMenu({
   current,
   counts,
   onSelect,
+  onStats,
   onClose,
 }: {
   current: VoucherStatus
   counts: Counts | null
   onSelect: (tab: VoucherStatus) => void
+  onStats: () => void
   onClose: () => void
 }) {
   useEffect(() => {
@@ -255,6 +264,13 @@ function TabMenu({
             эти карты рано убрали
           </p>
         )}
+
+        <button className="sheet-item" onClick={onStats}>
+          <span className="sheet-label">
+            📊 Статистика
+            <span className="sheet-hint">сколько лежит, куда уходит, кто тратит</span>
+          </span>
+        </button>
 
         <button className="btn" onClick={onClose}>
           Закрыть

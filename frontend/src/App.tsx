@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { api } from './api'
 import ListPage from './pages/ListPage'
+import StatsPage from './pages/StatsPage'
 import VoucherForm from './pages/VoucherForm'
 import VoucherPage from './pages/VoucherPage'
 import { inTelegram, initTelegram } from './telegram'
@@ -12,6 +13,7 @@ type View =
   | { name: 'list' }
   | { name: 'voucher'; id: number }
   | { name: 'form'; id?: number }
+  | { name: 'stats' }
 
 export default function App() {
   const [view, setView] = useState<View>({ name: 'list' })
@@ -84,8 +86,11 @@ export default function App() {
           onMerchantChange={setMerchant}
           onOpen={(id) => navigate({ name: 'voucher', id })}
           onCreate={() => navigate({ name: 'form' })}
+          onStats={() => navigate({ name: 'stats' })}
         />
       )}
+
+      {view.name === 'stats' && <StatsPage onBack={goBack} />}
 
       {view.name === 'voucher' && (
         <VoucherPage

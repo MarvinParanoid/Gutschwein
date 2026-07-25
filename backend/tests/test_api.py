@@ -60,6 +60,45 @@ def test_merchant_filter_narrows_the_list(client: TestClient) -> None:
     assert listed and all(v["merchant"] == "Penny-test" for v in listed)
 
 
+def test_stats_reflect_spending(client: TestClient, other_client: TestClient) -> None:
+    before = client.get("/api/vouchers/stats").json()
+
+    card = make_voucher(
+        client, merchant="Stats-Shop", value_kind="amount", value_amount="100", valid_until=None
+    )
+    client.post(f"/api/vouchers/{card['id']}/balance", json={"spent": "30"})
+    other_client.post(f"/api/vouchers/{card['id']}/balance", json={"spent": "20"})
+
+    after = client.get("/api/vouchers/stats").json()
+    assert Decimal(after["spent_total"]) == Decimal(before["spent_total"]) + Decimal("50")
+    assert Decimal(after["on_cards"]) == Decimal(before["on_cards"]) + Decimal("50")
+
+    shop = next(m for m in after["by_merchant"] if m["merchant"] == "Stats-Shop")
+    assert Decimal(shop["spent"]) == Decimal("50")
+    assert Decimal(shop["on_cards"]) == Decimal("50")
+
+    # Both family members show up with their own share.
+    members = {m["name"]: m for m in after["by_member"]}
+    assert Decimal(members["Dev 1000"]["spent"]) >= Decimal("30")
+    assert Decimal(members["Dev 2000"]["spent"]) >= Decimal("20")
+
+    # Six continuous months, current one last, this month carrying the spend.
+    assert len(after["monthly"]) == 6
+    assert Decimal(after["monthly"][-1]["spent"]) >= Decimal("50")
+    assert Decimal(after["spent_this_month"]) >= Decimal("50")
+
+
+def test_stats_flag_money_at_risk(client: TestClient) -> None:
+    before = client.get("/api/vouchers/stats").json()
+    make_voucher(
+        client, merchant="Expired-Shop", value_kind="amount", value_amount="12",
+        valid_until="2020-05-05",
+    )
+    after = client.get("/api/vouchers/stats").json()
+    # An expired card still holding money is exactly what the screen must surface.
+    assert Decimal(after["expired_balance"]) == Decimal(before["expired_balance"]) + Decimal("12")
+
+
 def test_counts_feed_the_menu(client: TestClient) -> None:
     before = client.get("/api/vouchers/counts").json()
 
