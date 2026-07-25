@@ -22,9 +22,12 @@ from sqlalchemy import select
 
 from app import storage
 from app.auth import TelegramUser, upsert_user
+from app.backup import backup_loop, send_backup
 from app.config import settings
 from app.db import SessionLocal
 from app.models import EventKind, Voucher, VoucherStatus, utcnow
+from app.notify import notify
+from app.quickadd import QuickAdd, apply_quick_add, find_pending_draft, parse_quick_add
 from app.services import record_event, voucher_label
 
 log = logging.getLogger(__name__)
@@ -57,6 +60,22 @@ def build_dispatcher() -> Dispatcher:
             lines.append(f"ID этого чата: <code>{message.chat.id}</code> → FAMILY_CHAT_ID")
         await message.answer("\n".join(lines))
 
+    @dp.message(Command("backup"))
+    async def cmd_backup(message: Message, bot: Bot) -> None:
+        """On-demand backup, so nobody has to wait until the nightly one."""
+        if not allowed(message):
+            return
+        if settings.family_chat_id is None:
+            await message.answer("FAMILY_CHAT_ID не настроен — бэкап отправлять некуда.")
+            return
+        await message.answer("Собираю бэкап…")
+        try:
+            summary = await send_backup(bot, f"по запросу от {message.from_user.first_name}")
+            await message.answer(f"Готово: {summary}")
+        except Exception as exc:  # noqa: BLE001 - report the reason to the user
+            log.warning("manual backup failed", exc_info=True)
+            await message.answer(f"Не получилось: {exc}")
+
     @dp.message(Command("start"))
     async def cmd_start(message: Message) -> None:
         if not allowed(message):
@@ -67,8 +86,11 @@ def build_dispatcher() -> Dispatcher:
             return
         keyboard = open_app_keyboard()
         hint = (
-            "Пришлите скрин или фото купона — я создам черновик, "
-            "останется заполнить поля в приложении."
+            "Купили карту — пришлите скрин <b>с подписью</b> «Rewe 50», "
+            "и она сразу появится в списке.\n\n"
+            "Без подписи получится черновик: тогда просто напишите следом "
+            "«Rewe 50» — или отдельно «Rewe», а потом «50».\n\n"
+            "Ещё умею /backup и /id."
         )
         if keyboard is None:
             await message.answer(
@@ -101,7 +123,6 @@ def build_dispatcher() -> Dispatcher:
             )
             voucher = Voucher(
                 status=VoucherStatus.draft,
-                title=(message.caption or "").strip()[:256],
                 image_path=image_path,
                 created_by_id=user.id,
             )
@@ -110,21 +131,94 @@ def build_dispatcher() -> Dispatcher:
             record_event(session, voucher, user, EventKind.created, {"source": "bot"})
             await session.commit()
 
-        await message.answer(
-            "📸 Черновик создан. Заполните поля в приложении — он ждёт во вкладке «Черновики».",
-            reply_markup=open_app_keyboard("Заполнить купон"),
-        )
+            # A caption like "Rewe 50" is all a gift card needs — no app required.
+            parsed = parse_quick_add(message.caption or "")
+            complete = await apply_quick_add(session, user, voucher, parsed)
+            reply = _describe(voucher, complete, parsed)
+            label = voucher_label(voucher)
+            actor = user.display_name
 
-    @dp.message()
-    async def fallback(message: Message) -> None:
+        await message.answer(reply, reply_markup=open_app_keyboard(
+            "Открыть карту" if complete else "Заполнить в приложении"
+        ))
+        if complete:
+            await _notify_family(message, f"🐷 {actor} добавил карту: <b>{label}</b>")
+
+    @dp.message(F.text)
+    async def on_text(message: Message) -> None:
+        """Completes the draft the last photo created, or adds a card without a photo."""
         if not allowed(message):
             return
-        await message.answer(
-            "Пришлите фото купона или откройте приложение.",
-            reply_markup=open_app_keyboard(),
-        )
+        parsed = parse_quick_add(message.text or "")
+        if parsed.is_empty:
+            await message.answer(
+                "Не понял. Пришлите скрин карты с подписью «Rewe 50» — "
+                "или напишите так же текстом.",
+                reply_markup=open_app_keyboard(),
+            )
+            return
+
+        async with SessionLocal() as session:
+            user = await upsert_user(session, _telegram_user(message))
+            voucher = await find_pending_draft(session, user)
+            if voucher is None:
+                if parsed.merchant is None or parsed.amount is None:
+                    await message.answer(
+                        "Черновиков нет. Пришлите скрин карты — можно сразу с подписью "
+                        "«Rewe 50»."
+                    )
+                    return
+                # No photo, but a complete card is still better than nothing.
+                voucher = Voucher(created_by_id=user.id, status=VoucherStatus.draft)
+                session.add(voucher)
+                await session.flush()
+                record_event(session, voucher, user, EventKind.created, {"source": "bot"})
+                await session.commit()
+
+            complete = await apply_quick_add(session, user, voucher, parsed)
+            reply = _describe(voucher, complete, parsed)
+            label = voucher_label(voucher)
+            actor = user.display_name
+
+        await message.answer(reply, reply_markup=open_app_keyboard(
+            "Открыть карту" if complete else "Заполнить в приложении"
+        ))
+        if complete:
+            await _notify_family(message, f"🐷 {actor} добавил карту: <b>{label}</b>")
 
     return dp
+
+
+def _telegram_user(message: Message) -> TelegramUser:
+    return TelegramUser(
+        {
+            "id": message.from_user.id,
+            "first_name": message.from_user.first_name or "",
+            "last_name": message.from_user.last_name or "",
+            "username": message.from_user.username or "",
+        }
+    )
+
+
+def _describe(voucher: Voucher, complete: bool, parsed: QuickAdd) -> str:
+    """What the bot understood — so a misparse is obvious immediately."""
+    if complete:
+        return (
+            f"✅ Добавил: <b>{voucher.merchant}</b> · "
+            f"{voucher.balance_amount.normalize()} {voucher.currency}"
+        )
+    if voucher.merchant and voucher.value_amount is None:
+        return f"Записал магазин: <b>{voucher.merchant}</b>. Теперь сумму — просто числом."
+    if parsed.amount is not None and not voucher.merchant:
+        return f"Записал сумму {parsed.amount.normalize()}. Теперь название магазина."
+    return "📸 Черновик создан. Напишите магазин и сумму — например «Rewe 50»."
+
+
+async def _notify_family(message: Message, text: str) -> None:
+    """Tell the others — unless this very chat is the family chat."""
+    if settings.family_chat_id is None or message.chat.id == settings.family_chat_id:
+        return
+    await notify(text)
 
 
 async def expiry_reminder_loop(bot: Bot) -> None:
@@ -175,8 +269,12 @@ def create_bot() -> Bot:
 
 async def run_bot(bot: Bot) -> None:
     dp = build_dispatcher()
-    reminders = asyncio.create_task(expiry_reminder_loop(bot))
+    background = [
+        asyncio.create_task(expiry_reminder_loop(bot)),
+        asyncio.create_task(backup_loop(bot)),
+    ]
     try:
         await dp.start_polling(bot, handle_signals=False)
     finally:
-        reminders.cancel()
+        for task in background:
+            task.cancel()

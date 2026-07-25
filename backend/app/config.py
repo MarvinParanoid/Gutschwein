@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     # Data
     database_url: str = "sqlite+aiosqlite:///./data/sparschwein.db"
     data_dir: Path = Path("./data")
+    # Hour (UTC) of the nightly backup into FAMILY_CHAT_ID.
+    backup_hour_utc: int = 4
 
     # Security
     init_data_max_age: int = 24 * 3600
