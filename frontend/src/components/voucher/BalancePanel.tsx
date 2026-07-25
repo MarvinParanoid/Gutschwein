@@ -1,0 +1,132 @@
+import { useState } from 'react'
+
+import { api } from '../../api'
+import { balanceRatio, money } from '../../format'
+import { haptic } from '../../telegram'
+import type { Voucher } from '../../types'
+
+/** Remaining balance plus the two-tap way to change it after paying. */
+export default function BalancePanel({
+  voucher,
+  onUpdated,
+}: {
+  voucher: Voucher
+  onUpdated: (voucher: Voucher) => void
+}) {
+  const [open, setOpen] = useState(false)
+  // The receipt prints what is left, and that is what gets typed in almost every
+  // time — so "осталось" is the default rather than the amount just spent.
+  const [mode, setMode] = useState<'spent' | 'remaining'>('remaining')
+  const [amount, setAmount] = useState('')
+  const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const ratio = balanceRatio(voucher)
+
+  async function submit() {
+    // Phone keyboards give a comma in most European locales.
+    const value = amount.replace(',', '.').trim()
+    if (!value) return
+    setSaving(true)
+    setError(null)
+    try {
+      const updated = await api.updateBalance(voucher.id, {
+        [mode]: value,
+        note: note.trim(),
+      })
+      haptic('success')
+      onUpdated(updated)
+      setOpen(false)
+      setAmount('')
+      setNote('')
+    } catch (e) {
+      setError((e as Error).message)
+      haptic('error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="panel balance">
+      <div className="balance-head">
+        <div>
+          <div className="balance-value">
+            {money(voucher.balance_amount!, voucher.currency)}
+          </div>
+          <div className="muted">
+            {voucher.value_amount
+              ? `из ${money(voucher.value_amount, voucher.currency)}`
+              : 'остаток'}
+          </div>
+        </div>
+        {!open && (
+          <button className="btn primary" onClick={() => setOpen(true)}>
+            Обновить остаток
+          </button>
+        )}
+      </div>
+
+      {ratio !== null && (
+        <div className="bar">
+          <div className="fill" style={{ width: `${Math.round(ratio * 100)}%` }} />
+        </div>
+      )}
+
+      {open && (
+        <div className="balance-form">
+          <div className="segmented">
+            <button
+              className={mode === 'remaining' ? 'active' : ''}
+              onClick={() => setMode('remaining')}
+            >
+              Осталось
+            </button>
+            <button
+              className={mode === 'spent' ? 'active' : ''}
+              onClick={() => setMode('spent')}
+            >
+              Потратил
+            </button>
+          </div>
+
+          {error && <div className="error">{error}</div>}
+
+          <div className="field">
+            <input
+              type="text"
+              inputMode="decimal"
+              autoFocus
+              placeholder={mode === 'spent' ? 'Сумма покупки' : 'Остаток с чека'}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submit()}
+            />
+          </div>
+          <div className="field">
+            <input
+              type="text"
+              placeholder="Заметка: что купили (необязательно)"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+
+          <div className="actions">
+            <button
+              className="btn primary"
+              disabled={saving || !amount.trim()}
+              onClick={submit}
+            >
+              {saving ? 'Сохраняю…' : 'Сохранить'}
+            </button>
+            <button className="btn" onClick={() => setOpen(false)}>
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
