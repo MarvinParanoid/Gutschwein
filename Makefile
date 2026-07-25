@@ -45,7 +45,9 @@ deploy:
 # './' from a subdirectory once mirrored frontend/ over the whole project.
 deploy-vps:
 	rsync $(RSYNC_FLAGS) --delete $(RSYNC_EXCLUDES) $(CURDIR)/ $(VPS):$(REMOTE)/
-	ssh $(VPS) 'cd $(REMOTE) && docker compose up -d --build'
+	# Every build leaves the previous image dangling, and the VPS disk is shared
+	# with other services — so prune right after a successful build.
+	ssh $(VPS) 'cd $(REMOTE) && docker compose up -d --build && docker image prune -f >/dev/null && docker builder prune -f >/dev/null'
 	@echo "ждём готовности $(URL) ..."
 	@for i in $$(seq 1 30); do \
 		curl -fsS $(URL)/healthz && echo " ✓ поднялся" && exit 0; \

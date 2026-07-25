@@ -9,3 +9,10 @@ services:
     ports:
       # Bound to loopback: a reverse proxy in front terminates TLS.
       - "127.0.0.1:8000:8000"
+    logging:
+      # Scanners hammer the public URL around the clock; without a cap the log
+      # grows until the disk is full.
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
