@@ -28,7 +28,11 @@ const clamp = (value: number, min: number, max: number) =>
 export default function ZoomableImage({ src, alt, rotated, className }: Props) {
   const [scale, setScale] = useState(1)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const [frame, setFrame] = useState({ width: 0, height: 0 })
+  const [natural, setNatural] = useState({ width: 0, height: 0 })
   const frameRef = useRef<HTMLDivElement | null>(null)
+  // Read inside gesture callbacks, which must not be re-created on every fit change.
+  const fitRef = useRef(1)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const pinch = useRef<{ distance: number; scale: number } | null>(null)
   const lastTap = useRef(0)
@@ -39,13 +43,43 @@ export default function ZoomableImage({ src, alt, rotated, className }: Props) {
     setOffset({ x: 0, y: 0 })
   }, [src, rotated])
 
+  const measureFrame = useCallback(() => {
+    const frame = frameRef.current
+    if (frame) setFrame({ width: frame.clientWidth, height: frame.clientHeight })
+  }, [])
+
+  useEffect(() => {
+    measureFrame()
+    window.addEventListener('resize', measureFrame)
+    return () => window.removeEventListener('resize', measureFrame)
+  }, [measureFrame])
+
+  // The element is sized to the picture itself instead of being letterboxed by
+  // object-fit: then the layout box and the visible image are the same thing, and
+  // the rotation maths below has nothing to guess.
+  const contain =
+    natural.width && frame.width
+      ? Math.min(frame.width / natural.width, frame.height / natural.height)
+      : 0
+  const shown = { width: natural.width * contain, height: natural.height * contain }
+  // Rotated, the picture takes its height across and its width down.
+  const fit =
+    rotated && shown.width
+      ? Math.min(frame.width / shown.height, frame.height / shown.width)
+      : 1
+  fitRef.current = fit
+
   /** Keep the image from being dragged off-screen. */
   const clampOffset = useCallback(
     (next: { x: number; y: number }, currentScale: number) => {
       const frame = frameRef.current
       if (!frame) return next
-      const limitX = (frame.clientWidth * (currentScale - 1)) / 2
-      const limitY = (frame.clientHeight * (currentScale - 1)) / 2
+      // The visible size is the user's zoom times the rotation fit, so the pan
+      // limits have to account for both — otherwise a rotated image can be
+      // dragged past its own edge.
+      const effective = currentScale * fitRef.current
+      const limitX = (frame.clientWidth * (effective - 1)) / 2
+      const limitY = (frame.clientHeight * (effective - 1)) / 2
       return {
         x: clamp(next.x, -limitX, limitX),
         y: clamp(next.y, -limitY, limitY),
@@ -143,9 +177,18 @@ export default function ZoomableImage({ src, alt, rotated, className }: Props) {
           src={src}
           alt={alt}
           draggable={false}
+          onLoad={(e) =>
+            setNatural({
+              width: e.currentTarget.naturalWidth,
+              height: e.currentTarget.naturalHeight,
+            })
+          }
           style={{
-            // Rotation goes last so panning stays aligned with the screen axes.
-            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale}) ${
+            width: shown.width || undefined,
+            height: shown.height || undefined,
+            // Read right to left: rotate, then scale to fit and to the user's
+            // zoom, then pan — so dragging stays aligned with the screen axes.
+            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale * fit}) ${
               rotated ? 'rotate(90deg)' : ''
             }`,
           }}

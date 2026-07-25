@@ -421,20 +421,19 @@ button {
 
 /* Scale up, not just down: a screenshot of a barcode is often smaller than the
    screen, and a scanner needs it as large as possible. */
+/* Size comes from ZoomableImage, which fits the picture to the frame in JS —
+   CSS percentages resolve unpredictably inside the flex/grid chain here. */
 .scan-image {
-  width: 100%;
-  height: auto;
-  max-height: 72vh;
-  object-fit: contain;
+  display: block;
+  /* A hairline edge: on a white overlay a screenshot with white margins looks
+     like the app mis-centred it. This shows where the picture actually ends. */
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
-/* Rotation is a transform, so the layout box keeps the pre-rotation size and the
-   width below becomes the visible height. The transform itself is applied inline
-   by ZoomableImage, which composes it with pan and zoom. */
-.scan-image.rotated {
-  width: 72vh;
-  max-height: none;
-}
+/* No size override when rotated: the layout box stays put and ZoomableImage
+   scales the image to fit the frame. Resizing the box instead made it wider than
+   the frame, and an overflowing grid item is pinned left — the image looked
+   shifted to the right. */
 
 /* touch-action: none is what lets pinch and drag reach us instead of being taken
    by the browser (or read by Telegram as swipe-to-close). */
