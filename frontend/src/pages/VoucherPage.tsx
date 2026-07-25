@@ -133,8 +133,11 @@ export default function VoucherPage({ voucherId, me, onBack, onDeleted, onEdit }
               dash is just noise. */}
           {voucher.valid_until && (
             <div className="row">
-              <span className="label">Срок</span>
+              <span className="label">
+                Срок{voucher.expiry_estimated && <span className="hint-note"> по правилу магазина</span>}
+              </span>
               <span className="val">
+                {voucher.expiry_estimated && '≈ '}
                 {formatDate(voucher.valid_until)}
                 {expiry && expiry.tone !== 'neutral' && (
                   <>

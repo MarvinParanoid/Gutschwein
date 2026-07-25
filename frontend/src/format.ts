@@ -116,11 +116,14 @@ export interface ExpiryInfo {
 
 export function expiryInfo(voucher: Voucher): ExpiryInfo | null {
   if (voucher.valid_until === null) return null
+  // A derived date is a guess; "≈" keeps it from reading as printed fact.
+  const prefix = voucher.expiry_estimated ? '≈ ' : ''
   const days = voucher.days_left ?? 0
-  if (days < 0) return { text: 'истёк', tone: 'expired' }
-  if (days === 0) return { text: 'сегодня последний день', tone: 'soon' }
-  if (days <= 7) return { text: `${days} ${plural(days, 'день', 'дня', 'дней')}`, tone: 'soon' }
-  return { text: `до ${formatDate(voucher.valid_until)}`, tone: 'neutral' }
+  if (days < 0) return { text: `${prefix}истёк`, tone: 'expired' }
+  if (days === 0) return { text: `${prefix}сегодня последний день`, tone: 'soon' }
+  if (days <= 7)
+    return { text: `${prefix}${days} ${plural(days, 'день', 'дня', 'дней')}`, tone: 'soon' }
+  return { text: `${prefix}до ${formatDate(voucher.valid_until)}`, tone: 'neutral' }
 }
 
 export function plural(n: number, one: string, few: string, many: string): string {

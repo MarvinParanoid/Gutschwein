@@ -8,7 +8,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import barcode, storage
-from app.models import Comment, Event, EventKind, User, ValueKind, Voucher
+from app.expiry import default_expiry
+from app.models import Comment, Event, EventKind, User, ValueKind, Voucher, utcnow
 
 CENT = Decimal("0.01")
 
@@ -46,6 +47,23 @@ async def comment_counts(session: AsyncSession, voucher_ids: list[int]) -> dict[
         .group_by(Comment.voucher_id)
     )
     return dict(rows.all())
+
+
+def apply_expiry_rule(voucher: Voucher) -> bool:
+    """Fill in the shop's default expiry when the card does not state one.
+
+    Counted from the activation date — `valid_from` if someone knows it, otherwise
+    the day the card was added. A date the user typed is never touched.
+    """
+    if voucher.valid_until is not None or not voucher.merchant:
+        return False
+    activated = voucher.valid_from or utcnow().date()
+    guess = default_expiry(voucher.merchant, activated)
+    if guess is None:
+        return False
+    voucher.valid_until = guess
+    voucher.expiry_estimated = True
+    return True
 
 
 async def attach_barcode(voucher: Voucher) -> None:

@@ -27,6 +27,8 @@ export interface Voucher {
   image_id: string | null
   /** Symbology decoded from the picture; null when there is no readable code. */
   barcode_format: string | null
+  /** valid_until came from the shop rule, not from the card. */
+  expiry_estimated: boolean
   is_expired: boolean
   days_left: number | null
   created_by: User

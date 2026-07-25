@@ -71,6 +71,8 @@ class VoucherOut(VoucherFields):
     balance_amount: Decimal | None
     image_id: str | None
     barcode_format: str | None
+    # True when valid_until came from the shop rule rather than the card itself.
+    expiry_estimated: bool
     is_expired: bool
     days_left: int | None
     created_by: UserOut

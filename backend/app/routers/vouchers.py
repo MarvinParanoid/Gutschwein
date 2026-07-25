@@ -32,6 +32,7 @@ from app.schemas import (
     VoucherUpdate,
 )
 from app.services import (
+    apply_expiry_rule,
     attach_barcode,
     comment_counts,
     format_amount,
@@ -190,6 +191,7 @@ async def create_voucher(
     # A gift card starts out unspent, so its balance equals the face value.
     if voucher.value_kind == ValueKind.amount and voucher.value_amount is not None:
         voucher.balance_amount = voucher.value_amount
+    apply_expiry_rule(voucher)
     await attach_barcode(voucher)
     session.add(voucher)
     await session.flush()

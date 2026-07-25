@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import EventKind, User, ValueKind, Voucher, VoucherStatus
-from app.services import record_event
+from app.services import apply_expiry_rule, record_event
 
 # A bare number, optionally with two decimals: "50", "12.50", "12,50".
 AMOUNT_RE = re.compile(r"(?<![\d.,])(\d{1,6}(?:[.,]\d{1,2})?)(?![\d.,])")
@@ -98,6 +98,10 @@ async def apply_quick_add(
         voucher.value_amount = parsed.amount
         voucher.balance_amount = parsed.amount
         changed.append("value_amount")
+
+    # The shop is only known now, so the expiry rule can finally be applied.
+    if apply_expiry_rule(voucher):
+        changed.append("valid_until")
 
     if changed:
         record_event(session, voucher, user, EventKind.updated, {"fields": changed})

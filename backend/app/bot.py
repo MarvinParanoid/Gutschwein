@@ -272,9 +272,12 @@ async def expiry_reminder_loop(bot: Bot) -> None:
             for voucher in expiring:
                 left = (voucher.valid_until - today).days
                 when = "истекает сегодня" if left == 0 else f"истекает через {left} дн."
+                # Say when the date is ours, not the card's — otherwise a guess
+                # reads as a deadline and people throw away a working card.
+                caveat = " (срок по правилу магазина)" if voucher.expiry_estimated else ""
                 await bot.send_message(
                     settings.family_chat_id,
-                    f"⏳ <b>{voucher_label(voucher)}</b> {when}",
+                    f"⏳ <b>{voucher_label(voucher)}</b> {when}{caveat}",
                     reply_markup=open_app_keyboard("Посмотреть"),
                 )
         except asyncio.CancelledError:

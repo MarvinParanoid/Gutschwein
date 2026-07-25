@@ -5,6 +5,7 @@ from enum import StrEnum
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     Date,
     DateTime,
     ForeignKey,
@@ -93,6 +94,9 @@ class Voucher(Base):
 
     valid_from: Mapped[date | None] = mapped_column(Date, nullable=True)
     valid_until: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    # True when valid_until came from the shop's rule rather than from the card,
+    # so the app can show it as an estimate instead of stating it as fact.
+    expiry_estimated: Mapped[bool] = mapped_column(Boolean, default=False)
     conditions: Mapped[str] = mapped_column(Text, default="")
     notes: Mapped[str] = mapped_column(Text, default="")
 
