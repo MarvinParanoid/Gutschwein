@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
-import { api, imageUrl } from '../api'
+import { api } from '../api'
+import MerchantMark from '../components/MerchantMark'
 import {
   STATUS_TABS,
   cardSubtitle,
@@ -305,14 +306,7 @@ function VoucherCard({ voucher, onClick }: { voucher: Voucher; onClick: () => vo
 
   return (
     <button className="card" onClick={onClick}>
-      {voucher.image_id ? (
-        <img className="thumb" src={imageUrl(voucher.image_id)} alt="" loading="lazy" />
-      ) : (
-        // The shop's initial reads faster than a row of identical icons.
-        <div className="thumb placeholder">
-          {(voucher.merchant || voucher.title || '?').trim().charAt(0).toUpperCase()}
-        </div>
-      )}
+      <MerchantMark merchant={voucher.merchant || voucher.title} />
 
       <div className="body">
         <div className="merchant">{cardTitle(voucher)}</div>
@@ -330,6 +324,7 @@ function VoucherCard({ voucher, onClick }: { voucher: Voucher; onClick: () => vo
           {voucher.used_at && (
             <span className="badge ok">потрачен {formatDate(voucher.used_at)}</span>
           )}
+          {voucher.balance_uncertain && <span className="badge soon">❔ не проверен</span>}
           {voucher.comments_count > 0 && (
             <span className="badge">💬 {voucher.comments_count}</span>
           )}

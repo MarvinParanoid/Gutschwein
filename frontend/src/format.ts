@@ -38,6 +38,8 @@ const FIELD_LABELS: Record<string, string> = {
   valid_until: 'срок',
   conditions: 'условия',
   notes: 'заметку',
+  balance_uncertain: 'пометку «остаток не подтверждён»',
+  balance_amount: 'остаток',
 }
 
 export const statusLabel = (status: VoucherStatus) => STATUS_LABELS[status]

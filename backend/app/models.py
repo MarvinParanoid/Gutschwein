@@ -97,6 +97,9 @@ class Voucher(Base):
     # True when valid_until came from the shop's rule rather than from the card,
     # so the app can show it as an estimate instead of stating it as fact.
     expiry_estimated: Mapped[bool] = mapped_column(Boolean, default=False)
+    # "I do not know whether anything is left on this one." Money under a question
+    # mark is counted apart from money you can rely on.
+    balance_uncertain: Mapped[bool] = mapped_column(Boolean, default=False)
     conditions: Mapped[str] = mapped_column(Text, default="")
     notes: Mapped[str] = mapped_column(Text, default="")
 

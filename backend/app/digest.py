@@ -97,6 +97,12 @@ async def build_digest(session: AsyncSession) -> str | None:
             f"<b>{format_amount(stats.expiring_soon)} {currency}</b> — {shown}{more}",
         ]
 
+    if stats.uncertain_balance > 0:
+        lines.append(
+            f"❔ Под вопросом: {format_amount(stats.uncertain_balance)} {currency} "
+            f"на {stats.cards_uncertain} карт(ах) — проверьте остаток"
+        )
+
     if stats.expired_balance > 0:
         lines.append(
             f"⚠️ Уже истекли, а деньги остались: "

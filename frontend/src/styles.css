@@ -318,7 +318,9 @@ button {
 .card .thumb.placeholder {
   display: grid;
   place-items: center;
-  font-size: 22px;
+  /* Two or three letters, so the four red German retailers stay apart. */
+  font-size: 17px;
+  letter-spacing: 0.02em;
   font-weight: 700;
   color: var(--accent-ink);
   background: color-mix(in srgb, var(--accent) 12%, var(--secondary-bg));
@@ -451,6 +453,17 @@ button {
   height: 100%;
   background: var(--accent);
   transition: width 0.3s ease;
+}
+
+.uncertain-toggle {
+  display: block;
+  margin-top: 10px;
+  padding: 0;
+}
+
+.badge.uncertain {
+  display: inline-block;
+  margin-top: 6px;
 }
 
 .balance-form {

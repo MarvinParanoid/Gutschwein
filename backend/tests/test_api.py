@@ -367,3 +367,37 @@ def test_delete_removes_voucher(client: TestClient) -> None:
     vid = make_voucher(client)["id"]
     assert client.delete(f"/api/vouchers/{vid}").status_code == 204
     assert client.get(f"/api/vouchers/{vid}").status_code == 404
+
+
+def test_uncertain_balance_is_kept_out_of_the_reliable_total(client: TestClient) -> None:
+    """Money you are unsure about must not inflate "on the cards"."""
+    before = client.get("/api/vouchers/stats").json()
+
+    card = make_voucher(
+        client, merchant="Doubt-Shop", value_kind="amount", value_amount="40",
+        valid_until=None,
+    )
+    client.patch(f"/api/vouchers/{card['id']}", json={"balance_uncertain": True})
+
+    after = client.get("/api/vouchers/stats").json()
+    assert Decimal(after["on_cards"]) == Decimal(before["on_cards"])
+    assert Decimal(after["uncertain_balance"]) == Decimal(before["uncertain_balance"]) + 40
+    assert after["cards_uncertain"] == before["cards_uncertain"] + 1
+    # It is still an active card, just an unreliable one.
+    assert after["cards_active"] == before["cards_active"] + 1
+
+
+def test_checking_the_balance_clears_the_doubt(client: TestClient) -> None:
+    card = make_voucher(
+        client, merchant="Doubt-Shop-2", value_kind="amount", value_amount="25",
+        valid_until=None,
+    )
+    client.patch(f"/api/vouchers/{card['id']}", json={"balance_uncertain": True})
+
+    updated = client.post(
+        f"/api/vouchers/{card['id']}/balance", json={"remaining": "18"}
+    ).json()
+
+    # You just read the number off a receipt — the flag has served its purpose.
+    assert updated["balance_uncertain"] is False
+    assert updated["balance_amount"] == "18.00"

@@ -24,6 +24,19 @@ export default function BalancePanel({
 
   const ratio = balanceRatio(voucher)
 
+  async function toggleUncertain() {
+    try {
+      onUpdated(
+        await api.updateVoucher(voucher.id, {
+          balance_uncertain: !voucher.balance_uncertain,
+        }),
+      )
+      haptic()
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
   async function submit() {
     // Phone keyboards give a comma in most European locales.
     const value = amount.replace(',', '.').trim()
@@ -60,6 +73,9 @@ export default function BalancePanel({
               ? `из ${money(voucher.value_amount, voucher.currency)}`
               : 'остаток'}
           </div>
+          {voucher.balance_uncertain && (
+            <div className="badge soon uncertain">❔ остаток не подтверждён</div>
+          )}
         </div>
         {!open && (
           <button className="btn primary" onClick={() => setOpen(true)}>
@@ -72,6 +88,14 @@ export default function BalancePanel({
         <div className="bar">
           <div className="fill" style={{ width: `${Math.round(ratio * 100)}%` }} />
         </div>
+      )}
+
+      {!open && (
+        <button className="btn link uncertain-toggle" onClick={toggleUncertain}>
+          {voucher.balance_uncertain
+            ? 'Остаток известен точно'
+            : 'Не уверен, что деньги остались'}
+        </button>
       )}
 
       {open && (

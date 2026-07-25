@@ -39,15 +39,24 @@ async def collect_stats(session: AsyncSession) -> StatsOut:
 
     # --- what is on the cards right now ---
     active_rows = await session.execute(
-        select(Voucher.merchant, Voucher.balance_amount, Voucher.valid_until).where(
-            Voucher.status == VoucherStatus.active
-        )
+        select(
+            Voucher.merchant,
+            Voucher.balance_amount,
+            Voucher.valid_until,
+            Voucher.balance_uncertain,
+        ).where(Voucher.status == VoucherStatus.active)
     )
     on_cards_by_merchant: dict[str, Decimal] = {}
     soon = today + timedelta(days=EXPIRING_SOON_DAYS)
-    for merchant, balance, valid_until in active_rows.all():
+    for merchant, balance, valid_until, uncertain in active_rows.all():
         amount = Decimal(balance or 0)
         stats.cards_active += 1
+        if uncertain:
+            # Kept out of every "you have" figure: money you are unsure about is
+            # not money you can plan with. It gets its own line instead.
+            stats.uncertain_balance += amount
+            stats.cards_uncertain += 1
+            continue
         stats.on_cards += amount
         if merchant:
             on_cards_by_merchant[merchant] = on_cards_by_merchant.get(merchant, Decimal(0)) + amount

@@ -346,6 +346,8 @@ async def update_balance(
     new_balance = new_balance.quantize(CENT)
     delta = (current - new_balance).quantize(CENT)
     voucher.balance_amount = new_balance
+    # You just read the number off a receipt, so the doubt is settled.
+    voucher.balance_uncertain = False
     record_event(
         session,
         voucher,

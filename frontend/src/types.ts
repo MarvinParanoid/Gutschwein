@@ -29,6 +29,8 @@ export interface Voucher {
   barcode_format: string | null
   /** valid_until came from the shop rule, not from the card. */
   expiry_estimated: boolean
+  /** Nobody is sure the money is still there. */
+  balance_uncertain: boolean
   is_expired: boolean
   days_left: number | null
   created_by: User
@@ -52,6 +54,8 @@ export interface VoucherDraft {
   notes: string
   image_id: string | null
   status?: VoucherStatus
+  /** Only ever sent on its own, from the toggle on the card. */
+  balance_uncertain?: boolean
 }
 
 export interface Stats {

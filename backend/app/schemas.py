@@ -61,6 +61,7 @@ class VoucherUpdate(BaseModel):
     notes: str | None = None
     image_id: str | None = None
     balance_amount: Decimal | None = None
+    balance_uncertain: bool | None = None
 
 
 class VoucherOut(VoucherFields):
@@ -73,6 +74,7 @@ class VoucherOut(VoucherFields):
     barcode_format: str | None
     # True when valid_until came from the shop rule rather than the card itself.
     expiry_estimated: bool
+    balance_uncertain: bool
     is_expired: bool
     days_left: int | None
     created_by: UserOut
@@ -151,6 +153,9 @@ class StatsOut(BaseModel):
     # What is available right now.
     on_cards: Decimal = Decimal("0")
     cards_active: int = 0
+    # Cards whose balance nobody has checked lately, counted apart.
+    uncertain_balance: Decimal = Decimal("0")
+    cards_uncertain: int = 0
 
     # Money at risk of quietly evaporating.
     expiring_soon: Decimal = Decimal("0")
