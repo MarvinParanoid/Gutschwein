@@ -6,8 +6,6 @@ never listed. Anyone holding the link can view that one image — acceptable for
 family voucher list, and the whole point when sharing a screenshot into a chat.
 """
 
-import re
-
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse
 
@@ -15,12 +13,10 @@ from app import storage
 
 router = APIRouter(prefix="/api/images", tags=["images"])
 
-IMAGE_ID_RE = re.compile(r"^\d{4}-\d{2}/[0-9a-f]{32}\.(jpg|png|webp|heic|heif)$")
-
 
 @router.get("/{image_id:path}")
 async def get_image(image_id: str) -> FileResponse:
-    if not IMAGE_ID_RE.match(image_id):
+    if not storage.IMAGE_ID_RE.match(image_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Изображение не найдено")
     path = storage.absolute_path(image_id)
     if not path.is_file():

@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import notify
 from app.config import settings
+from app.maintenance import maintenance_loop
 from app.migrations import upgrade_database
 from app.routers import images, uploads, users, vouchers
 
@@ -50,10 +51,13 @@ async def lifespan(app: FastAPI):
             bool(settings.bot_token),
         )
 
+    housekeeping = asyncio.create_task(maintenance_loop())
+
     try:
         yield
     finally:
         notify.set_notifier(None)
+        housekeeping.cancel()
         if bot_task is not None:
             bot_task.cancel()
             try:

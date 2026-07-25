@@ -1,5 +1,6 @@
 """Voucher images on disk: data/uploads/<yyyy-mm>/<random>.<ext>."""
 
+import re
 import secrets
 from pathlib import Path
 
@@ -7,6 +8,10 @@ from fastapi import HTTPException, UploadFile, status
 
 from app.config import settings
 from app.models import utcnow
+
+# The exact shape of a name we generate. Serving and cleanup both go through it,
+# so nothing else in the volume can be served — or deleted.
+IMAGE_ID_RE = re.compile(r"^\d{4}-\d{2}/[0-9a-f]{32}\.(jpg|png|webp|heic|heif)$")
 
 MAX_IMAGE_BYTES = 12 * 1024 * 1024
 ALLOWED_CONTENT_TYPES = {
