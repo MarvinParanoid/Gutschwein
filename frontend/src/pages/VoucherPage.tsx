@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
+import ZoomableImage from '../ZoomableImage'
 import { api, imageUrl } from '../api'
 import {
   balanceRatio,
@@ -265,10 +266,11 @@ function ScanOverlay({
 
   return (
     <div className="scan">
-      <img
+      <ZoomableImage
         className={`scan-image ${rotated ? 'rotated' : ''}`}
         src={imageUrl(imageId)}
         alt="Купон для сканирования"
+        rotated={rotated}
       />
       {code && <div className="scan-code">{code}</div>}
       <div className="scan-actions">
@@ -279,7 +281,9 @@ function ScanOverlay({
           Готово
         </button>
       </div>
-      <p className="scan-hint">Выкрутите яркость экрана — так сканер читает надёжнее</p>
+      <p className="scan-hint">
+        Щипок или двойной тап — увеличить. Выкрутите яркость: так сканер читает надёжнее
+      </p>
     </div>
   )
 }

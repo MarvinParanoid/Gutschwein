@@ -1,4 +1,13 @@
-.PHONY: install dev-api dev-web build test lint migration deploy
+.PHONY: install dev-api dev-web build test lint migration deploy deploy-vps
+
+VPS ?= root@185.142.99.209
+REMOTE ?= /root/sparschwein
+# data/ holds the database and uploads. It is excluded, and rsync never deletes
+# excluded paths, so --delete cannot eat it.
+RSYNC_EXCLUDES := --exclude '.git' --exclude 'frontend/node_modules' \
+	--exclude 'backend/.venv' --exclude 'backend/static' --exclude 'data' \
+	--exclude '__pycache__' --exclude '.ruff_cache' --exclude '.pytest_cache' \
+	--exclude '*.egg-info' --exclude '.claude'
 
 install:
 	cd backend && python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
@@ -27,3 +36,10 @@ migration:
 
 deploy:
 	docker compose up -d --build
+
+# $(CURDIR)/ pins the sync root to this directory: running rsync with a relative
+# './' from a subdirectory once mirrored frontend/ over the whole project.
+deploy-vps:
+	rsync -a --delete $(RSYNC_EXCLUDES) $(CURDIR)/ $(VPS):$(REMOTE)/
+	ssh $(VPS) 'cd $(REMOTE) && docker compose up -d --build'
+	@echo "проверка:" && curl -s https://spar-schwein.duckdns.org/healthz && echo

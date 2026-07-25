@@ -11,7 +11,7 @@ import {
   money,
   primaryAmount,
 } from '../format'
-import { haptic } from '../telegram'
+import { haptic, inTelegram } from '../telegram'
 import type { Voucher, VoucherStatus } from '../types'
 
 interface Props {
@@ -63,9 +63,13 @@ export default function ListPage({
 
   return (
     <>
-      <div className="topbar">
-        <h1>🐷 Sparschwein</h1>
-      </div>
+      {/* Telegram already shows the app name in its own header; only the browser
+          (and a future PWA) needs a title of our own. */}
+      {!inTelegram && (
+        <div className="topbar">
+          <h1>🐷 Sparschwein</h1>
+        </div>
+      )}
 
       <div className="tabs">
         {STATUS_TABS.map((item) => (

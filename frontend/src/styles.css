@@ -313,11 +313,47 @@ button {
 }
 
 /* Rotation is a transform, so the layout box keeps the pre-rotation size and the
-   width below becomes the visible height. */
+   width below becomes the visible height. The transform itself is applied inline
+   by ZoomableImage, which composes it with pan and zoom. */
 .scan-image.rotated {
   width: 72vh;
   max-height: none;
-  transform: rotate(90deg);
+}
+
+/* touch-action: none is what lets pinch and drag reach us instead of being taken
+   by the browser (or read by Telegram as swipe-to-close). */
+.zoom-frame {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+}
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.zoom-controls .btn {
+  background: #eceff3;
+  color: #000000;
+  width: 46px;
+  padding: 10px 0;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.zoom-level {
+  min-width: 56px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: #6b7280;
+  font-size: 14px;
 }
 
 .scan-code {
