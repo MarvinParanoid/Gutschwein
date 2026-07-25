@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
     # Hour (UTC) of the nightly backup into FAMILY_CHAT_ID.
     backup_hour_utc: int = 4
+    # Weekly digest: Sunday evening, before the week's shopping starts.
+    digest_weekday: int = 6  # Monday is 0
+    digest_hour_utc: int = 17
 
     # Security
     init_data_max_age: int = 24 * 3600

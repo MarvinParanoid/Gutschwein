@@ -25,6 +25,7 @@ from app.auth import TelegramUser, upsert_user
 from app.backup import backup_loop, send_backup
 from app.config import settings
 from app.db import SessionLocal
+from app.digest import build_digest, digest_loop
 from app.models import EventKind, Voucher, VoucherStatus, utcnow
 from app.notify import notify
 from app.quickadd import QuickAdd, apply_quick_add, find_pending_draft, parse_quick_add
@@ -76,6 +77,18 @@ def build_dispatcher() -> Dispatcher:
             log.warning("manual backup failed", exc_info=True)
             await message.answer(f"Не получилось: {exc}")
 
+    @dp.message(Command("digest"))
+    async def cmd_digest(message: Message, bot: Bot) -> None:
+        """The weekly summary on demand — also the way to see what it looks like."""
+        if not allowed(message):
+            return
+        async with SessionLocal() as session:
+            text = await build_digest(session)
+        if text is None:
+            await message.answer("Пока не о чем рассказывать: активных карт нет.")
+            return
+        await message.answer(text, reply_markup=open_app_keyboard("Открыть карты"))
+
     @dp.message(Command("start"))
     async def cmd_start(message: Message) -> None:
         if not allowed(message):
@@ -90,7 +103,7 @@ def build_dispatcher() -> Dispatcher:
             "и она сразу появится в списке.\n\n"
             "Без подписи получится черновик: тогда просто напишите следом "
             "«Rewe 50» — или отдельно «Rewe», а потом «50».\n\n"
-            "Ещё умею /backup и /id."
+            "Ещё умею /digest, /backup и /id."
         )
         if keyboard is None:
             await message.answer(
@@ -283,6 +296,7 @@ async def run_bot(bot: Bot) -> None:
     background = [
         asyncio.create_task(expiry_reminder_loop(bot)),
         asyncio.create_task(backup_loop(bot)),
+        asyncio.create_task(digest_loop(bot)),
     ]
     try:
         await dp.start_polling(bot, handle_signals=False)
