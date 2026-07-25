@@ -4,13 +4,54 @@
   --text: var(--tg-theme-text-color, #16181c);
   --hint: var(--tg-theme-hint-color, #8a8f98);
   --link: var(--tg-theme-link-color, #2f7de1);
-  --accent: var(--tg-theme-button-color, #e0518a);
-  --accent-text: var(--tg-theme-button-text-color, #ffffff);
+  /* The accent is ours everywhere — inside Telegram too. Surfaces and text still
+     follow the client's theme, so the app fits in; the brand colour stays the same
+     one that is on the home-screen icon instead of changing per Telegram theme.
+     Two tokens, because one colour cannot do both jobs: a fill dark enough for
+     white button text is too dark to read as text on a dark surface. */
+  --accent: #c9356f;
+  --accent-text: #ffffff;
+  --accent-ink: #c9356f;
   --danger: #e05252;
   --warning: #d99a2b;
   --success: #3aa76d;
   --radius: 14px;
   --gap: 12px;
+}
+
+/* Dark mode for the browser and the installed PWA.
+   Only the *fallbacks* change: inside Telegram --tg-theme-* still wins, so the
+   Mini App keeps following the client's own theme exactly as before. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: var(--tg-theme-bg-color, #1c2733);
+    --secondary-bg: var(--tg-theme-secondary-bg-color, #121a22);
+    --text: var(--tg-theme-text-color, #eef2f6);
+    --hint: var(--tg-theme-hint-color, #93a1b0);
+    --link: var(--tg-theme-link-color, #6ab3f3);
+    --accent-ink: #f78ab4;
+    /* Status hues lightened for a dark surface; the light steps drop below 3:1. */
+    --danger: #ff7b7b;
+    --warning: #efb54c;
+    --success: #57c98f;
+  }
+}
+
+/* Telegram's own light/dark wins over the OS setting: a dark Telegram on a light
+   phone would otherwise get the light variants on a dark background. The badge
+   red drops to 4.27:1 there — readable, but under the 4.5 bar for small text. */
+:root[data-tg-theme='dark'] {
+  --accent-ink: #f78ab4;
+  --danger: #ff7b7b;
+  --warning: #efb54c;
+  --success: #57c98f;
+}
+
+:root[data-tg-theme='light'] {
+  --accent-ink: #c9356f;
+  --danger: #e05252;
+  --warning: #d99a2b;
+  --success: #3aa76d;
 }
 
 * {
@@ -291,7 +332,7 @@ button {
 
 .card .value {
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-ink);
   white-space: nowrap;
 }
 
@@ -375,7 +416,7 @@ button {
 .balance-value {
   font-size: 30px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-ink);
   line-height: 1.1;
 }
 

@@ -25,6 +25,7 @@ interface TelegramWebApp {
   showConfirm(message: string, cb: (confirmed: boolean) => void): void
   showAlert(message: string, cb?: () => void): void
   openTelegramLink(url: string): void
+  onEvent(event: string, handler: () => void): void
 }
 
 declare global {
@@ -39,6 +40,21 @@ export const inTelegram = Boolean(tg?.initData)
 export function initTelegram(): void {
   tg?.ready()
   tg?.expand()
+  applyColorScheme()
+  // Telegram's theme is its own setting, changeable while the app is open.
+  tg?.onEvent('themeChanged', applyColorScheme)
+}
+
+/**
+ * Publishes Telegram's light/dark choice as a data attribute.
+ *
+ * Inside Telegram the client's theme is what matters, and it need not match the
+ * OS: a dark Telegram on a light system would otherwise get the light variants of
+ * our own colours through `prefers-color-scheme`, on a dark background.
+ */
+function applyColorScheme(): void {
+  const scheme = tg?.colorScheme
+  if (scheme) document.documentElement.dataset.tgTheme = scheme
 }
 
 export function haptic(kind: 'tap' | 'success' | 'error' = 'tap'): void {
