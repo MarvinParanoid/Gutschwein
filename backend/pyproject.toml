@@ -17,6 +17,8 @@ dependencies = [
     # and then fails to render in the webview.
     "pillow>=10",
     "pillow-heif>=0.16",
+    # Reads the barcode out of a card screenshot and redraws it as SVG.
+    "zxing-cpp>=2.2",
 ]
 
 [project.optional-dependencies]

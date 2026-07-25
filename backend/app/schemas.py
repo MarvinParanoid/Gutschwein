@@ -70,6 +70,7 @@ class VoucherOut(VoucherFields):
     status: VoucherStatus
     balance_amount: Decimal | None
     image_id: str | None
+    barcode_format: str | None
     is_expired: bool
     days_left: int | None
     created_by: UserOut

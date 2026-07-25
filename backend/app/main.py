@@ -12,7 +12,7 @@ from app import notify
 from app.config import settings
 from app.maintenance import maintenance_loop
 from app.migrations import upgrade_database
-from app.routers import images, uploads, users, vouchers
+from app.routers import barcodes, images, uploads, users, vouchers
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)-5.5s [%(name)s] %(message)s")
 log = logging.getLogger(__name__)
@@ -83,6 +83,7 @@ app.include_router(users.router)
 app.include_router(vouchers.router)
 app.include_router(uploads.router)
 app.include_router(images.router)
+app.include_router(barcodes.router)
 
 
 @app.get("/healthz")

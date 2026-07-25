@@ -25,6 +25,8 @@ export interface Voucher {
   conditions: string
   notes: string
   image_id: string | null
+  /** Symbology decoded from the picture; null when there is no readable code. */
+  barcode_format: string | null
   is_expired: boolean
   days_left: number | null
   created_by: User

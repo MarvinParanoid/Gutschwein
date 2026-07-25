@@ -97,6 +97,9 @@ class Voucher(Base):
     notes: Mapped[str] = mapped_column(Text, default="")
 
     image_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # Symbology of the barcode found in the image ("Code 128", "Aztec", …), so the
+    # scan screen can redraw it. Empty when the picture has no readable code.
+    barcode_format: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(

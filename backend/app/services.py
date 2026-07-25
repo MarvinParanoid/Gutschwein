@@ -1,11 +1,13 @@
 """Shared voucher helpers: lookup, event log, human-readable labels."""
 
+import asyncio
 from decimal import Decimal
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import barcode, storage
 from app.models import Comment, Event, EventKind, User, ValueKind, Voucher
 
 CENT = Decimal("0.01")
@@ -44,6 +46,26 @@ async def comment_counts(session: AsyncSession, voucher_ids: list[int]) -> dict[
         .group_by(Comment.voucher_id)
     )
     return dict(rows.all())
+
+
+async def attach_barcode(voucher: Voucher) -> None:
+    """Read the code out of the attached picture.
+
+    Never overwrites a code a human typed — the screenshot is evidence, not
+    authority. Decoding a 1080p screenshot (with the upscale retry) takes long
+    enough to be worth a thread.
+    """
+    if not voucher.image_path:
+        voucher.barcode_format = None
+        return
+
+    path = storage.absolute_path(voucher.image_path)
+    if not path.is_file():
+        return
+    found = await asyncio.to_thread(barcode.decode, path.read_bytes())
+    voucher.barcode_format = found.format if found else None
+    if found and not voucher.code:
+        voucher.code = found.text[:128]
 
 
 def format_amount(value: Decimal) -> str:

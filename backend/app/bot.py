@@ -28,7 +28,7 @@ from app.db import SessionLocal
 from app.models import EventKind, Voucher, VoucherStatus, utcnow
 from app.notify import notify
 from app.quickadd import QuickAdd, apply_quick_add, find_pending_draft, parse_quick_add
-from app.services import format_amount, record_event, voucher_label
+from app.services import attach_barcode, format_amount, record_event, voucher_label
 
 log = logging.getLogger(__name__)
 
@@ -126,6 +126,7 @@ def build_dispatcher() -> Dispatcher:
                 image_path=image_path,
                 created_by_id=user.id,
             )
+            await attach_barcode(voucher)
             session.add(voucher)
             await session.flush()
             record_event(session, voucher, user, EventKind.created, {"source": "bot"})
@@ -134,7 +135,7 @@ def build_dispatcher() -> Dispatcher:
             # A caption like "Rewe 50" is all a gift card needs — no app required.
             parsed = parse_quick_add(message.caption or "")
             complete = await apply_quick_add(session, user, voucher, parsed)
-            reply = _describe(voucher, complete, parsed)
+            reply = _describe(voucher, complete, parsed) + _barcode_note(voucher)
             label = voucher_label(voucher)
             actor = user.display_name
 
@@ -212,6 +213,16 @@ def _describe(voucher: Voucher, complete: bool, parsed: QuickAdd) -> str:
     if parsed.amount is not None and not voucher.merchant:
         return f"Записал сумму {format_amount(parsed.amount)}. Теперь название магазина."
     return "📸 Черновик создан. Напишите магазин и сумму — например «Rewe 50»."
+
+
+def _barcode_note(voucher: Voucher) -> str:
+    """Say it now, at the kitchen table, rather than let it surprise you at the till."""
+    if voucher.barcode_format:
+        return f"\n▮▮ Штрихкод распознан ({voucher.barcode_format}) — покажу его чётким."
+    return (
+        "\n⚠️ Штрихкод в скрине не читается — покажу саму картинку. "
+        "Пришлите скрин целиком, не обрезанный: в мелком коде штрихи теряются."
+    )
 
 
 async def _notify_family(message: Message, text: str) -> None:

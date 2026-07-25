@@ -32,6 +32,7 @@ from app.schemas import (
     VoucherUpdate,
 )
 from app.services import (
+    attach_barcode,
     comment_counts,
     format_amount,
     get_voucher_or_404,
@@ -189,6 +190,7 @@ async def create_voucher(
     # A gift card starts out unspent, so its balance equals the face value.
     if voucher.value_kind == ValueKind.amount and voucher.value_amount is not None:
         voucher.balance_amount = voucher.value_amount
+    await attach_barcode(voucher)
     session.add(voucher)
     await session.flush()
     record_event(session, voucher, user, EventKind.created)
@@ -237,6 +239,7 @@ async def update_voucher(
         old = voucher.image_path
         voucher.image_path = _resolve_image(image_id)
         if old != voucher.image_path:
+            await attach_barcode(voucher)
             record_event(session, voucher, user, EventKind.image_replaced)
             storage.delete(old)
 

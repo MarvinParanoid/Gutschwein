@@ -101,3 +101,5 @@ export const api = {
 }
 
 export const imageUrl = (imageId: string) => `/api/images/${imageId}`
+/** Barcode redrawn from the decoded code — sharp at any zoom, unlike the screenshot. */
+export const barcodeUrl = (imageId: string) => `/api/barcodes/${imageId}`
