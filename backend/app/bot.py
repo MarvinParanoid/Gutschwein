@@ -28,7 +28,7 @@ from app.db import SessionLocal
 from app.models import EventKind, Voucher, VoucherStatus, utcnow
 from app.notify import notify
 from app.quickadd import QuickAdd, apply_quick_add, find_pending_draft, parse_quick_add
-from app.services import record_event, voucher_label
+from app.services import format_amount, record_event, voucher_label
 
 log = logging.getLogger(__name__)
 
@@ -205,12 +205,12 @@ def _describe(voucher: Voucher, complete: bool, parsed: QuickAdd) -> str:
     if complete:
         return (
             f"✅ Добавил: <b>{voucher.merchant}</b> · "
-            f"{voucher.balance_amount.normalize()} {voucher.currency}"
+            f"{format_amount(voucher.balance_amount)} {voucher.currency}"
         )
     if voucher.merchant and voucher.value_amount is None:
         return f"Записал магазин: <b>{voucher.merchant}</b>. Теперь сумму — просто числом."
     if parsed.amount is not None and not voucher.merchant:
-        return f"Записал сумму {parsed.amount.normalize()}. Теперь название магазина."
+        return f"Записал сумму {format_amount(parsed.amount)}. Теперь название магазина."
     return "📸 Черновик создан. Напишите магазин и сумму — например «Rewe 50»."
 
 

@@ -33,6 +33,7 @@ from app.schemas import (
 )
 from app.services import (
     comment_counts,
+    format_amount,
     get_voucher_or_404,
     record_event,
     voucher_label,
@@ -323,7 +324,8 @@ async def update_balance(
         if payload.spent > current:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                f"Нельзя списать {payload.spent} — на купоне {current} {voucher.currency}",
+                f"Нельзя списать {format_amount(payload.spent)} — "
+                f"на купоне {format_amount(current)} {voucher.currency}",
             )
         new_balance = current - payload.spent
     else:
@@ -331,7 +333,8 @@ async def update_balance(
         if voucher.value_amount is not None and new_balance > voucher.value_amount:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                f"Остаток больше номинала ({voucher.value_amount} {voucher.currency}) — "
+                f"Остаток больше номинала ({format_amount(voucher.value_amount)} "
+                f"{voucher.currency}) — "
                 "поправьте номинал в купоне",
             )
 
@@ -361,13 +364,13 @@ async def update_balance(
         await notify(f"💳 {user.display_name} потратил <b>{label}</b> до конца")
     elif delta > 0:
         await notify(
-            f"💳 {user.display_name}: −{delta} {voucher.currency} с <b>{label}</b>, "
-            f"осталось {new_balance} {voucher.currency}"
+            f"💳 {user.display_name}: −{format_amount(delta)} {voucher.currency} "
+            f"с <b>{label}</b>, осталось {format_amount(new_balance)} {voucher.currency}"
         )
     else:
         await notify(
             f"💳 {user.display_name} поправил остаток <b>{label}</b>: "
-            f"{new_balance} {voucher.currency}"
+            f"{format_amount(new_balance)} {voucher.currency}"
         )
     return await _serialize_one(session, voucher)
 

@@ -1,10 +1,14 @@
 """Shared voucher helpers: lookup, event log, human-readable labels."""
 
+from decimal import Decimal
+
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Comment, Event, EventKind, User, ValueKind, Voucher
+
+CENT = Decimal("0.01")
 
 
 async def get_voucher_or_404(session: AsyncSession, voucher_id: int) -> Voucher:
@@ -42,12 +46,20 @@ async def comment_counts(session: AsyncSession, voucher_ids: list[int]) -> dict[
     return dict(rows.all())
 
 
+def format_amount(value: Decimal) -> str:
+    """Money for humans: "10", "12.5", never Decimal.normalize()'s "1E+1".
+
+    normalize() turns 10 into 1E+1 — correct arithmetic, nonsense in a chat message.
+    """
+    text = format(value.quantize(CENT), "f")
+    return text.rstrip("0").rstrip(".") if "." in text else text
+
+
 def value_label(voucher: Voucher) -> str:
     if voucher.value_kind == ValueKind.amount and voucher.value_amount is not None:
-        amount = voucher.value_amount.normalize()
-        return f"{amount} {voucher.currency}"
+        return f"{format_amount(voucher.value_amount)} {voucher.currency}"
     if voucher.value_kind == ValueKind.percent and voucher.value_amount is not None:
-        return f"-{voucher.value_amount.normalize()}%"
+        return f"-{format_amount(voucher.value_amount)}%"
     return voucher.title or "купон"
 
 
