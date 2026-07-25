@@ -14,3 +14,6 @@ frontend/dist/
 .vscode/
 # Personal Claude Code permissions; .claude/settings.json is shared and stays tracked.
 .claude/settings.local.json
+frontend/test-results/
+frontend/playwright-report/
+backend/.e2e-data/
