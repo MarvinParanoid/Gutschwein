@@ -4,15 +4,19 @@ The client sends `Authorization: tma <initData>` — verbatim the string Telegra
 puts in `window.Telegram.WebApp.initData`. We verify the HMAC signature with the
 bot token, check auth_date freshness and whitelist membership. There are no
 sessions or app-issued tokens: initData is itself a signed identity bearer.
+
+The signature check is aiogram's: the data-check-string covers every field except
+`hash` — including `signature`, which modern clients always send. Excluding it
+(as an earlier version here did) breaks every real request while passing
+hand-built test fixtures.
 """
 
-import hashlib
-import hmac
 import json
 from datetime import UTC, datetime
 from typing import Annotated
 from urllib.parse import parse_qsl
 
+from aiogram.utils.web_app import check_webapp_signature
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,20 +35,10 @@ class TelegramUser(dict):
 
 
 def verify_init_data(init_data: str, bot_token: str, max_age: int) -> TelegramUser:
-    pairs = parse_qsl(init_data, keep_blank_values=True)
-    data = dict(pairs)
-    received_hash = data.pop("hash", None)
-    if not received_hash:
+    data = dict(parse_qsl(init_data, keep_blank_values=True))
+    if "hash" not in data:
         raise ValueError("initData без hash")
-
-    # `signature` is Telegram's own third-party-validation field and is excluded
-    # from the data-check-string.
-    data.pop("signature", None)
-    check_string = "\n".join(f"{k}={data[k]}" for k in sorted(data))
-
-    secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
-    expected = hmac.new(secret, check_string.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected, received_hash):
+    if not check_webapp_signature(bot_token, init_data):
         raise ValueError("Неверная подпись initData")
 
     auth_date = int(data.get("auth_date", "0"))

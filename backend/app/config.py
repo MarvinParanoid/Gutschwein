@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,6 +32,12 @@ class Settings(BaseSettings):
     dev_mode: bool = False
 
     cors_origins: str = ""
+
+    @field_validator("family_chat_id", mode="before")
+    @classmethod
+    def empty_means_unset(cls, value: object) -> object:
+        """`FAMILY_CHAT_ID=` in .env arrives as "", which is not an int."""
+        return None if value == "" else value
 
     @property
     def allowed_ids(self) -> set[int]:

@@ -14,7 +14,9 @@ from app.models import Base
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # Migrations also run in-process at app startup; without this flag fileConfig
+    # would disable uvicorn's loggers and the server would go silent afterwards.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 

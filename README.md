@@ -161,6 +161,22 @@ sudo systemctl reload caddy
 черновик. Если приложение отвечает «Нет доступа» — в сообщении будет ваш Telegram ID,
 допишите его в `ALLOWED_TELEGRAM_IDS` и `docker compose up -d`.
 
+### Грабли, проверенные на живом сервере
+
+- **Docker из snap не видит `/opt`.** Если docker установлен как snap (Ubuntu часто ставит
+  именно его), CLI и демон живут в конфайнменте и путь вне `$HOME` для них не существует —
+  `docker compose` отвечает `no configuration file provided`, показывая `/var/lib/snapd/void/`.
+  Лечится размещением проекта в `/root/sparschwein`; bind-mount тома оттуда работает.
+- **`localhost` может не резолвиться.** В образах Timeweb в `/etc/hosts` бывает только
+  технический хостнейм, без `127.0.0.1 localhost`. Caddy на этом падает
+  (`lookup localhost on 8.8.8.8:53: no such host`), и не только он. Добавьте строки
+  `127.0.0.1 localhost` и `::1 localhost ip6-localhost ip6-loopback`.
+- **1 ГБ RAM без swap** — сборка фронта (`npm ci` + vite) рискует уйти в OOM.
+  2 ГБ swap решают: `fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile
+  && swapon /swapfile`, плюс строка в `/etc/fstab`.
+- **Логи в Caddyfile лучше не заводить**: юнит Caddy запрещает запись в `/var/log/caddy`
+  (`ProtectSystem`), а всё нужное и так попадает в `journalctl -u caddy`.
+
 ### Обновление и бэкап
 
 ```bash

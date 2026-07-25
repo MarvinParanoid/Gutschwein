@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -13,8 +13,20 @@ from app.config import settings
 from app.migrations import upgrade_database
 from app.routers import images, uploads, users, vouchers
 
+logging.basicConfig(level=logging.INFO, format="%(levelname)-5.5s [%(name)s] %(message)s")
 log = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
+
+def _report_bot_exit(task: asyncio.Task) -> None:
+    """Nothing awaits the bot task, so without this a crash would be silent."""
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        log.error("telegram bot stopped with an error", exc_info=exc)
+    else:
+        log.warning("telegram bot task finished unexpectedly")
 
 
 @asynccontextmanager
@@ -29,6 +41,7 @@ async def lifespan(app: FastAPI):
         bot = create_bot()
         notify.set_notifier(bot)
         bot_task = asyncio.create_task(run_bot(bot))
+        bot_task.add_done_callback(_report_bot_exit)
         log.info("telegram bot started")
     else:
         log.warning(
@@ -82,4 +95,9 @@ if (STATIC_DIR / "index.html").exists():
         candidate = (STATIC_DIR / path).resolve()
         if path and candidate.is_file() and candidate.is_relative_to(STATIC_DIR):
             return FileResponse(candidate)
-        return FileResponse(STATIC_DIR / "index.html")
+        # The Mini App has no client-side routes, so only the entry point falls
+        # back to index.html. Everything else is a 404 instead of a cheerful 200
+        # for every /.env and /.aws/credentials a scanner asks for.
+        if path in ("", "index.html"):
+            return FileResponse(STATIC_DIR / "index.html")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")

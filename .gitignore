@@ -12,3 +12,5 @@ frontend/dist/
 .DS_Store
 .idea/
 .vscode/
+# Personal Claude Code permissions; .claude/settings.json is shared and stays tracked.
+.claude/settings.local.json

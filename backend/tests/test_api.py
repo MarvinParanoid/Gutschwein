@@ -24,6 +24,20 @@ def make_voucher(client: TestClient, **overrides) -> dict:
     return response.json()
 
 
+def test_blank_optional_env_values_are_unset() -> None:
+    """`.env.example` ships FAMILY_CHAT_ID= empty; that must not crash startup."""
+    from app.config import Settings
+
+    assert Settings(family_chat_id="").family_chat_id is None
+    assert Settings(family_chat_id="-1001234567890").family_chat_id == -1001234567890
+
+
+def test_unknown_paths_are_404_not_the_spa(client: TestClient) -> None:
+    """Scanners probe /.env and friends; they must not get a cheerful 200."""
+    for path in ("/.env", "/.aws/credentials", "/secrets.yaml", "/info.php"):
+        assert client.get(path).status_code == 404, path
+
+
 def test_me_returns_current_user(client: TestClient) -> None:
     body = client.get("/api/me").json()
     assert body["user"]["telegram_id"] == 1000
