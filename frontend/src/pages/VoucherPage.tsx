@@ -297,7 +297,9 @@ function BalancePanel({
   onUpdated: (voucher: Voucher) => void
 }) {
   const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<'spent' | 'remaining'>('spent')
+  // The receipt prints what is left, and that is what gets typed in almost every
+  // time — so "осталось" is the default rather than the amount just spent.
+  const [mode, setMode] = useState<'spent' | 'remaining'>('remaining')
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
@@ -359,16 +361,16 @@ function BalancePanel({
         <div className="balance-form">
           <div className="segmented">
             <button
-              className={mode === 'spent' ? 'active' : ''}
-              onClick={() => setMode('spent')}
-            >
-              Потратил
-            </button>
-            <button
               className={mode === 'remaining' ? 'active' : ''}
               onClick={() => setMode('remaining')}
             >
               Осталось
+            </button>
+            <button
+              className={mode === 'spent' ? 'active' : ''}
+              onClick={() => setMode('spent')}
+            >
+              Потратил
             </button>
           </div>
 
