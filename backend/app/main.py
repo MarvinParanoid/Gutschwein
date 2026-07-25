@@ -1,0 +1,85 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from app import notify
+from app.config import settings
+from app.migrations import upgrade_database
+from app.routers import images, uploads, users, vouchers
+
+log = logging.getLogger(__name__)
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await asyncio.to_thread(upgrade_database)
+
+    bot_task: asyncio.Task | None = None
+    bot = None
+    if settings.run_bot and settings.bot_token:
+        from app.bot import create_bot, run_bot
+
+        bot = create_bot()
+        notify.set_notifier(bot)
+        bot_task = asyncio.create_task(run_bot(bot))
+        log.info("telegram bot started")
+    else:
+        log.warning(
+            "bot disabled: RUN_BOT=%s, token set=%s",
+            settings.run_bot,
+            bool(settings.bot_token),
+        )
+
+    try:
+        yield
+    finally:
+        notify.set_notifier(None)
+        if bot_task is not None:
+            bot_task.cancel()
+            try:
+                await bot_task
+            except asyncio.CancelledError:
+                pass
+        if bot is not None:
+            await bot.session.close()
+
+
+app = FastAPI(title="Sparschwein", lifespan=lifespan)
+
+if settings.cors_origin_list:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origin_list,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+app.include_router(users.router)
+app.include_router(vouchers.router)
+app.include_router(uploads.router)
+app.include_router(images.router)
+
+
+@app.get("/healthz")
+async def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+# The built Mini App is served by this same process; mounted last so /api wins.
+if (STATIC_DIR / "index.html").exists():
+    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def spa(path: str) -> FileResponse:
+        candidate = (STATIC_DIR / path).resolve()
+        if path and candidate.is_file() and candidate.is_relative_to(STATIC_DIR):
+            return FileResponse(candidate)
+        return FileResponse(STATIC_DIR / "index.html")

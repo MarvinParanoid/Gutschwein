@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(google-chrome-stable --headless=new --disable-gpu --no-sandbox --hide-scrollbars --window-size=420,900 --virtual-time-budget=6000 --screenshot=list.png http://localhost:5173/)",
+      "Bash(pkill -f \"[u]vicorn app.main:app\")",
+      "Bash(pkill -f \"[r]emote-debugging-port=9222\")",
+      "Bash(pkill -9 -f \"[c]hrome-profile\")",
+      "Bash(DEV_MODE=true RUN_BOT=false .venv/bin/uvicorn app.main:app --port 8000 --reload)",
+      "Bash(curl -s -H 'X-Dev-User: 1000' -H 'Content-Type: application/json' -X PATCH -d '{\"image_id\":\"2026-07/318f389b67dfe37791261c4924da6133.png\"}' http://127.0.0.1:8000/api/vouchers/4)"
+    ]
+  }
+}

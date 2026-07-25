@@ -1,0 +1,11 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      # SQLite database and uploaded images.
+      - ./data:/data
+    ports:
+      # Bound to loopback: a reverse proxy in front terminates TLS.
+      - "127.0.0.1:8000:8000"
