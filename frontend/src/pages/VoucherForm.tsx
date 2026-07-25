@@ -230,7 +230,7 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
               />
             </div>
             {draft.value_kind === 'amount' && (
-              <div className="field">
+              <div className="field narrow">
                 <label htmlFor="currency">Валюта</label>
                 <input
                   id="currency"

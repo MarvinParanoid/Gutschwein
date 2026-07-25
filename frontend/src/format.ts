@@ -93,9 +93,11 @@ export function cardSubtitle(voucher: Voucher): string {
 
 export function formatDate(iso: string | null): string {
   if (!iso) return '—'
+  // Numeric: "25.07.2029" fits a badge, where "25 июл. 2029 г." wraps and the
+  // trailing "г." carries nothing.
   return new Date(iso).toLocaleDateString('ru-RU', {
     day: '2-digit',
-    month: 'short',
+    month: '2-digit',
     year: 'numeric',
   })
 }

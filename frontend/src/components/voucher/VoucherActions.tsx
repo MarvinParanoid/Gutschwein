@@ -27,7 +27,7 @@ export default function VoucherActions({
         )}
         {voucher.status === 'active' && (
           <button className="btn" disabled={busy} onClick={() => onTransition('use')}>
-            ✅ {isGiftCard(voucher) ? 'Потратил полностью' : 'Использован'}
+            ✅ {isGiftCard(voucher) ? 'Потратил всё' : 'Использован'}
           </button>
         )}
         {voucher.status === 'used' && (

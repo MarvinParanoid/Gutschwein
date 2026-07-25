@@ -136,6 +136,9 @@ button {
   background: var(--bg);
   border-radius: 18px 18px 0 0;
   padding: 10px 14px calc(14px + env(safe-area-inset-bottom));
+  /* Without a cap the last item and the close button fall off a short screen. */
+  max-height: 85vh;
+  overflow-y: auto;
   animation: sheet-up 0.18s ease-out;
 }
 
@@ -192,6 +195,17 @@ button {
   flex-shrink: 0;
 }
 
+/* Statistics is not one of the lists above; a hairline says so. */
+.sheet-item.separated {
+  border-top: 1px solid var(--secondary-bg);
+  margin-top: 6px;
+  padding-top: 14px;
+}
+
+.empty .btn {
+  margin-top: 12px;
+}
+
 .sheet-note {
   font-size: 13px;
   color: var(--hint);
@@ -214,6 +228,8 @@ button {
   overflow-x: auto;
   padding-bottom: 4px;
   margin-bottom: 8px;
+  /* Fades the right edge so it is visible that the row continues. */
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
   /* Hide the scrollbar but keep the row swipeable. */
   scrollbar-width: none;
 }
@@ -302,7 +318,10 @@ button {
 .card .thumb.placeholder {
   display: grid;
   place-items: center;
-  font-size: 24px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent-ink);
+  background: color-mix(in srgb, var(--accent) 12%, var(--secondary-bg));
 }
 
 .card .body {
@@ -898,6 +917,11 @@ button {
 .field-row > * {
   flex: 1;
   min-width: 0;
+}
+
+/* "EUR" never changes; the amount is what gets typed. */
+.field-row > .field.narrow {
+  flex: 0 0 84px;
 }
 
 .segmented {

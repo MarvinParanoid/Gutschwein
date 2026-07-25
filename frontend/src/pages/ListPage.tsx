@@ -104,6 +104,7 @@ export default function ListPage({
   }
 
   const empty = EMPTY_STATES[tab]
+  const filtering = Boolean(query.trim() || merchant)
   const currentLabel = STATUS_TABS.find((t) => t.key === tab)?.label ?? ''
   const selectedShop = shops.find((s) => s.merchant === merchant) ?? null
 
@@ -186,12 +187,29 @@ export default function ListPage({
 
       {vouchers === null && !error && <div className="spinner" />}
 
-      {vouchers?.length === 0 && (
-        <div className="empty">
-          <span className="emoji">{empty.emoji}</span>
-          <p>{empty.text}</p>
-        </div>
-      )}
+      {vouchers?.length === 0 &&
+        // An empty *result* is not an empty list: saying "add your first card"
+        // while six of them sit behind a filter is simply wrong.
+        (filtering ? (
+          <div className="empty">
+            <span className="emoji">🔍</span>
+            <p>Ничего не нашлось{query.trim() && ` по запросу «${query.trim()}»`}.</p>
+            <button
+              className="btn"
+              onClick={() => {
+                onQueryChange('')
+                onMerchantChange(null)
+              }}
+            >
+              Сбросить фильтры
+            </button>
+          </div>
+        ) : (
+          <div className="empty">
+            <span className="emoji">{empty.emoji}</span>
+            <p>{empty.text}</p>
+          </div>
+        ))}
 
       {vouchers && vouchers.length > 0 && (
         <div className="list">
@@ -265,7 +283,7 @@ function TabMenu({
           </p>
         )}
 
-        <button className="sheet-item" onClick={onStats}>
+        <button className="sheet-item separated" onClick={onStats}>
           <span className="sheet-label">
             📊 Статистика
             <span className="sheet-hint">сколько лежит, куда уходит, кто тратит</span>
@@ -290,7 +308,10 @@ function VoucherCard({ voucher, onClick }: { voucher: Voucher; onClick: () => vo
       {voucher.image_id ? (
         <img className="thumb" src={imageUrl(voucher.image_id)} alt="" loading="lazy" />
       ) : (
-        <div className="thumb placeholder">🎟️</div>
+        // The shop's initial reads faster than a row of identical icons.
+        <div className="thumb placeholder">
+          {(voucher.merchant || voucher.title || '?').trim().charAt(0).toUpperCase()}
+        </div>
       )}
 
       <div className="body">
