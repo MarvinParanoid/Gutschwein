@@ -13,6 +13,10 @@ dependencies = [
     "pydantic-settings>=2.4",
     "python-multipart>=0.0.9",
     "aiogram>=3.13",
+    # Uploads are re-encoded to WebP: HEIC from iPhones is otherwise stored fine
+    # and then fails to render in the webview.
+    "pillow>=10",
+    "pillow-heif>=0.16",
 ]
 
 [project.optional-dependencies]
