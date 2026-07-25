@@ -2,6 +2,7 @@ import { tg } from './telegram'
 import type {
   Comment,
   Counts,
+  MerchantStat,
   User,
   Voucher,
   VoucherDraft,
@@ -47,14 +48,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const api = {
   me: () => request<{ user: User; members: User[] }>('/api/me'),
 
-  listVouchers: (status: VoucherStatus | 'all', q?: string) => {
+  listVouchers: (status: VoucherStatus | 'all', q?: string, merchant?: string | null) => {
     const params = new URLSearchParams({ status })
     if (q?.trim()) params.set('q', q.trim())
+    if (merchant) params.set('merchant', merchant)
     return request<Voucher[]>(`/api/vouchers?${params}`)
   },
   getVoucher: (id: number) => request<Voucher>(`/api/vouchers/${id}`),
   merchants: () => request<string[]>('/api/vouchers/merchants'),
   counts: () => request<Counts>('/api/vouchers/counts'),
+  merchantStats: (status: VoucherStatus | 'all') =>
+    request<MerchantStat[]>(`/api/vouchers/merchants/stats?status=${status}`),
 
   createVoucher: (draft: VoucherDraft) =>
     request<Voucher>('/api/vouchers', { method: 'POST', body: JSON.stringify(draft) }),

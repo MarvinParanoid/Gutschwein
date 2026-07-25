@@ -33,6 +33,33 @@ def test_blank_optional_env_values_are_unset() -> None:
     assert Settings(family_chat_id="-1001234567890").family_chat_id == -1001234567890
 
 
+def test_merchant_chips_are_ordered_by_how_often_you_pay_there(client: TestClient) -> None:
+    regular = make_voucher(
+        client, merchant="Rewe-test", value_kind="amount", value_amount="50", valid_until=None
+    )
+    make_voucher(
+        client, merchant="Aral-test", value_kind="amount", value_amount="50", valid_until=None
+    )
+    # Two payments at one shop, none at the other.
+    client.post(f"/api/vouchers/{regular['id']}/balance", json={"spent": "5"})
+    client.post(f"/api/vouchers/{regular['id']}/balance", json={"spent": "5"})
+
+    stats = client.get("/api/vouchers/merchants/stats").json()
+    by_name = {s["merchant"]: s for s in stats}
+    assert by_name["Rewe-test"]["uses"] == 2
+    assert by_name["Aral-test"]["uses"] == 0
+    assert by_name["Rewe-test"]["balance"] == "40.00"
+    # The shop you actually use comes first.
+    names = [s["merchant"] for s in stats]
+    assert names.index("Rewe-test") < names.index("Aral-test")
+
+
+def test_merchant_filter_narrows_the_list(client: TestClient) -> None:
+    make_voucher(client, merchant="Penny-test", code="PENNY-1")
+    listed = client.get("/api/vouchers", params={"merchant": "Penny-test"}).json()
+    assert listed and all(v["merchant"] == "Penny-test" for v in listed)
+
+
 def test_counts_feed_the_menu(client: TestClient) -> None:
     before = client.get("/api/vouchers/counts").json()
 

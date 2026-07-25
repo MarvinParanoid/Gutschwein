@@ -50,6 +50,14 @@ export interface VoucherDraft {
   status?: VoucherStatus
 }
 
+export interface MerchantStat {
+  merchant: string
+  count: number
+  balance: string
+  /** Payments ever made here — the chip order is based on this. */
+  uses: number
+}
+
 export interface Counts {
   active: number
   draft: number

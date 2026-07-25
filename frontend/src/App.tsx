@@ -18,9 +18,11 @@ export default function App() {
   const [me, setMe] = useState<User | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
 
-  // Tab and query live here so they survive navigation into a voucher and back.
+  // Tab, query and shop filter live here so they survive navigation into a
+  // voucher and back — you pick Rewe, open a card, and come back to Rewe.
   const [tab, setTab] = useState<VoucherStatus>('active')
   const [query, setQuery] = useState('')
+  const [merchant, setMerchant] = useState<string | null>(null)
 
   useEffect(() => {
     initTelegram()
@@ -71,9 +73,15 @@ export default function App() {
       {view.name === 'list' && (
         <ListPage
           tab={tab}
-          onTabChange={setTab}
+          onTabChange={(next) => {
+            setTab(next)
+            // A shop that has cards in one list may have none in another.
+            setMerchant(null)
+          }}
           query={query}
           onQueryChange={setQuery}
+          merchant={merchant}
+          onMerchantChange={setMerchant}
           onOpen={(id) => navigate({ name: 'voucher', id })}
           onCreate={() => navigate({ name: 'form' })}
         />

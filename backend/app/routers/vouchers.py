@@ -25,6 +25,7 @@ from app.schemas import (
     CommentOut,
     CountsOut,
     EventOut,
+    MerchantStat,
     VoucherCreate,
     VoucherOut,
     VoucherUpdate,
@@ -113,6 +114,48 @@ async def counts(user: CurrentUser, session: Session) -> CountsOut:
         if status_value == VoucherStatus.archived:
             result.archived_balance = Decimal(balance or 0)
     return result
+
+
+@router.get("/merchants/stats", response_model=list[MerchantStat])
+async def merchant_stats(
+    user: CurrentUser,
+    session: Session,
+    status_filter: Annotated[StatusFilter, Query(alias="status")] = "active",
+) -> list[MerchantStat]:
+    """Shops for the chip row, most-used first.
+
+    Frequency comes from the event log rather than a counter we maintain: every
+    payment is already recorded as a `balance_updated` event.
+    """
+    stmt = select(
+        Voucher.merchant,
+        func.count(),
+        func.coalesce(func.sum(Voucher.balance_amount), 0),
+    ).where(Voucher.merchant != "")
+    if status_filter != "all":
+        stmt = stmt.where(Voucher.status == VoucherStatus(status_filter))
+    rows = (await session.execute(stmt.group_by(Voucher.merchant))).all()
+
+    uses_rows = await session.execute(
+        select(Voucher.merchant, func.count())
+        .join(Event, Event.voucher_id == Voucher.id)
+        .where(Event.kind == EventKind.balance_updated, Voucher.merchant != "")
+        .group_by(Voucher.merchant)
+    )
+    uses = dict(uses_rows.all())
+
+    stats = [
+        MerchantStat(
+            merchant=merchant,
+            count=count,
+            balance=Decimal(balance or 0),
+            uses=uses.get(merchant, 0),
+        )
+        for merchant, count, balance in rows
+    ]
+    # Regulars float up on their own; one-off shops sink to the end of the row.
+    stats.sort(key=lambda s: (-s.uses, -s.count, s.merchant.lower()))
+    return stats
 
 
 @router.get("/merchants", response_model=list[str])

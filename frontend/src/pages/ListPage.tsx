@@ -9,16 +9,19 @@ import {
   formatDate,
   isPartlySpent,
   money,
+  plural,
   primaryAmount,
 } from '../format'
 import { haptic, inTelegram } from '../telegram'
-import type { Counts, Voucher, VoucherStatus } from '../types'
+import type { Counts, MerchantStat, Voucher, VoucherStatus } from '../types'
 
 interface Props {
   tab: VoucherStatus
   onTabChange: (tab: VoucherStatus) => void
   query: string
   onQueryChange: (query: string) => void
+  merchant: string | null
+  onMerchantChange: (merchant: string | null) => void
   onOpen: (id: number) => void
   onCreate: () => void
 }
@@ -42,6 +45,8 @@ export default function ListPage({
   onTabChange,
   query,
   onQueryChange,
+  merchant,
+  onMerchantChange,
   onOpen,
   onCreate,
 }: Props) {
@@ -50,6 +55,7 @@ export default function ListPage({
   const [debouncedQuery, setDebouncedQuery] = useState(query)
   const [menuOpen, setMenuOpen] = useState(false)
   const [counts, setCounts] = useState<Counts | null>(null)
+  const [shops, setShops] = useState<MerchantStat[]>([])
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 250)
@@ -60,13 +66,26 @@ export default function ListPage({
     let active = true
     setError(null)
     api
-      .listVouchers(tab, debouncedQuery)
+      .listVouchers(tab, debouncedQuery, merchant)
       .then((data) => active && setVouchers(data))
       .catch((e: Error) => active && setError(e.message))
     return () => {
       active = false
     }
-  }, [tab, debouncedQuery])
+  }, [tab, debouncedQuery, merchant])
+
+  // Chips describe the tab, not the current filter, so selecting one must not
+  // refetch them. Coming back from a voucher remounts this page and refreshes.
+  useEffect(() => {
+    let active = true
+    api
+      .merchantStats(tab)
+      .then((data) => active && setShops(data))
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [tab])
 
   // Counters are only needed when the menu opens, and they change as vouchers move.
   useEffect(() => {
@@ -84,6 +103,7 @@ export default function ListPage({
 
   const empty = EMPTY_STATES[tab]
   const currentLabel = STATUS_TABS.find((t) => t.key === tab)?.label ?? ''
+  const selectedShop = shops.find((s) => s.merchant === merchant) ?? null
 
   return (
     <>
@@ -110,6 +130,42 @@ export default function ListPage({
           onSelect={selectTab}
           onClose={() => setMenuOpen(false)}
         />
+      )}
+
+      {shops.length > 1 && (
+        <div className="chips">
+          <button
+            className={`chip ${merchant === null ? 'active' : ''}`}
+            onClick={() => {
+              haptic()
+              onMerchantChange(null)
+            }}
+          >
+            Все
+          </button>
+          {shops.map((shop) => (
+            <button
+              key={shop.merchant}
+              className={`chip ${merchant === shop.merchant ? 'active' : ''}`}
+              onClick={() => {
+                haptic()
+                // Tapping the selected shop again clears the filter.
+                onMerchantChange(merchant === shop.merchant ? null : shop.merchant)
+              }}
+            >
+              {shop.merchant}
+              <span className="chip-count">{shop.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {selectedShop && (
+        <p className="chip-summary">
+          {selectedShop.merchant}: {selectedShop.count}{' '}
+          {plural(selectedShop.count, 'карта', 'карты', 'карт')}
+          {Number(selectedShop.balance) > 0 && ` · ${money(selectedShop.balance, 'EUR')}`}
+        </p>
       )}
 
       <input

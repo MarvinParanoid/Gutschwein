@@ -125,6 +125,16 @@ class EventOut(BaseModel):
     created_at: datetime
 
 
+class MerchantStat(BaseModel):
+    """One shop chip on the main screen."""
+
+    merchant: str
+    count: int
+    balance: Decimal = Decimal("0")
+    # How many times money was ever spent here — the frequency the order is based on.
+    uses: int = 0
+
+
 class CountsOut(BaseModel):
     """Per-tab counters for the menu, plus money still sitting in the archive."""
 
