@@ -301,20 +301,24 @@ function VoucherCard({ voucher, onClick }: { voucher: Voucher; onClick: () => vo
         <div className="merchant">{cardTitle(voucher)}</div>
         {subtitle && <div className="sub">{subtitle}</div>}
         <div className="card-meta">
-          {expiry ? (
+          {/* Keyed off used_at, not the status: a spent voucher that was later
+              archived must not look like it was never used. Once it is spent the
+              expiry has nothing left to warn about, so it gives up its place. */}
+          {voucher.used_at ? (
+            <span className="badge ok">{t.list.spentOn(formatDate(voucher.used_at))}</span>
+          ) : expiry ? (
             <span className={`badge ${expiry.tone === 'neutral' ? '' : expiry.tone}`}>
               {expiry.text}
             </span>
           ) : (
             <span className="badge">{t.list.noBalance}</span>
           )}
-          {/* Keyed off used_at, not the status: a spent voucher that was later
-              archived must not look like it was never used. */}
-          {voucher.used_at && (
-            <span className="badge ok">{t.list.spentOn(formatDate(voucher.used_at))}</span>
-          )}
+          {/* Icon only: the meta row has to stay on one line, and the word is
+              right there on the card itself. */}
           {voucher.balance_uncertain && (
-            <span className="badge soon">{t.list.unchecked}</span>
+            <span className="badge soon" title={t.list.unchecked} aria-label={t.list.unchecked}>
+              ❔
+            </span>
           )}
           {voucher.comments_count > 0 && (
             <span className="badge">💬 {voucher.comments_count}</span>

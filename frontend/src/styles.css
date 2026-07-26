@@ -368,7 +368,21 @@ button {
   align-items: center;
   gap: 8px;
   margin-top: 6px;
-  flex-wrap: wrap;
+  /* One line, always: a wrapped chip would make that one card taller than its
+     neighbours, and a list of cards jumping between two heights reads as broken. */
+  flex-wrap: nowrap;
+}
+
+.card-meta .badge {
+  flex: 0 0 auto;
+}
+
+/* The date is the only chip long enough to be worth truncating; the others are
+   a glyph or a single digit. */
+.card-meta .badge:first-child {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------- badges ---------- */

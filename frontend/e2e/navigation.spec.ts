@@ -78,3 +78,29 @@ test('the archive is reachable and separate from the active list', async ({ page
   await expect(page.locator('.card', { hasText: merchant })).toHaveCount(1)
   expect(card.id).toBeGreaterThan(0)
 })
+
+test('badges never change the height of a card', async ({ page, request }) => {
+  // A wrapped meta row used to make one card taller than its neighbours, which
+  // reads as a broken list while scrolling past it.
+  const tag = uniqueMerchant('Height')
+  await createCard(request, { merchant: 'Ikea', notes: tag, value_amount: '25' })
+  const loaded = await createCard(request, {
+    merchant: 'Jet',
+    notes: tag,
+    value_amount: '50',
+    valid_until: '2029-12-31',
+  })
+  await request.patch(`/api/vouchers/${loaded.id}`, { data: { balance_uncertain: true } })
+  await request.post(`/api/vouchers/${loaded.id}/comments`, { data: { text: 'в бардачке' } })
+
+  await page.goto('/')
+  await page.getByPlaceholder('Поиск').fill(tag)
+  await expect(page.locator('.card')).toHaveCount(2)
+  // Three chips on one card, one on the other.
+  await expect(page.locator('.card', { hasText: 'Jet' }).locator('.badge')).toHaveCount(3)
+
+  const heights = await page
+    .locator('.card')
+    .evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().height))
+  expect(new Set(heights).size).toBe(1)
+})

@@ -51,7 +51,7 @@ export const ru = {
       `Ничего не нашлось${query ? ` по запросу «${query}»` : ''}.`,
     resetFilters: 'Сбросить фильтры',
     noBalance: 'без срока',
-    unchecked: '❔ не проверен',
+    unchecked: 'не проверен',
     spentOn: (date: string) => `потрачен ${date}`,
     outOf: (amount: string) => `из ${amount}`,
     cardFallback: (id: number) => `Купон #${id}`,

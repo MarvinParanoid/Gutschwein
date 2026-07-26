@@ -50,7 +50,7 @@ export const en: Dictionary = {
     noResults: (query: string) => `Nothing found${query ? ` for “${query}”` : ''}.`,
     resetFilters: 'Clear filters',
     noBalance: 'no expiry',
-    unchecked: '❔ unchecked',
+    unchecked: 'not checked',
     spentOn: (date: string) => `spent ${date}`,
     outOf: (amount: string) => `of ${amount}`,
     cardFallback: (id: number) => `Card #${id}`,
