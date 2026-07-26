@@ -59,7 +59,8 @@ deploy-vps:
 	echo "НЕ поднялся за минуту — смотрите: ssh $(VPS) 'cd $(REMOTE) && docker compose logs app'"; \
 	exit 1
 
-# Visitor counts from the reverse proxy log on the VPS.
+# Visitor counts from the reverse proxy log on the VPS. Needs deploy/demo-stats
+# installed there once; see docs/deploy.md.
 # make stats SINCE="3 days ago"
 SINCE ?= today
 stats:

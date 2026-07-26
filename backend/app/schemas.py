@@ -10,7 +10,8 @@ class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    telegram_id: int
+    # Null for a member invited from the console, who has no Telegram account.
+    telegram_id: int | None
     username: str
     display_name: str
 

@@ -75,9 +75,14 @@ async def upsert_user(session: AsyncSession, tg: TelegramUser) -> User:
 def check_allowed(user: User) -> User:
     """Membership is checked on every request, not only at login.
 
-    Removing someone from ALLOWED_TELEGRAM_IDS has to lock them out immediately,
-    including a browser session opened while they still had access.
+    Two kinds of member, one rule each. A Telegram member is allowed exactly
+    while their id is in ALLOWED_TELEGRAM_IDS — removing it locks them out on the
+    next request, including a browser session opened while they still had access.
+    A member invited from the console has no Telegram id; for them the row itself
+    is the membership, and revoking means deleting it (`app.invite --revoke`).
     """
+    if user.telegram_id is None:
+        return user
     if user.telegram_id not in settings.allowed_ids:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,

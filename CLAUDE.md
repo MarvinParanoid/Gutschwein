@@ -1,7 +1,8 @@
 # Sparschwein — notes for Claude
 
-Family voucher (Gutschein) manager: FastAPI + Telegram Mini App. See README.md for the
-product description and deployment.
+Family voucher (Gutschein) manager: FastAPI + Telegram Mini App. README.md is the product
+description, `docs/deploy.md` the server guide, `docs/internals.md` the reasoning behind
+the demo mode, the languages and the access model.
 
 ## Conventions
 
@@ -42,6 +43,10 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
   A schema change means a new revision — there is no `create_all` fallback.
 - `alembic/env.py` strips the async driver from `DATABASE_URL`; keep that in mind when
   switching to Postgres (`+asyncpg` → `+psycopg`).
+- Two kinds of member, checked on every request in `check_allowed()`: a Telegram member is
+  allowed while their id is in `ALLOWED_TELEGRAM_IDS`, a console member (`telegram_id IS
+  NULL`, created by `python -m app.invite`) while their row exists. Neither path may become
+  a way around the other; `tests/test_invite.py` guards that.
 - Auth carries no session: every request re-validates `initData`, which expires after
   `INIT_DATA_MAX_AGE` (24h). Reopening the Mini App issues a fresh one.
 - Uploads are two-step: `POST /api/uploads` returns an `image_id`, then the voucher is

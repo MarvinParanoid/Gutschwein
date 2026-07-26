@@ -11,7 +11,7 @@ export const de: Dictionary = {
     offline:
       'Keine Verbindung — du siehst die zuletzt geladenen Daten. Änderungen werden nicht gespeichert.',
     noAccessHint:
-      'Öffne die App über den Bot in Telegram — oder schick dem Bot /login, dann bekommst du einen Link für den Browser.',
+      'Öffne die App über den Bot in Telegram — oder frag nach einem Login-Link bei dem, der diesen Server betreibt.',
     genericError: (status: number) => `Fehler ${status}`,
     loginNoToken: 'In diesem Link steht kein Anmeldecode. Fordere einen neuen an: /login an den Bot.',
   },

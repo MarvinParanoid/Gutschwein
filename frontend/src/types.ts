@@ -3,7 +3,8 @@ export type ValueKind = 'amount' | 'percent' | 'other'
 
 export interface User {
   id: number
-  telegram_id: number
+  /** Null for a member invited from the server console. */
+  telegram_id: number | null
   username: string
   display_name: string
 }

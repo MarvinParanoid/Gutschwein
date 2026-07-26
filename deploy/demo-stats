@@ -1,0 +1,27 @@
+#!/bin/sh
+# Who looked at Sparschwein. Usage: demo-stats [since]   e.g. demo-stats "3 days ago"
+#
+# Only a real browser fetches the JS bundle — scanners request "/" and leave, so
+# a hit on "/" proves nothing. And because the demo client never calls the API
+# while a signed-in member always does (/api/me on every load), an address that
+# fetched the bundle but never touched /api is exactly a demo-only visitor.
+#
+# Undercounts on purpose: the service worker caches the bundle, so someone
+# coming back a second time may not reach the server at all.
+since="${1:-today}"
+tmp=$(mktemp -d); trap "rm -rf $tmp" EXIT
+
+journalctl -u caddy --since "$since" -o cat --no-pager 2>/dev/null | grep http.log.access |
+  sed -n "s/.*\"client_ip\":\"\([^\"]*\)\".*\"uri\":\"\([^\"]*\)\".*/\1 \2/p" > "$tmp/all"
+
+grep -E " /assets/index-.*\.js$" "$tmp/all" | cut -d" " -f1 | sort -u > "$tmp/browsers"
+grep -E " /api/" "$tmp/all" | cut -d" " -f1 | sort -u > "$tmp/signed_in"
+comm -23 "$tmp/browsers" "$tmp/signed_in" > "$tmp/visitors"
+
+n() { wc -l < "$1" | tr -d " "; }
+echo "since: $since"
+echo "  demo link (/demo) opened : $(grep -c " /demo$" "$tmp/all") times"
+echo "  real browsers loaded it  : $(n "$tmp/browsers") addresses"
+echo "    signed-in family       : $(n "$tmp/signed_in")"
+echo "    demo-only visitors     : $(n "$tmp/visitors")"
+echo "  requests to / (incl. scanners): $(grep -c " /$" "$tmp/all")"

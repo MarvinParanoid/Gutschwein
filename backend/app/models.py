@@ -55,7 +55,11 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    # Null for a member invited from the server console: they never touched
+    # Telegram, so there is no id to store.
+    telegram_id: Mapped[int | None] = mapped_column(
+        BigInteger, unique=True, index=True, nullable=True
+    )
     first_name: Mapped[str] = mapped_column(String(128), default="")
     last_name: Mapped[str] = mapped_column(String(128), default="")
     username: Mapped[str] = mapped_column(String(128), default="")
@@ -71,7 +75,7 @@ class User(Base):
     @property
     def display_name(self) -> str:
         name = " ".join(p for p in (self.first_name, self.last_name) if p).strip()
-        return name or (f"@{self.username}" if self.username else str(self.telegram_id))
+        return name or (f"@{self.username}" if self.username else f"#{self.id}")
 
 
 class Voucher(Base):

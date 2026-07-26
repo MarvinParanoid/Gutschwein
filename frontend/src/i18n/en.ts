@@ -8,7 +8,7 @@ export const en: Dictionary = {
     title: 'Sparschwein',
     offline: 'No connection — showing the last loaded data. Changes will not be saved.',
     noAccessHint:
-      'Open the app from the bot in Telegram — or send the bot /login and it will give you a link for the browser.',
+      'Open the app from the bot in Telegram — or ask whoever runs this server for a login link.',
     genericError: (status: number) => `Error ${status}`,
     loginNoToken: 'That link has no login code. Ask for a new one: send /login to the bot.',
   },
