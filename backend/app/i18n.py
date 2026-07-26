@@ -195,9 +195,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         ),
     },
     "bot.open_app": {
-        RU: "🐷 Открыть Sparschwein",
-        EN: "🐷 Open Sparschwein",
-        DE: "🐷 Sparschwein öffnen",
+        RU: "🐷 Открыть Gutschwein",
+        EN: "🐷 Open Gutschwein",
+        DE: "🐷 Gutschwein öffnen",
     },
     "bot.open_card": {RU: "Открыть карту", EN: "Open the card", DE: "Karte öffnen"},
     "bot.fill_in_app": {
@@ -418,9 +418,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         DE: "{size} MB, Bilder: {images}{note}",
     },
     "backup.caption": {
-        RU: "💾 Бэкап Sparschwein · {stamp}\n{summary}\n{reason}",
-        EN: "💾 Sparschwein backup · {stamp}\n{summary}\n{reason}",
-        DE: "💾 Sparschwein-Backup · {stamp}\n{summary}\n{reason}",
+        RU: "💾 Бэкап Gutschwein · {stamp}\n{summary}\n{reason}",
+        EN: "💾 Gutschwein backup · {stamp}\n{summary}\n{reason}",
+        DE: "💾 Gutschwein-Backup · {stamp}\n{summary}\n{reason}",
     },
     "backup.reason_manual": {
         RU: "по запросу от {name}",

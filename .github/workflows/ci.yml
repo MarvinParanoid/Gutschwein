@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Build image
-        run: docker build -t sparschwein:ci .
+        run: docker build -t gutschwein:ci .
 
       # The image build and startup are what broke twice in real deployment
       # (unparsable FAMILY_CHAT_ID, silenced logs), so CI starts it for real.
@@ -67,7 +67,7 @@ jobs:
             -e RUN_BOT=false \
             -e DEV_MODE=false \
             -e FAMILY_CHAT_ID= \
-            sparschwein:ci
+            gutschwein:ci
 
       - name: Wait for health
         run: |

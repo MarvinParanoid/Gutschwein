@@ -5,7 +5,7 @@ export const ru = {
   locale: 'ru-RU',
 
   app: {
-    title: 'Sparschwein',
+    title: 'Gutschwein',
     offline: 'Нет сети — показываю последние загруженные данные. Изменения не сохранятся.',
     noAccessHint:
       'Откройте приложение через бота в Telegram — или попросите ссылку для входа у того, кто держит этот сервер.',

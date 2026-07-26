@@ -7,7 +7,7 @@ export const de: Dictionary = {
   locale: 'de-DE',
 
   app: {
-    title: 'Sparschwein',
+    title: 'Gutschwein',
     offline:
       'Keine Verbindung — du siehst die zuletzt geladenen Daten. Änderungen werden nicht gespeichert.',
     noAccessHint:

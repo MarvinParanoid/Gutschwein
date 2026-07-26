@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     run_bot: bool = True
 
     # Data
-    database_url: str = "sqlite+aiosqlite:///./data/sparschwein.db"
+    database_url: str = "sqlite+aiosqlite:///./data/gutschwein.db"
     data_dir: Path = Path("./data")
     # Hour (UTC) of the nightly backup into FAMILY_CHAT_ID.
     backup_hour_utc: int = 4

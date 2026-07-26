@@ -1,5 +1,5 @@
 #!/bin/sh
-# Who looked at Sparschwein. Usage: demo-stats [since]   e.g. demo-stats "3 days ago"
+# Who looked at Gutschwein. Usage: demo-stats [since]   e.g. demo-stats "3 days ago"
 #
 # Only a real browser fetches the JS bundle — scanners request "/" and leave, so
 # a hit on "/" proves nothing. And because the demo client never calls the API

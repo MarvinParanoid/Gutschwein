@@ -23,7 +23,7 @@ def test_archive_contains_database_and_images(client: TestClient, tmp_path: Path
 
     with tarfile.open(archive) as tar:
         names = tar.getnames()
-    assert "sparschwein.db" in names
+    assert "gutschwein.db" in names
     assert any(n.startswith("uploads/") for n in names)
     assert "МБ" in summary
 
@@ -34,9 +34,9 @@ def test_snapshot_is_a_readable_database(client: TestClient, tmp_path: Path) -> 
     archive, _ = backup.create_archive(tmp_path)
 
     with tarfile.open(archive) as tar:
-        tar.extract("sparschwein.db", path=tmp_path, filter="data")
+        tar.extract("gutschwein.db", path=tmp_path, filter="data")
 
-    with sqlite3.connect(tmp_path / "sparschwein.db") as db:
+    with sqlite3.connect(tmp_path / "gutschwein.db") as db:
         assert db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"vouchers", "events", "comments", "users"} <= tables
@@ -53,7 +53,7 @@ def test_oversized_archive_drops_images(client: TestClient, tmp_path: Path, monk
 
     with tarfile.open(archive) as tar:
         names = tar.getnames()
-    assert names == ["sparschwein.db"]
+    assert names == ["gutschwein.db"]
     assert "Картинки не влезли" in summary
 
 

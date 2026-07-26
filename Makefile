@@ -3,9 +3,9 @@
 # Machine-specific settings live outside the repository. Copy the three lines
 # below into .make.local (gitignored) with your own values.
 -include .make.local
-VPS ?= root@sparschwein.example.com
-REMOTE ?= /root/sparschwein
-URL ?= https://sparschwein.example.com
+VPS ?= root@gutschwein.example.com
+REMOTE ?= /root/gutschwein
+URL ?= https://gutschwein.example.com
 # data/ holds the database and uploads. It is excluded, and rsync never deletes
 # excluded paths, so --delete cannot eat it.
 # --no-owner/--no-group: rsync run as root would otherwise stamp the remote files

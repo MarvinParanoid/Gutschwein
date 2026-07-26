@@ -62,11 +62,11 @@ async def logout(
     user: CurrentUser,
     session: Session,
     response: Response,
-    sparschwein_session: Annotated[str | None, Cookie()] = None,
+    gutschwein_session: Annotated[str | None, Cookie()] = None,
 ) -> None:
     """Drops this browser's session; other devices keep theirs."""
-    if sparschwein_session:
-        await close_session(session, sparschwein_session)
+    if gutschwein_session:
+        await close_session(session, gutschwein_session)
     response.delete_cookie(COOKIE_NAME, path="/")
 
 

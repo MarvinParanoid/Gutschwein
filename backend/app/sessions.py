@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import LoginToken, Session, User, utcnow
 
-COOKIE_NAME = "sparschwein_session"
+COOKIE_NAME = "gutschwein_session"
 LOGIN_TOKEN_TTL = timedelta(minutes=10)
 SESSION_TTL = timedelta(days=90)
 

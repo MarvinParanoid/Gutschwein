@@ -42,7 +42,7 @@ test('the login link from the bot opens a working session in a plain browser', a
   expect(page.url()).not.toContain(token)
 
   const cookies = await context.cookies()
-  const session = cookies.find((c) => c.name === 'sparschwein_session')
+  const session = cookies.find((c) => c.name === 'gutschwein_session')
   expect(session).toBeTruthy()
   expect(session!.httpOnly).toBe(true)
 

@@ -11,7 +11,7 @@ FROM python:3.13-slim
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     DATA_DIR=/data \
-    DATABASE_URL=sqlite+aiosqlite:////data/sparschwein.db
+    DATABASE_URL=sqlite+aiosqlite:////data/gutschwein.db
 
 WORKDIR /app
 COPY backend/pyproject.toml ./
@@ -22,8 +22,8 @@ COPY backend/alembic.ini ./
 COPY backend/alembic ./alembic
 COPY --from=frontend /src/backend/static ./static
 
-RUN useradd --create-home --uid 10001 sparschwein && mkdir -p /data && chown -R sparschwein /data /app
-USER sparschwein
+RUN useradd --create-home --uid 10001 gutschwein && mkdir -p /data && chown -R gutschwein /data /app
+USER gutschwein
 
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \

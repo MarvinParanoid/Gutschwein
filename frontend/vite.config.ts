@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon-192.png', 'icon-512.png', 'icon-maskable.png'],
       manifest: {
-        name: 'Sparschwein — карты и купоны',
-        short_name: 'Sparschwein',
+        name: 'Gutschwein — карты и купоны',
+        short_name: 'Gutschwein',
         description: 'Подарочные карты семьи: остатки, сроки, штрихкод у кассы',
         lang: 'ru',
         display: 'standalone',
@@ -42,7 +42,7 @@ export default defineConfig({
             urlPattern: ({ url }) => /^\/api\/(images|barcodes)\//.test(url.pathname),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'sparschwein-cards',
+              cacheName: 'gutschwein-cards',
               expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 180 },
               cacheableResponse: { statuses: [200] },
             },
@@ -53,7 +53,7 @@ export default defineConfig({
             handler: 'NetworkFirst',
             method: 'GET',
             options: {
-              cacheName: 'sparschwein-api',
+              cacheName: 'gutschwein-api',
               networkTimeoutSeconds: 4,
               expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 7 },
               cacheableResponse: { statuses: [200] },

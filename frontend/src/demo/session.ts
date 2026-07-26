@@ -9,7 +9,7 @@
  * so there is no request to authorise in the first place.
  */
 
-const FLAG = 'sparschwein-demo'
+const FLAG = 'gutschwein-demo'
 
 // A shared link lands on /demo. The flag is what everything else reads, so the
 // path is turned into one immediately and the address bar goes back to normal —

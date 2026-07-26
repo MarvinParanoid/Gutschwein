@@ -10,7 +10,7 @@ from collections.abc import Iterator
 
 import pytest
 
-TMP_DIR = tempfile.mkdtemp(prefix="sparschwein-tests-")
+TMP_DIR = tempfile.mkdtemp(prefix="gutschwein-tests-")
 os.environ.update(
     DEV_MODE="true",
     RUN_BOT="false",

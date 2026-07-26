@@ -95,7 +95,7 @@ async def get_current_user(
     session: Annotated[AsyncSession, Depends(get_session)],
     authorization: Annotated[str | None, Header()] = None,
     x_dev_user: Annotated[int | None, Header()] = None,
-    sparschwein_session: Annotated[str | None, Cookie()] = None,
+    gutschwein_session: Annotated[str | None, Cookie()] = None,
     accept_language: Annotated[str | None, Header()] = None,
 ) -> User:
     language = language_for(accept_language, settings.default_language)
@@ -106,8 +106,8 @@ async def get_current_user(
         )
 
     # Outside Telegram (the PWA) the identity comes from the session cookie.
-    if sparschwein_session:
-        user = await resolve_session(session, sparschwein_session)
+    if gutschwein_session:
+        user = await resolve_session(session, gutschwein_session)
         if user is not None:
             return check_allowed(user)
 

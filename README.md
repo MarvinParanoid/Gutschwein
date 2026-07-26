@@ -1,7 +1,9 @@
-# 🐷 Sparschwein
+# 🐷 Gutschwein
 
-A family gift-card (Gutschein) manager: what is left on each card, who spent what, and a
-screen the cashier can scan. Runs as a Telegram Mini App and as an installable PWA.
+A family gift-card manager: what is left on each card, who spent what, and a screen the
+cashier can scan. Runs as a Telegram Mini App and as an installable PWA.
+
+*Gutschein* (voucher) + *Schwein* (pig) — the piggy bank you keep your vouchers in.
 
 <img src="docs/demo.gif" alt="Finding a card, showing it at the till, writing down what is left" width="300">
 
@@ -13,7 +15,7 @@ No Telegram account, no bot, no configuration — the demo dataset is enough to 
 screen:
 
 ```bash
-git clone https://github.com/MarvinParanoid/Sparschwein && cd Sparschwein
+git clone https://github.com/MarvinParanoid/Gutschwein && cd Gutschwein
 cp .env.example .env
 docker compose up -d --build
 # then open http://localhost:8000/demo

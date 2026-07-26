@@ -1,4 +1,4 @@
-# Running Sparschwein on a server
+# Running Gutschwein on a server
 
 You need a domain (A record to the server), Docker with the compose plugin, and ports
 80/443 open. Telegram only opens a Mini App over **https with a valid certificate** — a
@@ -11,7 +11,7 @@ three commands, no domain, no bot.
 
 ```
 /newbot                → name, username, gives you BOT_TOKEN
-/setmenubutton         → pick the bot, enter https://sparschwein.example.com,
+/setmenubutton         → pick the bot, enter https://gutschwein.example.com,
                          label the button
 ```
 
@@ -22,8 +22,8 @@ Running without Telegram at all is possible — see [Members without Telegram](#
 ## 2. Code and configuration
 
 ```bash
-git clone https://github.com/MarvinParanoid/Sparschwein /root/sparschwein
-cd /root/sparschwein
+git clone https://github.com/MarvinParanoid/Gutschwein /root/gutschwein
+cd /root/gutschwein
 cp .env.example .env && nano .env
 ```
 
@@ -59,7 +59,7 @@ Caddy gets and renews the certificate on its own, which makes it the shortest pa
 `/etc/caddy/Caddyfile`:
 
 ```
-sparschwein.example.com {
+gutschwein.example.com {
     reverse_proxy 127.0.0.1:8000
 
     # Caddy does not cap the body by default; set it just above the app's own
@@ -95,7 +95,7 @@ app says you have no access, the message carries your Telegram id — add it to
 - **Snap Docker cannot see `/opt`.** Installed as a snap (Ubuntu often does), the CLI and
   the daemon live in a confinement where paths outside `$HOME` do not exist: `docker
   compose` answers `no configuration file provided` and points at `/var/lib/snapd/void/`.
-  Keep the project in `/root/sparschwein` instead; a bind mount from there works.
+  Keep the project in `/root/gutschwein` instead; a bind mount from there works.
 - **`localhost` may not resolve.** Some VPS images ship an `/etc/hosts` with only the
   machine's own hostname. Caddy dies on it (`lookup localhost on 8.8.8.8:53: no such
   host`), and it is not the only one. Add `127.0.0.1 localhost` and
@@ -166,10 +166,10 @@ mechanism off.
 ## Restoring (rehearsed 2026-07-26)
 
 ```bash
-cd /root/sparschwein
+cd /root/gutschwein
 docker compose down
 rm -rf data && mkdir data
-tar xzf ~/sparschwein-2026-07-26.tar.gz -C data
+tar xzf ~/gutschwein-2026-07-26.tar.gz -C data
 # Required: the container runs as uid 10001 and SQLite needs to write.
 chown -R 10001:10001 data
 docker compose up -d

@@ -1,4 +1,4 @@
-# Sparschwein — notes for Claude
+# Gutschwein — notes for Claude
 
 Family voucher (Gutschein) manager: FastAPI + Telegram Mini App. README.md is the product
 description, `docs/deploy.md` the server guide, `docs/internals.md` the reasoning behind

@@ -5,7 +5,7 @@ export const en: Dictionary = {
   locale: 'en-GB',
 
   app: {
-    title: 'Sparschwein',
+    title: 'Gutschwein',
     offline: 'No connection — showing the last loaded data. Changes will not be saved.',
     noAccessHint:
       'Open the app from the bot in Telegram — or ask whoever runs this server for a login link.',

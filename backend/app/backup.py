@@ -49,15 +49,15 @@ def _snapshot_database(source: Path, target: Path) -> None:
 def _build_archive(workdir: Path, include_uploads: bool) -> tuple[Path, int, int]:
     """Pack the snapshot (and optionally the images). Returns path, files, bytes."""
     stamp = datetime.now(UTC).strftime("%Y-%m-%d")
-    archive = workdir / f"sparschwein-{stamp}.tar.gz"
+    archive = workdir / f"gutschwein-{stamp}.tar.gz"
     db = database_file()
     images = 0
 
     with tarfile.open(archive, "w:gz") as tar:
         if db is not None and db.exists():
-            snapshot = workdir / "sparschwein.db"
+            snapshot = workdir / "gutschwein.db"
             _snapshot_database(db, snapshot)
-            tar.add(snapshot, arcname="sparschwein.db")
+            tar.add(snapshot, arcname="gutschwein.db")
         if include_uploads and settings.upload_dir.exists():
             for image in sorted(settings.upload_dir.rglob("*")):
                 if image.is_file():
@@ -90,7 +90,7 @@ async def send_backup(bot: Bot, reason: str) -> str:
     if settings.family_chat_id is None:
         raise RuntimeError(group_t("error.no_chat_for_backup"))
 
-    with tempfile.TemporaryDirectory(prefix="sparschwein-backup-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="gutschwein-backup-") as tmp:
         archive, summary = await asyncio.to_thread(create_archive, Path(tmp))
         stamp = datetime.now(UTC).strftime("%d.%m.%Y %H:%M UTC")
         await bot.send_document(
