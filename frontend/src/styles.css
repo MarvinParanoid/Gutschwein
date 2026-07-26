@@ -396,6 +396,13 @@ button {
   white-space: nowrap;
 }
 
+/* A one-character badge. The box matches its neighbours exactly — the glyph has
+   to as well, which is why this is a typed "?" and not the ❔ emoji: colour
+   emoji ignore the surrounding font metrics and read as a size too big. */
+.badge.glyph {
+  font-weight: 700;
+}
+
 .badge.soon {
   background: color-mix(in srgb, var(--warning) 18%, transparent);
   color: var(--warning);

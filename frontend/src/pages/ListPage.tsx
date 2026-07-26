@@ -316,8 +316,12 @@ function VoucherCard({ voucher, onClick }: { voucher: Voucher; onClick: () => vo
           {/* Icon only: the meta row has to stay on one line, and the word is
               right there on the card itself. */}
           {voucher.balance_uncertain && (
-            <span className="badge soon" title={t.list.unchecked} aria-label={t.list.unchecked}>
-              ❔
+            <span
+              className="badge soon glyph"
+              title={t.list.unchecked}
+              aria-label={t.list.unchecked}
+            >
+              ?
             </span>
           )}
           {voucher.comments_count > 0 && (
