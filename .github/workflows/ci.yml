@@ -88,6 +88,9 @@ jobs:
       - name: Mini App is served from the image
         run: curl -fsS http://127.0.0.1:8000/ | grep -q 'id="root"'
 
+      - name: The demo runs without any configuration
+        run: curl -fsS http://127.0.0.1:8000/demo | grep -q 'id="root"'
+
       - name: Unknown paths are 404, not the SPA
         run: |
           code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/.env)

@@ -7,6 +7,21 @@ screen the cashier can scan. Runs as a Telegram Mini App and as an installable P
 
 **[Try the demo](https://spar-schwein.duckdns.org/demo)** — made-up cards, no account, nothing saved.
 
+## Run it yourself
+
+No Telegram account, no bot, no configuration — the demo dataset is enough to see every
+screen:
+
+```bash
+git clone https://github.com/MarvinParanoid/Sparschwein && cd Sparschwein
+cp .env.example .env
+docker compose up -d --build
+# then open http://localhost:8000/demo
+```
+
+For the real thing you need a bot token and a public HTTPS domain; see
+[Deploying to a VPS](#deploying-to-a-vps).
+
 ## The flow it is built around
 
 A gift card with money on it gets spent over several trips:
