@@ -396,9 +396,13 @@ button {
   white-space: nowrap;
 }
 
-/* A one-character badge. The box matches its neighbours exactly — the glyph has
-   to as well, which is why this is a typed "?" and not the ❔ emoji: colour
-   emoji ignore the surrounding font metrics and read as a size too big. */
+/* A one-character badge, in the same neutral chip as its neighbours: the mark
+   says "unconfirmed", which is an annotation rather than a warning, and an amber
+   blob in a row of grey ones reads as a foreign object. The glyph is what tells
+   it apart, the way 💬 does for comments.
+
+   A typed "?" rather than the ❔ emoji: colour emoji ignore the surrounding font
+   metrics and come out a size too big. */
 .badge.glyph {
   font-weight: 700;
 }

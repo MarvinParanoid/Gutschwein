@@ -317,7 +317,7 @@ function VoucherCard({ voucher, onClick }: { voucher: Voucher; onClick: () => vo
               right there on the card itself. */}
           {voucher.balance_uncertain && (
             <span
-              className="badge soon glyph"
+              className="badge glyph"
               title={t.list.unchecked}
               aria-label={t.list.unchecked}
             >
