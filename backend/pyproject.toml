@@ -1,6 +1,7 @@
 [project]
 name = "sparschwein-backend"
 version = "0.1.0"
+license = "MIT"
 description = "Family voucher manager - FastAPI backend and Telegram bot"
 requires-python = ">=3.12"
 dependencies = [

@@ -257,3 +257,9 @@ optional), but nothing fills it in automatically.
 
 Maybe later: recognising the fields after all, a push aimed at one person rather than the
 whole chat, Postgres if the data ever grows (`DATABASE_URL` is already external).
+
+## Licence
+
+MIT — see [LICENSE](LICENSE). The merchant tiles are drawn from initials and colours on
+purpose: no third-party logos are shipped, so nothing here carries someone else's
+trademark.
