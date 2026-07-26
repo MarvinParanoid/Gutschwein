@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import barcode, storage
 from app.db import get_session
+from app.i18n import Message
 from app.models import Voucher
 
 router = APIRouter(prefix="/api/barcodes", tags=["images"])
@@ -26,16 +27,16 @@ async def get_barcode(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
     if not storage.IMAGE_ID_RE.match(image_id):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Штрихкод не найден")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, Message("error.barcode_not_found"))
 
     rows = await session.execute(select(Voucher).where(Voucher.image_path == image_id))
     voucher = rows.unique().scalars().first()
     if voucher is None or not voucher.code or not voucher.barcode_format:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Штрихкод не найден")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, Message("error.barcode_not_found"))
 
     svg = barcode.to_svg(voucher.code, voucher.barcode_format)
     if svg is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Этот формат не перерисовывается")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, Message("error.barcode_not_drawable"))
 
     return Response(
         svg,

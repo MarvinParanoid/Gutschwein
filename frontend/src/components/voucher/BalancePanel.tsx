@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { api } from '../../api'
 import { balanceRatio, money } from '../../format'
+import { t } from '../../i18n'
 import { haptic } from '../../telegram'
 import type { Voucher } from '../../types'
 
@@ -70,16 +71,16 @@ export default function BalancePanel({
           </div>
           <div className="muted">
             {voucher.value_amount
-              ? `из ${money(voucher.value_amount, voucher.currency)}`
-              : 'остаток'}
+              ? t.list.outOf(money(voucher.value_amount, voucher.currency))
+              : t.balance.rest}
           </div>
           {voucher.balance_uncertain && (
-            <div className="badge soon uncertain">❔ остаток не подтверждён</div>
+            <div className="badge soon uncertain">{t.balance.uncertainBadge}</div>
           )}
         </div>
         {!open && (
           <button className="btn primary" onClick={() => setOpen(true)}>
-            Обновить остаток
+            {t.balance.update}
           </button>
         )}
       </div>
@@ -92,9 +93,7 @@ export default function BalancePanel({
 
       {!open && (
         <button className="btn link uncertain-toggle" onClick={toggleUncertain}>
-          {voucher.balance_uncertain
-            ? 'Остаток известен точно'
-            : 'Не уверен, что деньги остались'}
+          {voucher.balance_uncertain ? t.balance.markCertain : t.balance.markUncertain}
         </button>
       )}
 
@@ -105,13 +104,13 @@ export default function BalancePanel({
               className={mode === 'remaining' ? 'active' : ''}
               onClick={() => setMode('remaining')}
             >
-              Осталось
+              {t.balance.remaining}
             </button>
             <button
               className={mode === 'spent' ? 'active' : ''}
               onClick={() => setMode('spent')}
             >
-              Потратил
+              {t.balance.spent}
             </button>
           </div>
 
@@ -122,7 +121,7 @@ export default function BalancePanel({
               type="text"
               inputMode="decimal"
               autoFocus
-              placeholder={mode === 'spent' ? 'Сумма покупки' : 'Остаток с чека'}
+              placeholder={mode === 'spent' ? t.balance.amountSpent : t.balance.amountRemaining}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submit()}
@@ -131,7 +130,7 @@ export default function BalancePanel({
           <div className="field">
             <input
               type="text"
-              placeholder="Заметка: что купили (необязательно)"
+              placeholder={t.balance.note}
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
@@ -143,10 +142,10 @@ export default function BalancePanel({
               disabled={saving || !amount.trim()}
               onClick={submit}
             >
-              {saving ? 'Сохраняю…' : 'Сохранить'}
+              {saving ? t.balance.saving : t.balance.save}
             </button>
             <button className="btn" onClick={() => setOpen(false)}>
-              Отмена
+              {t.balance.cancel}
             </button>
           </div>
         </div>

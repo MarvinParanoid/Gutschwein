@@ -5,13 +5,16 @@ product description and deployment.
 
 ## Conventions
 
-- **Comments and docstrings in English.** UI strings and API error messages are in Russian —
-  they are shown to the family directly.
+- **Comments and docstrings in English.** User-facing text is localized (ru/en), never
+  written inline: the frontend reads `src/i18n/ru.ts` / `en.ts`, the backend raises
+  `Message("error.…")` keys from `app/i18n.py`.
 - Comment the *why*, not the *what*. Existing comments explain non-obvious decisions
   (capability URLs for images, `render_as_batch` for SQLite, id tiebreak in event ordering).
 - Backend: async everywhere, SQLAlchemy 2 style (`Mapped[...]`, `select()`), no sync sessions.
 - Frontend: no router, no state library. Views are a discriminated union in `App.tsx`,
   server state is fetched per page with `useEffect`.
+- New user-facing string? Add the key to `ru.ts` (source of truth) and `en.ts`, or to
+  `MESSAGES` in `app/i18n.py`. Both halves are covered by tests that fail on a gap.
 
 ## Commands
 
@@ -39,6 +42,9 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
   created/patched with it. An abandoned form leaves an orphan file (no GC yet).
 - Status changes go through `_transition()` in `routers/vouchers.py`, which also writes the
   event. Don't set `voucher.status` directly.
+- API errors carry a key, not a sentence: `raise HTTPException(404, Message("error.x"))`.
+  `main.py` renders it in the reader's language at the boundary, so helpers stay language-free.
+  Family-chat messages have no reader, so they use `group_t()` / `DEFAULT_LANGUAGE`.
 - Gift card balance: `vouchers.balance_amount` is the current truth, and every change is an
   append-only `balance_updated` event carrying `{spent, remaining, note}` — there is no
   separate ledger table. Corrections are ordinary updates, so never mutate past events.
@@ -47,5 +53,5 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
 ## Deliberately not built
 
 Per the product decisions: no OCR/vision recognition, no groups/households/invites,
-no PWA yet. The voucher model is recognition-ready (all fields optional) but nothing
+no manual language switch (the client's language wins). The voucher model is recognition-ready (all fields optional) but nothing
 fills it automatically.

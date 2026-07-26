@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import storage
 from app.auth import CurrentUser
 from app.db import get_session
+from app.i18n import Message, group_t, request_language
 from app.models import (
     Comment,
     Event,
@@ -45,6 +46,9 @@ from app.stats import collect_stats
 router = APIRouter(prefix="/api/vouchers", tags=["vouchers"])
 
 Session = Annotated[AsyncSession, Depends(get_session)]
+# The one thing the request language is needed for by hand: names inside the
+# stats payload. Error details carry their own key and are rendered in main.py.
+Lang = Annotated[str, Depends(request_language)]
 StatusFilter = Literal["active", "draft", "used", "archived", "all"]
 
 
@@ -66,7 +70,7 @@ def _resolve_image(image_id: str | None) -> str | None:
     if image_id is None:
         return None
     if not storage.absolute_path(image_id).is_file():
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Изображение не найдено")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, Message("error.image_not_found"))
     return image_id
 
 
@@ -108,8 +112,8 @@ async def list_vouchers(
 
 
 @router.get("/stats", response_model=StatsOut)
-async def stats(user: CurrentUser, session: Session) -> StatsOut:
-    return await collect_stats(session)
+async def stats(user: CurrentUser, session: Session, lang: Lang) -> StatsOut:
+    return await collect_stats(session, lang)
 
 
 @router.get("/counts", response_model=CountsOut)
@@ -201,7 +205,11 @@ async def create_voucher(
 
     if voucher.status == VoucherStatus.active:
         await notify(
-            f"🐷 {user.display_name} добавил купон: <b>{voucher_label(voucher)}</b>"
+            group_t(
+                "notify.card_added",
+                actor=user.display_name,
+                label=voucher_label(voucher),
+            )
         )
     return await _serialize_one(session, voucher)
 
@@ -275,10 +283,12 @@ async def _transition(
 
 
 @router.post("/{voucher_id}/use", response_model=VoucherOut)
-async def mark_used(user: CurrentUser, session: Session, voucher_id: int) -> VoucherOut:
+async def mark_used(
+    user: CurrentUser, session: Session, voucher_id: int
+) -> VoucherOut:
     voucher = await get_voucher_or_404(session, voucher_id)
     if voucher.status == VoucherStatus.used:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Купон уже отмечен использованным")
+        raise HTTPException(status.HTTP_409_CONFLICT, Message("error.already_used"))
     # "Used up" on a gift card means nothing is left on it.
     if voucher.balance_amount is not None and voucher.balance_amount > 0:
         record_event(
@@ -291,7 +301,7 @@ async def mark_used(user: CurrentUser, session: Session, voucher_id: int) -> Vou
         voucher.balance_amount = Decimal("0.00")
     await _transition(session, voucher, user, VoucherStatus.used, EventKind.used)
     await notify(
-        f"✅ {user.display_name} использовал купон: <b>{voucher_label(voucher)}</b>"
+        group_t("notify.card_used", actor=user.display_name, label=voucher_label(voucher))
     )
     return await _serialize_one(session, voucher)
 
@@ -312,7 +322,7 @@ async def update_balance(
     voucher = await get_voucher_or_404(session, voucher_id)
     if voucher.value_kind != ValueKind.amount:
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "Остаток есть только у купонов на сумму"
+            status.HTTP_400_BAD_REQUEST, Message("error.balance_amount_only")
         )
 
     current = (
@@ -321,16 +331,18 @@ async def update_balance(
         else voucher.value_amount
     )
     if current is None:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "У купона не указан номинал — сначала заполните его"
-        )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, Message("error.no_face_value"))
 
     if payload.spent is not None:
         if payload.spent > current:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                f"Нельзя списать {format_amount(payload.spent)} — "
-                f"на купоне {format_amount(current)} {voucher.currency}",
+                Message(
+                    "error.spend_too_much",
+                    spent=format_amount(payload.spent),
+                    current=format_amount(current),
+                    currency=voucher.currency,
+                ),
             )
         new_balance = current - payload.spent
     else:
@@ -338,9 +350,11 @@ async def update_balance(
         if voucher.value_amount is not None and new_balance > voucher.value_amount:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
-                f"Остаток больше номинала ({format_amount(voucher.value_amount)} "
-                f"{voucher.currency}) — "
-                "поправьте номинал в купоне",
+                Message(
+                    "error.above_face_value",
+                    face=format_amount(voucher.value_amount),
+                    currency=voucher.currency,
+                ),
             )
 
     new_balance = new_balance.quantize(CENT)
@@ -368,16 +382,29 @@ async def update_balance(
 
     label = voucher_label(voucher)
     if emptied:
-        await notify(f"💳 {user.display_name} потратил <b>{label}</b> до конца")
+        await notify(
+            group_t("notify.balance_emptied", actor=user.display_name, label=label)
+        )
     elif delta > 0:
         await notify(
-            f"💳 {user.display_name}: −{format_amount(delta)} {voucher.currency} "
-            f"с <b>{label}</b>, осталось {format_amount(new_balance)} {voucher.currency}"
+            group_t(
+                "notify.balance_spent",
+                actor=user.display_name,
+                label=label,
+                spent=format_amount(delta),
+                remaining=format_amount(new_balance),
+                currency=voucher.currency,
+            )
         )
     else:
         await notify(
-            f"💳 {user.display_name} поправил остаток <b>{label}</b>: "
-            f"{format_amount(new_balance)} {voucher.currency}"
+            group_t(
+                "notify.balance_fixed",
+                actor=user.display_name,
+                label=label,
+                remaining=format_amount(new_balance),
+                currency=voucher.currency,
+            )
         )
     return await _serialize_one(session, voucher)
 
@@ -389,10 +416,10 @@ async def activate_draft(
     """Promote a draft (usually created from a photo sent to the bot) to active."""
     voucher = await get_voucher_or_404(session, voucher_id)
     if voucher.status != VoucherStatus.draft:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Это не черновик")
+        raise HTTPException(status.HTTP_409_CONFLICT, Message("error.not_a_draft"))
     await _transition(session, voucher, user, VoucherStatus.active, EventKind.published)
     await notify(
-        f"🐷 {user.display_name} добавил купон: <b>{voucher_label(voucher)}</b>"
+        group_t("notify.card_added", actor=user.display_name, label=voucher_label(voucher))
     )
     return await _serialize_one(session, voucher)
 
@@ -458,7 +485,12 @@ async def add_comment(
     await session.commit()
     await session.refresh(comment)
     await notify(
-        f"💬 {user.display_name} к купону <b>{voucher_label(voucher)}</b>: {payload.text[:200]}"
+        group_t(
+            "notify.comment",
+            actor=user.display_name,
+            label=voucher_label(voucher),
+            text=payload.text[:200],
+        )
     )
     return CommentOut.model_validate(comment)
 
@@ -471,10 +503,10 @@ async def delete_comment(
 ) -> None:
     comment = await session.get(Comment, comment_id)
     if comment is None or comment.voucher_id != voucher_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Комментарий не найден")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, Message("error.comment_not_found"))
     if comment.author_id != user.id:
         raise HTTPException(
-            status.HTTP_403_FORBIDDEN, "Удалять можно только свои комментарии"
+            status.HTTP_403_FORBIDDEN, Message("error.comment_not_yours")
         )
     await session.delete(comment)
     await session.commit()

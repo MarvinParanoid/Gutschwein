@@ -1,4 +1,5 @@
 import { isGiftCard } from '../../format'
+import { t } from '../../i18n'
 import type { Voucher } from '../../types'
 
 export type Transition = 'use' | 'unuse' | 'archive' | 'restore' | 'activate'
@@ -22,33 +23,33 @@ export default function VoucherActions({
       <div className="actions">
         {voucher.status === 'draft' && (
           <button className="btn primary" disabled={busy} onClick={() => onTransition('activate')}>
-            В активные
+            {t.actions.activate}
           </button>
         )}
         {voucher.status === 'active' && (
           <button className="btn" disabled={busy} onClick={() => onTransition('use')}>
-            ✅ {isGiftCard(voucher) ? 'Потратил всё' : 'Использован'}
+            {isGiftCard(voucher) ? t.actions.useUp : t.actions.markUsed}
           </button>
         )}
         {voucher.status === 'used' && (
           <button className="btn" disabled={busy} onClick={() => onTransition('unuse')}>
-            Вернуть в активные
+            {t.actions.unuse}
           </button>
         )}
         {voucher.status === 'archived' ? (
           <button className="btn" disabled={busy} onClick={() => onTransition('restore')}>
-            Достать из архива
+            {t.actions.restore}
           </button>
         ) : (
           <button className="btn" disabled={busy} onClick={() => onTransition('archive')}>
-            📦 В архив
+            {t.actions.archive}
           </button>
         )}
         <button className="btn" onClick={onEdit}>
-          ✏️ Изменить
+          {t.actions.edit}
         </button>
         <button className="btn danger" onClick={onDelete}>
-          Удалить
+          {t.actions.delete}
         </button>
       </div>
     </div>

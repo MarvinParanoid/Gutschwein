@@ -20,6 +20,7 @@ from fastapi import HTTPException, UploadFile, status
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.config import settings
+from app.i18n import Message
 from app.models import utcnow
 
 pillow_heif.register_heif_opener()
@@ -70,7 +71,7 @@ def to_webp(data: bytes) -> bytes:
             return buffer.getvalue()
     except (UnidentifiedImageError, OSError, ValueError) as exc:
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "Не удалось прочитать изображение"
+            status.HTTP_400_BAD_REQUEST, Message("error.image_unreadable")
         ) from exc
 
 
@@ -87,16 +88,16 @@ async def save_upload(file: UploadFile) -> str:
     if (file.content_type or "") not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            f"Неподдерживаемый тип файла: {file.content_type}",
+            Message("error.unsupported_type", content_type=file.content_type),
         )
     data = await file.read(MAX_IMAGE_BYTES + 1)
     if len(data) > MAX_IMAGE_BYTES:
         raise HTTPException(
             status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            f"Файл больше {MAX_IMAGE_BYTES // 1024 // 1024} МБ",
+            Message("error.file_too_big", limit=MAX_IMAGE_BYTES // 1024 // 1024),
         )
     if not data:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Пустой файл")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, Message("error.empty_file"))
     return save_bytes(data)
 
 
@@ -105,7 +106,7 @@ def absolute_path(relative: str) -> Path:
     root = settings.upload_dir.resolve()
     target = (root / relative).resolve()
     if not target.is_relative_to(root):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Некорректный путь к файлу")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, Message("error.bad_path"))
     return target
 
 

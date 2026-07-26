@@ -42,7 +42,7 @@ class VoucherCreate(VoucherFields):
     @classmethod
     def only_editable_statuses(cls, value: VoucherStatus) -> VoucherStatus:
         if value not in (VoucherStatus.draft, VoucherStatus.active):
-            raise ValueError("Новый купон может быть только черновиком или активным")
+            raise ValueError("error.new_voucher_status")
         return value
 
 
@@ -95,7 +95,7 @@ class BalanceUpdate(BaseModel):
     @model_validator(mode="after")
     def exactly_one(self) -> "BalanceUpdate":
         if (self.spent is None) == (self.remaining is None):
-            raise ValueError("Укажите либо потраченную сумму, либо остаток")
+            raise ValueError("error.spent_or_remaining")
         return self
 
 
@@ -107,7 +107,7 @@ class CommentCreate(BaseModel):
     def strip_text(cls, value: str) -> str:
         stripped = value.strip()
         if not stripped:
-            raise ValueError("Пустой комментарий")
+            raise ValueError("error.empty_comment")
         return stripped
 
 

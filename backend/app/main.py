@@ -3,13 +3,17 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, Response, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.exception_handlers import http_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import notify
 from app.config import settings
+from app.i18n import MESSAGES, Message, language_for, t
 from app.maintenance import maintenance_loop
 from app.migrations import upgrade_database
 from app.routers import auth, barcodes, images, uploads, users, vouchers
@@ -87,6 +91,36 @@ app.include_router(vouchers.router)
 app.include_router(uploads.router)
 app.include_router(images.router)
 app.include_router(barcodes.router)
+
+
+def _reader_language(request: Request) -> str:
+    return language_for(request.headers.get("accept-language"), settings.default_language)
+
+
+# Errors are raised with a message key rather than a sentence, so nothing below
+# has to know who is reading. The language is applied once, here at the edge.
+@app.exception_handler(HTTPException)
+async def localized_http_exception(request: Request, exc: HTTPException) -> Response:
+    if isinstance(exc.detail, Message):
+        detail = exc.detail.render(_reader_language(request))
+        exc = HTTPException(exc.status_code, detail, headers=exc.headers)
+    return await http_exception_handler(request, exc)
+
+
+@app.exception_handler(RequestValidationError)
+async def localized_validation_error(
+    request: Request, exc: RequestValidationError
+) -> Response:
+    """Pydantic prefixes its own text; the key is what the validator raised."""
+    language = _reader_language(request)
+    errors = []
+    for error in exc.errors():
+        key = str(error.get("msg", "")).removeprefix("Value error, ")
+        errors.append({**error, "msg": t(key, language)} if key in MESSAGES else error)
+    return JSONResponse(
+        jsonable_encoder({"detail": errors}),
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+    )
 
 
 @app.get("/healthz")

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { expiryInfo, formatDate, isGiftCard, valueLabel } from '../../format'
+import { t } from '../../i18n'
 import { alertMessage, haptic } from '../../telegram'
 import type { Voucher } from '../../types'
 
@@ -13,13 +14,13 @@ export default function VoucherFacts({ voucher }: { voucher: Voucher }) {
     <div className="panel">
       <div className="rows">
         {!giftCard && valueLabel(voucher) && (
-          <Row label="Скидка">
+          <Row label={t.card.discount}>
             <span className="value">{valueLabel(voucher)}</span>
           </Row>
         )}
         {/* No «Номинал» row for gift cards: the balance panel above already
             reads «32.65 EUR из 50 EUR». */}
-        {voucher.title && voucher.merchant && <Row label="Название">{voucher.title}</Row>}
+        {voucher.title && voucher.merchant && <Row label={t.card.name}>{voucher.title}</Row>}
 
         {/* Most gift cards are added without a deadline; an empty row with a
             dash is just noise. */}
@@ -27,9 +28,9 @@ export default function VoucherFacts({ voucher }: { voucher: Voucher }) {
           <Row
             label={
               <>
-                Срок
+                {t.card.expires}
                 {voucher.expiry_estimated && (
-                  <span className="hint-note"> по правилу магазина</span>
+                  <span className="hint-note">{t.card.expiresByRule}</span>
                 )}
               </>
             }
@@ -46,16 +47,16 @@ export default function VoucherFacts({ voucher }: { voucher: Voucher }) {
         )}
 
         {voucher.valid_from && (
-          <Row label="Действует с">{formatDate(voucher.valid_from)}</Row>
+          <Row label={t.card.validFrom}>{formatDate(voucher.valid_from)}</Row>
         )}
-        {voucher.conditions && <Row label="Условия">{voucher.conditions}</Row>}
-        {voucher.notes && <Row label="Заметка">{voucher.notes}</Row>}
+        {voucher.conditions && <Row label={t.card.conditions}>{voucher.conditions}</Row>}
+        {voucher.notes && <Row label={t.card.note}>{voucher.notes}</Row>}
 
-        <Row label="Добавил">
+        <Row label={t.card.addedBy}>
           {voucher.created_by.display_name}, {formatDate(voucher.created_at)}
         </Row>
         {voucher.used_by && voucher.used_at && (
-          <Row label="Использовал">
+          <Row label={t.card.usedBy}>
             {voucher.used_by.display_name}, {formatDate(voucher.used_at)}
           </Row>
         )}
@@ -85,7 +86,7 @@ function CodeBlock({ code }: { code: string }) {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      alertMessage('Не удалось скопировать — выделите код вручную.')
+      alertMessage(t.card.copyFailed)
     }
   }
 
@@ -93,7 +94,7 @@ function CodeBlock({ code }: { code: string }) {
     <div className="code" style={{ marginTop: 12 }}>
       <span>{code}</span>
       <button className="btn link" onClick={copy}>
-        {copied ? 'скопировано' : 'копировать'}
+        {copied ? t.card.copied : t.card.copy}
       </button>
     </div>
   )

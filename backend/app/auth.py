@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db import get_session
+from app.i18n import language_for, t
 from app.models import User, utcnow
 from app.sessions import resolve_session
 
@@ -36,20 +37,21 @@ class TelegramUser(dict):
 
 
 def verify_init_data(init_data: str, bot_token: str, max_age: int) -> TelegramUser:
+    """Raises ValueError carrying a message *key*, so the caller can translate."""
     data = dict(parse_qsl(init_data, keep_blank_values=True))
     if "hash" not in data:
-        raise ValueError("initData без hash")
+        raise ValueError("error.init_data_no_hash")
     if not check_webapp_signature(bot_token, init_data):
-        raise ValueError("Неверная подпись initData")
+        raise ValueError("error.init_data_bad_signature")
 
     auth_date = int(data.get("auth_date", "0"))
     age = (datetime.now(UTC) - datetime.fromtimestamp(auth_date, UTC)).total_seconds()
     if age > max_age:
-        raise ValueError("initData просрочен")
+        raise ValueError("error.init_data_expired")
 
     raw_user = data.get("user")
     if not raw_user:
-        raise ValueError("initData без блока user")
+        raise ValueError("error.init_data_no_user")
     return TelegramUser(json.loads(raw_user))
 
 
@@ -63,6 +65,7 @@ async def upsert_user(session: AsyncSession, tg: TelegramUser) -> User:
     user.first_name = tg.get("first_name", "") or ""
     user.last_name = tg.get("last_name", "") or ""
     user.username = tg.get("username", "") or ""
+    user.language = language_for(tg.get("language_code"), settings.default_language)
     user.last_seen_at = utcnow()
     await session.commit()
     await session.refresh(user)
@@ -78,7 +81,7 @@ def check_allowed(user: User) -> User:
     if user.telegram_id not in settings.allowed_ids:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            f"Нет доступа. Передайте администратору свой Telegram ID: {user.telegram_id}",
+            t("error.no_access", user.language, telegram_id=user.telegram_id),
         )
     return user
 
@@ -88,7 +91,9 @@ async def get_current_user(
     authorization: Annotated[str | None, Header()] = None,
     x_dev_user: Annotated[int | None, Header()] = None,
     sparschwein_session: Annotated[str | None, Cookie()] = None,
+    accept_language: Annotated[str | None, Header()] = None,
 ) -> User:
+    language = language_for(accept_language, settings.default_language)
     if settings.dev_mode and x_dev_user is not None:
         # Name includes the id so several fake members stay distinguishable locally.
         return await upsert_user(
@@ -104,11 +109,11 @@ async def get_current_user(
     if not authorization or not authorization.lower().startswith("tma "):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
-            "Нужен вход: откройте приложение через бота или войдите по ссылке из чата",
+            t("error.auth_required", language),
         )
     if not settings.bot_token:
         raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "BOT_TOKEN не сконфигурирован"
+            status.HTTP_500_INTERNAL_SERVER_ERROR, t("error.no_bot_token", language)
         )
 
     try:
@@ -116,12 +121,14 @@ async def get_current_user(
             authorization[4:].strip(), settings.bot_token, settings.init_data_max_age
         )
     except ValueError as exc:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, t(str(exc), language)
+        ) from exc
 
     if tg.id not in settings.allowed_ids:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            f"Нет доступа. Передайте администратору свой Telegram ID: {tg.id}",
+            t("error.no_access", language, telegram_id=tg.id),
         )
 
     return await upsert_user(session, tg)

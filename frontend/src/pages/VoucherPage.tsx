@@ -7,7 +7,8 @@ import HistoryPanel from '../components/voucher/HistoryPanel'
 import ScanOverlay from '../components/voucher/ScanOverlay'
 import VoucherActions, { type Transition } from '../components/voucher/VoucherActions'
 import VoucherFacts from '../components/voucher/VoucherFacts'
-import { isGiftCard, statusLabel } from '../format'
+import { cardTitle, isGiftCard, statusLabel } from '../format'
+import { t } from '../i18n'
 import { alertMessage, confirmAction, haptic, inTelegram } from '../telegram'
 import type { Comment, User, Voucher, VoucherEvent } from '../types'
 
@@ -52,7 +53,7 @@ export default function VoucherPage({ voucherId, me, onBack, onDeleted, onEdit }
   }
 
   async function remove() {
-    if (!(await confirmAction('Удалить купон вместе с фото и историей?'))) return
+    if (!(await confirmAction(t.card.deleteConfirm))) return
     try {
       await api.deleteVoucher(voucherId)
       haptic('success')
@@ -79,18 +80,18 @@ export default function VoucherPage({ voucherId, me, onBack, onDeleted, onEdit }
       <div className="topbar">
         {/* Telegram draws its own back button in the header; outside it we need one. */}
         {!inTelegram && (
-          <button className="back" onClick={onBack} aria-label="Назад">
+          <button className="back" onClick={onBack} aria-label={t.common.back}>
             ‹
           </button>
         )}
-        <h1>{voucher.merchant || voucher.title || `Купон #${voucher.id}`}</h1>
+        <h1>{cardTitle(voucher)}</h1>
         <span className="badge">{statusLabel(voucher.status)}</span>
       </div>
 
       {voucher.image_id && (
         <button className="hero-button" onClick={() => setScanning(true)}>
-          <img className="hero" src={imageUrl(voucher.image_id)} alt="Купон" />
-          <span className="hero-hint">📷 Нажмите, чтобы показать сканеру</span>
+          <img className="hero" src={imageUrl(voucher.image_id)} alt="" />
+          <span className="hero-hint">{t.card.scanHint}</span>
         </button>
       )}
 

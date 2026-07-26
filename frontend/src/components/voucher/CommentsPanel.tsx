@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { api } from '../../api'
 import { formatDateTime } from '../../format'
+import { t } from '../../i18n'
 import { alertMessage, confirmAction, haptic } from '../../telegram'
 import type { Comment, User } from '../../types'
 
@@ -36,7 +37,7 @@ export default function CommentsPanel({
   }
 
   async function remove(commentId: number) {
-    if (!(await confirmAction('Удалить комментарий?'))) return
+    if (!(await confirmAction(t.comments.deleteConfirm))) return
     try {
       await api.deleteComment(voucherId, commentId)
       onChanged()
@@ -47,8 +48,8 @@ export default function CommentsPanel({
 
   return (
     <div className="panel">
-      <h2>Комментарии</h2>
-      {comments.length === 0 && <p className="muted">Пока никто ничего не написал.</p>}
+      <h2>{t.comments.title}</h2>
+      {comments.length === 0 && <p className="muted">{t.comments.empty}</p>}
       {comments.map((comment) => (
         <div className="comment" key={comment.id}>
           <div className="head">
@@ -57,7 +58,7 @@ export default function CommentsPanel({
             {/* Only your own: deleting someone else's word is not yours to do. */}
             {comment.author.id === me.id && (
               <button className="btn link" onClick={() => remove(comment.id)}>
-                удалить
+                {t.comments.delete}
               </button>
             )}
           </div>
@@ -67,7 +68,7 @@ export default function CommentsPanel({
 
       <div className="comment-form">
         <input
-          placeholder="Написать семье…"
+          placeholder={t.comments.placeholder}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && send()}

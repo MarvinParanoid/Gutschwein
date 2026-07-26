@@ -20,6 +20,7 @@ from aiogram import Bot
 from aiogram.types import FSInputFile
 
 from app.config import settings
+from app.i18n import group_t
 
 log = logging.getLogger(__name__)
 
@@ -74,21 +75,20 @@ def create_archive(workdir: Path) -> tuple[Path, str]:
         # Losing the images from one archive beats losing the backup entirely.
         archive.unlink(missing_ok=True)
         archive, images, size = _build_archive(workdir, include_uploads=False)
-        note = (
-            f"\n⚠️ Картинки не влезли в лимит Telegram ({MAX_UPLOAD_BYTES // 1024 // 1024} МБ) "
-            "— в архиве только база. Фото есть в этом чате выше."
-        )
+        note = group_t("backup.images_dropped", limit=MAX_UPLOAD_BYTES // 1024 // 1024)
     else:
         note = ""
 
-    summary = f"{size / 1024 / 1024:.1f} МБ, картинок: {images}{note}"
+    summary = group_t(
+        "backup.summary", size=f"{size / 1024 / 1024:.1f}", images=images, note=note
+    )
     return archive, summary
 
 
 async def send_backup(bot: Bot, reason: str) -> str:
     """Build and send a backup. Returns the summary line, raises on failure."""
     if settings.family_chat_id is None:
-        raise RuntimeError("FAMILY_CHAT_ID не задан — некуда отправлять бэкап")
+        raise RuntimeError(group_t("error.no_chat_for_backup"))
 
     with tempfile.TemporaryDirectory(prefix="sparschwein-backup-") as tmp:
         archive, summary = await asyncio.to_thread(create_archive, Path(tmp))
@@ -96,7 +96,7 @@ async def send_backup(bot: Bot, reason: str) -> str:
         await bot.send_document(
             settings.family_chat_id,
             FSInputFile(archive),
-            caption=f"💾 Бэкап Sparschwein · {stamp}\n{summary}\n{reason}",
+            caption=group_t("backup.caption", stamp=stamp, summary=summary, reason=reason),
             disable_notification=True,
         )
     log.info("backup sent: %s", summary)
@@ -137,7 +137,7 @@ async def backup_loop(bot: Bot) -> None:
         try:
             if _already_done_today():
                 continue
-            await send_backup(bot, "по расписанию")
+            await send_backup(bot, group_t("backup.reason_scheduled"))
             _mark_done()
         except asyncio.CancelledError:
             raise

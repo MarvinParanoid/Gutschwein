@@ -21,6 +21,10 @@ export default defineConfig({
 
   use: {
     baseURL: BASE_URL,
+    // The UI follows the client's language. Pin it, or Playwright's default
+    // en-US would silently switch the whole suite to the English dictionary;
+    // locale.spec.ts opts into each language explicitly.
+    locale: 'ru-RU',
     // The production bundle has no dev login of its own. The backend honours this
     // header only when DEV_MODE is on, which is exactly the case here.
     extraHTTPHeaders: { 'X-Dev-User': '1000' },

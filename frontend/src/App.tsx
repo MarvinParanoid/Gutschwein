@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { api } from './api'
+import { t } from './i18n'
 import ListPage from './pages/ListPage'
 import StatsPage from './pages/StatsPage'
 import VoucherForm from './pages/VoucherForm'
@@ -71,10 +72,7 @@ export default function App() {
           <span className="emoji">🔒</span>
           <p>{message}</p>
           {!inTelegram && (
-            <p className="muted">
-              Откройте приложение через бота в Telegram — или пришлите боту команду
-              <b> /login</b>, он даст ссылку для входа в браузере.
-            </p>
+            <p className="muted">{t.app.noAccessHint}</p>
           )}
         </div>
       </div>
@@ -86,9 +84,7 @@ export default function App() {
   return (
     <div className="app">
       {!online && (
-        <div className="offline">
-          Нет сети — показываю последние загруженные данные. Изменения не сохранятся.
-        </div>
+        <div className="offline">{t.app.offline}</div>
       )}
       {view.name === 'list' && (
         <ListPage

@@ -2,6 +2,8 @@
 
 interface TelegramWebApp {
   initData: string
+  // Unsigned copy of the same data; fine for choosing a language, never for auth.
+  initDataUnsafe?: { user?: { language_code?: string } }
   colorScheme: 'light' | 'dark'
   ready(): void
   expand(): void

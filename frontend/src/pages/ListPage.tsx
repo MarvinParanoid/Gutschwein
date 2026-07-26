@@ -10,10 +10,11 @@ import {
   formatDate,
   isPartlySpent,
   money,
-  plural,
   primaryAmount,
 } from '../format'
+import { t } from '../i18n'
 import { haptic, inTelegram } from '../telegram'
+import { useOverlay } from '../useOverlay'
 import type { Counts, MerchantStat, Voucher, VoucherStatus } from '../types'
 
 interface Props {
@@ -28,18 +29,11 @@ interface Props {
   onStats: () => void
 }
 
-const EMPTY_STATES: Record<VoucherStatus, { emoji: string; text: string }> = {
-  active: { emoji: '🐷', text: 'Пока пусто. Пришлите фото купона боту или добавьте вручную.' },
-  draft: { emoji: '📸', text: 'Черновиков нет. Отправьте боту скрин — он появится здесь.' },
-  used: { emoji: '✅', text: 'Ничего пока не потрачено.' },
-  archived: { emoji: '📦', text: 'Архив пуст.' },
-}
-
-const TAB_HINTS: Record<VoucherStatus, string> = {
-  active: 'есть чем платить',
-  draft: 'фото есть, поля не заполнены',
-  used: 'денег на них не осталось',
-  archived: 'убраны с глаз, деньги могли остаться',
+const EMPTY_EMOJI: Record<VoucherStatus, string> = {
+  active: '🐷',
+  draft: '📸',
+  used: '✅',
+  archived: '📦',
 }
 
 export default function ListPage({
@@ -104,9 +98,9 @@ export default function ListPage({
     setVouchers(null)
   }
 
-  const empty = EMPTY_STATES[tab]
+  const emptyEmoji = EMPTY_EMOJI[tab]
   const filtering = Boolean(query.trim() || merchant)
-  const currentLabel = STATUS_TABS.find((t) => t.key === tab)?.label ?? ''
+  const currentLabel = STATUS_TABS.find((item) => item.key === tab)?.label ?? ''
   const selectedShop = shops.find((s) => s.merchant === merchant) ?? null
 
   return (
@@ -121,7 +115,7 @@ export default function ListPage({
             haptic()
             setMenuOpen(true)
           }}
-          aria-label="Меню"
+          aria-label={t.list.menu}
         >
           ☰
         </button>
@@ -150,7 +144,7 @@ export default function ListPage({
               onMerchantChange(null)
             }}
           >
-            Все
+            {t.list.all}
           </button>
           {shops.map((shop) => (
             <button
@@ -171,15 +165,17 @@ export default function ListPage({
 
       {selectedShop && (
         <p className="chip-summary">
-          {selectedShop.merchant}: {selectedShop.count}{' '}
-          {plural(selectedShop.count, 'карта', 'карты', 'карт')}
-          {Number(selectedShop.balance) > 0 && ` · ${money(selectedShop.balance, 'EUR')}`}
+          {t.list.shopSummary(
+            selectedShop.merchant,
+            t.list.cards(selectedShop.count),
+            Number(selectedShop.balance) > 0 ? money(selectedShop.balance, 'EUR') : null,
+          )}
         </p>
       )}
 
       <input
         className="search"
-        placeholder="Поиск: магазин, заметка…"
+        placeholder={t.list.search}
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
       />
@@ -194,7 +190,7 @@ export default function ListPage({
         (filtering ? (
           <div className="empty">
             <span className="emoji">🔍</span>
-            <p>Ничего не нашлось{query.trim() && ` по запросу «${query.trim()}»`}.</p>
+            <p>{t.list.noResults(query.trim())}</p>
             <button
               className="btn"
               onClick={() => {
@@ -202,13 +198,13 @@ export default function ListPage({
                 onMerchantChange(null)
               }}
             >
-              Сбросить фильтры
+              {t.list.resetFilters}
             </button>
           </div>
         ) : (
           <div className="empty">
-            <span className="emoji">{empty.emoji}</span>
-            <p>{empty.text}</p>
+            <span className="emoji">{emptyEmoji}</span>
+            <p>{t.empty[tab]}</p>
           </div>
         ))}
 
@@ -227,7 +223,7 @@ export default function ListPage({
         </div>
       )}
 
-      <button className="fab" onClick={onCreate} aria-label="Добавить купон">
+      <button className="fab" onClick={onCreate} aria-label={t.list.add}>
         +
       </button>
     </>
@@ -249,13 +245,7 @@ function TabMenu({
   onStats: () => void
   onClose: () => void
 }) {
-  useEffect(() => {
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previous
-    }
-  }, [])
+  useOverlay(onClose)
 
   const leftInArchive = counts && Number(counts.archived_balance) > 0
 
@@ -271,7 +261,7 @@ function TabMenu({
           >
             <span className="sheet-label">
               {item.label}
-              <span className="sheet-hint">{TAB_HINTS[item.key]}</span>
+              <span className="sheet-hint">{t.tabHints[item.key]}</span>
             </span>
             {counts && <span className="sheet-count">{counts[item.key]}</span>}
           </button>
@@ -279,20 +269,19 @@ function TabMenu({
 
         {leftInArchive && (
           <p className="sheet-note">
-            💸 В архиве ещё {money(counts.archived_balance, counts.currency)} — возможно,
-            эти карты рано убрали
+            {t.list.inArchive(money(counts.archived_balance, counts.currency))}
           </p>
         )}
 
         <button className="sheet-item separated" onClick={onStats}>
           <span className="sheet-label">
-            📊 Статистика
-            <span className="sheet-hint">сколько лежит, куда уходит, кто тратит</span>
+            {t.list.stats}
+            <span className="sheet-hint">{t.list.statsHint}</span>
           </span>
         </button>
 
         <button className="btn" onClick={onClose}>
-          Закрыть
+          {t.list.close}
         </button>
       </div>
     </div>
@@ -317,14 +306,16 @@ function VoucherCard({ voucher, onClick }: { voucher: Voucher; onClick: () => vo
               {expiry.text}
             </span>
           ) : (
-            <span className="badge">без срока</span>
+            <span className="badge">{t.list.noBalance}</span>
           )}
           {/* Keyed off used_at, not the status: a spent voucher that was later
               archived must not look like it was never used. */}
           {voucher.used_at && (
-            <span className="badge ok">потрачен {formatDate(voucher.used_at)}</span>
+            <span className="badge ok">{t.list.spentOn(formatDate(voucher.used_at))}</span>
           )}
-          {voucher.balance_uncertain && <span className="badge soon">❔ не проверен</span>}
+          {voucher.balance_uncertain && (
+            <span className="badge soon">{t.list.unchecked}</span>
+          )}
           {voucher.comments_count > 0 && (
             <span className="badge">💬 {voucher.comments_count}</span>
           )}
@@ -336,7 +327,7 @@ function VoucherCard({ voucher, onClick }: { voucher: Voucher; onClick: () => vo
           <div className="value">{value}</div>
           {/* Face value only matters once part of the card is gone. */}
           {isPartlySpent(voucher) && voucher.value_amount && (
-            <div className="of">из {money(voucher.value_amount, voucher.currency)}</div>
+            <div className="of">{t.list.outOf(money(voucher.value_amount, voucher.currency))}</div>
           )}
         </div>
       )}

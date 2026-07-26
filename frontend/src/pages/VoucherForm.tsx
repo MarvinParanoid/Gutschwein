@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { api, imageUrl } from '../api'
 import { trimAmount } from '../format'
+import { t } from '../i18n'
 import { alertMessage, haptic, inTelegram } from '../telegram'
 import type { ValueKind, VoucherDraft } from '../types'
 
@@ -12,31 +13,15 @@ interface Props {
 }
 
 const VALUE_KINDS: { key: ValueKind; label: string }[] = [
-  { key: 'amount', label: 'На сумму' },
-  { key: 'percent', label: 'Процент' },
-  { key: 'other', label: 'Другое' },
+  { key: 'amount', label: t.form.kindAmount },
+  { key: 'percent', label: t.form.kindPercent },
+  { key: 'other', label: t.form.kindOther },
 ]
 
 // Placeholders rotate on every open: they show the format and make a form nobody
 // wants to fill in slightly less of a chore.
-const NOTE_HINTS = [
-  'Не трогать! Это на новый пылесос',
-  'Лежит в бардачке под мандаринами',
-  'Потратишь — купи мне кофе',
-  'Спрятан за банкой с гречкой',
-  'Только на что-нибудь бесполезное и приятное',
-  'Папа, это не на инструменты',
-]
-
-const CONDITION_HINTS = [
-  'от 30 EUR и, конечно, не на алкоголь',
-  'кроме акционных товаров — как всегда',
-  'не суммируется ни с чем на свете',
-  'только по вторникам, спасибо, Rewe',
-  'один раз, одному человеку, в одном магазине',
-]
-
-const pick = (options: string[]) => options[Math.floor(Math.random() * options.length)]
+const pick = (options: readonly string[]) =>
+  options[Math.floor(Math.random() * options.length)]
 
 const EMPTY: VoucherDraft = {
   merchant: '',
@@ -59,8 +44,8 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
   const [showExtra, setShowExtra] = useState(false)
   // Chosen once per mount, so the text does not shuffle while typing.
   const [hints] = useState(() => ({
-    notes: pick(NOTE_HINTS),
-    conditions: pick(CONDITION_HINTS),
+    notes: pick(t.form.noteHints),
+    conditions: pick(t.form.conditionHints),
   }))
   const [loading, setLoading] = useState(Boolean(voucherId))
   const [saving, setSaving] = useState(false)
@@ -154,20 +139,20 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
     <>
       <div className="topbar">
         {!inTelegram && (
-          <button className="back" onClick={onCancel} aria-label="Назад">
+          <button className="back" onClick={onCancel} aria-label={t.common.back}>
             ‹
           </button>
         )}
-        <h1>{voucherId ? 'Изменить купон' : 'Новый купон'}</h1>
+        <h1>{voucherId ? t.form.editTitle : t.form.newTitle}</h1>
       </div>
 
       {error && <div className="error">{error}</div>}
 
       <label className="photo-picker">
         {draft.image_id ? (
-          <img src={imageUrl(draft.image_id)} alt="Фото купона" />
+          <img src={imageUrl(draft.image_id)} alt="" />
         ) : (
-          <span>{uploading ? 'Загружаю…' : '📷 Добавить фото или скрин'}</span>
+          <span>{uploading ? t.form.uploading : t.form.addPhoto}</span>
         )}
         <input
           type="file"
@@ -177,18 +162,18 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
       </label>
       {draft.image_id && (
         <button className="btn link" onClick={() => set('image_id', null)}>
-          убрать фото
+          {t.form.removePhoto}
         </button>
       )}
 
       <div className="panel">
         <div className="field">
-          <label htmlFor="merchant">Магазин</label>
+          <label htmlFor="merchant">{t.form.merchant}</label>
           <input
             id="merchant"
             list="merchants"
             value={draft.merchant}
-            placeholder="DM, Rewe, Lidl…"
+            placeholder={t.form.merchantPlaceholder}
             onChange={(e) => set('merchant', e.target.value)}
           />
           <datalist id="merchants">
@@ -199,7 +184,7 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
         </div>
 
         <div className="field">
-          <label>Тип скидки</label>
+          <label>{t.form.kind}</label>
           <div className="segmented">
             {VALUE_KINDS.map((kind) => (
               <button
@@ -217,7 +202,7 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
           <div className="field-row">
             <div className="field">
               <label htmlFor="amount">
-                {draft.value_kind === 'percent' ? 'Процент' : 'Номинал'}
+                {draft.value_kind === 'percent' ? t.form.percent : t.form.faceValue}
               </label>
               <input
                 id="amount"
@@ -231,7 +216,7 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
             </div>
             {draft.value_kind === 'amount' && (
               <div className="field narrow">
-                <label htmlFor="currency">Валюта</label>
+                <label htmlFor="currency">{t.form.currency}</label>
                 <input
                   id="currency"
                   value={draft.currency}
@@ -243,7 +228,7 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
         )}
 
         <div className="field">
-          <label htmlFor="notes">Заметка для семьи</label>
+          <label htmlFor="notes">{t.form.note}</label>
           <textarea
             id="notes"
             value={draft.notes}
@@ -256,34 +241,34 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
             gift card is identified by the shop and the photo. They stay in the
             model, just out of the way. */}
         <button className="btn link disclosure" onClick={() => setShowExtra(!showExtra)}>
-          {showExtra ? 'Свернуть ▴' : 'Дополнительно ▾'}
+          {showExtra ? t.form.less : t.form.more}
         </button>
 
         {showExtra && (
           <>
             <div className="field">
-              <label htmlFor="title">Название</label>
+              <label htmlFor="title">{t.form.name}</label>
               <input
                 id="title"
                 value={draft.title}
-                placeholder="если отличается от магазина"
+                placeholder={t.form.namePlaceholder}
                 onChange={(e) => set('title', e.target.value)}
               />
             </div>
 
             <div className="field">
-              <label htmlFor="code">Код</label>
+              <label htmlFor="code">{t.form.code}</label>
               <input
                 id="code"
                 value={draft.code}
-                placeholder="если на фото его не видно"
+                placeholder={t.form.codePlaceholder}
                 onChange={(e) => set('code', e.target.value)}
               />
             </div>
 
             <div className="field-row">
               <div className="field">
-                <label htmlFor="from">Действует с</label>
+                <label htmlFor="from">{t.form.validFrom}</label>
                 <input
                   id="from"
                   type="date"
@@ -292,7 +277,7 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
                 />
               </div>
               <div className="field">
-                <label htmlFor="until">Действует до</label>
+                <label htmlFor="until">{t.form.validUntil}</label>
                 <input
                   id="until"
                   type="date"
@@ -303,7 +288,7 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
             </div>
 
             <div className="field">
-              <label htmlFor="conditions">Условия</label>
+              <label htmlFor="conditions">{t.form.conditions}</label>
               <input
                 id="conditions"
                 value={draft.conditions}
@@ -317,10 +302,10 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
 
       <div className="actions">
         <button className="btn primary" disabled={saving || uploading} onClick={save}>
-          {saving ? 'Сохраняю…' : 'Сохранить'}
+          {saving ? t.form.saving : t.form.save}
         </button>
         <button className="btn" onClick={onCancel}>
-          Отмена
+          {t.form.cancel}
         </button>
       </div>
     </>

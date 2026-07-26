@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 
 import { api } from '../api'
-import { money, plural, trimAmount } from '../format'
+import { money, trimAmount } from '../format'
+import { locale, t } from '../i18n'
 import { inTelegram } from '../telegram'
 import type { Stats } from '../types'
 
@@ -27,7 +28,10 @@ export default function StatsPage({ onBack }: { onBack: () => void }) {
   const { currency } = stats
   const thisMonth = Number(stats.spent_this_month)
   const prevMonth = Number(stats.spent_prev_month)
-  const atRisk = Number(stats.expired_balance) + Number(stats.expiring_soon)
+  const atRisk =
+    Number(stats.expired_balance) +
+    Number(stats.expiring_soon) +
+    Number(stats.uncertain_balance)
   // A shop nothing was ever spent at says nothing about where money goes.
   const spentByMerchant = stats.by_merchant.filter((m) => Number(m.spent) > 0)
 
@@ -35,52 +39,57 @@ export default function StatsPage({ onBack }: { onBack: () => void }) {
     <>
       <div className="topbar">
         {!inTelegram && (
-          <button className="back" onClick={onBack} aria-label="Назад">
+          <button className="back" onClick={onBack} aria-label={t.common.back}>
             ‹
           </button>
         )}
-        <h1>Статистика</h1>
+        <h1>{t.stats.title}</h1>
       </div>
 
       <div className="panel">
         <div className="stat-hero">{money(stats.on_cards, currency)}</div>
         <div className="stat-hero-caption">
-          на картах · {stats.cards_active}{' '}
-          {plural(stats.cards_active, 'активная карта', 'активные карты', 'активных карт')}
+          {t.stats.onCards} · {t.stats.activeCards(stats.cards_active)}
         </div>
       </div>
 
       <div className="kpi-row">
         <div className="kpi">
           <div className="kpi-value">{money(stats.spent_this_month, currency)}</div>
-          <div className="kpi-label">в этом месяце</div>
+          <div className="kpi-label">{t.stats.thisMonth}</div>
           {prevMonth > 0 && <MonthDelta current={thisMonth} previous={prevMonth} />}
         </div>
         <div className="kpi">
           <div className="kpi-value">{money(stats.spent_total, currency)}</div>
-          <div className="kpi-label">за всё время</div>
+          <div className="kpi-label">{t.stats.allTime}</div>
         </div>
       </div>
 
       {atRisk > 0 && (
         <div className="panel">
-          <h2>Деньги под риском</h2>
+          <h2>{t.stats.atRisk}</h2>
           <div className="rows">
             {Number(stats.expired_balance) > 0 && (
               <div className="row">
-                <span className="label">⚠️ на истёкших картах</span>
+                <span className="label">{t.stats.expired}</span>
                 <span className="val">{money(stats.expired_balance, currency)}</span>
               </div>
             )}
             {Number(stats.expiring_soon) > 0 && (
               <div className="row">
-                <span className="label">⏳ истекает за {stats.expiring_soon_days} дней</span>
+                <span className="label">{t.stats.expiringIn(stats.expiring_soon_days)}</span>
                 <span className="val">{money(stats.expiring_soon, currency)}</span>
+              </div>
+            )}
+            {Number(stats.uncertain_balance) > 0 && (
+              <div className="row">
+                <span className="label">{t.stats.uncertain}</span>
+                <span className="val">{money(stats.uncertain_balance, currency)}</span>
               </div>
             )}
             {Number(stats.archived_balance) > 0 && (
               <div className="row">
-                <span className="label">📦 лежит в архиве</span>
+                <span className="label">{t.stats.inArchive}</span>
                 <span className="val">{money(stats.archived_balance, currency)}</span>
               </div>
             )}
@@ -90,13 +99,13 @@ export default function StatsPage({ onBack }: { onBack: () => void }) {
 
       {spentByMerchant.length > 0 && (
         <div className="panel">
-          <h2>Куда уходит</h2>
+          <h2>{t.stats.whereItGoes}</h2>
           <BarList
             items={spentByMerchant.map((m) => ({
               label: m.merchant,
               value: Number(m.spent),
               text: money(m.spent, currency),
-              note: Number(m.on_cards) > 0 ? `осталось ${money(m.on_cards, currency)}` : '',
+              note: Number(m.on_cards) > 0 ? t.stats.left(money(m.on_cards, currency)) : '',
             }))}
           />
         </div>
@@ -104,20 +113,20 @@ export default function StatsPage({ onBack }: { onBack: () => void }) {
 
       {stats.by_member.length > 0 && (
         <div className="panel">
-          <h2>Кто тратит</h2>
+          <h2>{t.stats.whoSpends}</h2>
           <BarList
             items={stats.by_member.map((m) => ({
               label: m.name,
               value: Number(m.spent),
               text: money(m.spent, currency),
-              note: `${m.payments} ${plural(m.payments, 'покупка', 'покупки', 'покупок')}`,
+              note: t.stats.purchases(m.payments),
             }))}
           />
         </div>
       )}
 
       <div className="panel">
-        <h2>По месяцам</h2>
+        <h2>{t.stats.byMonth}</h2>
         <MonthlyChart months={stats.monthly} currency={currency} />
       </div>
     </>
@@ -126,12 +135,15 @@ export default function StatsPage({ onBack }: { onBack: () => void }) {
 
 function MonthDelta({ current, previous }: { current: number; previous: number }) {
   const diff = current - previous
-  if (Math.abs(diff) < 0.01) return <div className="kpi-delta">как в прошлом месяце</div>
+  if (Math.abs(diff) < 0.01)
+    return <div className="kpi-delta">{t.stats.sameAsLastMonth}</div>
   // Arrow plus words, never colour alone: this app's accent and green are
   // indistinguishable to a deuteranope.
   return (
     <div className="kpi-delta">
-      {diff > 0 ? '▲' : '▼'} {trimAmount(Math.abs(diff).toFixed(2))} к прошлому
+      {t.stats.vsLastMonth(
+        `${diff > 0 ? '▲' : '▼'} ${trimAmount(Math.abs(diff).toFixed(2))}`,
+      )}
     </div>
   )
 }
@@ -171,7 +183,7 @@ function BarList({ items }: { items: BarItem[] }) {
 
 function monthLabel(month: string): string {
   const [year, index] = month.split('-').map(Number)
-  return new Date(year, index - 1, 1).toLocaleDateString('ru-RU', { month: 'short' })
+  return new Date(year, index - 1, 1).toLocaleDateString(locale, { month: 'short' })
 }
 
 /**
@@ -189,7 +201,7 @@ function MonthlyChart({
   const values = months.map((m) => Number(m.spent))
   const max = Math.max(...values, 0)
 
-  if (max === 0) return <p className="muted">Пока ничего не потрачено.</p>
+  if (max === 0) return <p className="muted">{t.stats.nothingSpent}</p>
 
   const peak = months[values.indexOf(max)]?.month
   const selected = months.find((m) => m.month === picked)
@@ -228,7 +240,7 @@ function MonthlyChart({
       <p className="muted">
         {selected
           ? `${monthLabel(selected.month)}: ${money(selected.spent, currency)}`
-          : 'Нажмите на столбец, чтобы увидеть сумму'}
+          : t.stats.tapColumn}
       </p>
     </>
   )

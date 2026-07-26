@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { t } from '../i18n'
+
 const MIN_SCALE = 1
 const MAX_SCALE = 6
 const STEP = 1.6
@@ -200,7 +202,7 @@ export default function ZoomableImage({ src, alt, rotated, className }: Props) {
           className="btn"
           onClick={() => zoomTo(scale / STEP)}
           disabled={scale <= MIN_SCALE}
-          aria-label="Уменьшить"
+          aria-label={t.scan.zoomOut}
         >
           −
         </button>
@@ -209,7 +211,7 @@ export default function ZoomableImage({ src, alt, rotated, className }: Props) {
           className="btn"
           onClick={() => zoomTo(scale * STEP)}
           disabled={scale >= MAX_SCALE}
-          aria-label="Увеличить"
+          aria-label={t.scan.zoomIn}
         >
           +
         </button>

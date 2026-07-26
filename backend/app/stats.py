@@ -15,6 +15,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.i18n import default_language, t
 from app.models import Event, EventKind, User, Voucher, VoucherStatus, utcnow
 from app.schemas import MemberSpend, MerchantSpend, MonthSpend, StatsOut
 
@@ -33,7 +34,8 @@ def _shift_month(anchor: date, months: int) -> date:
     return date(total // 12, total % 12 + 1, 1)
 
 
-async def collect_stats(session: AsyncSession) -> StatsOut:
+async def collect_stats(session: AsyncSession, language: str | None = None) -> StatsOut:
+    language = language or default_language()
     today = utcnow().date()
     stats = StatsOut(expiring_soon_days=EXPIRING_SOON_DAYS)
 
@@ -108,7 +110,7 @@ async def collect_stats(session: AsyncSession) -> StatsOut:
         if merchant:
             spent_by_merchant[merchant] = spent_by_merchant.get(merchant, Decimal(0)) + amount
 
-        name = actor.display_name if actor is not None else "Кто-то"
+        name = actor.display_name if actor is not None else t("label.someone", language)
         entry = spent_by_member.setdefault(name, [Decimal(0), 0])
         entry[0] += amount
         entry[1] += 1

@@ -49,27 +49,27 @@ def test_accepts_init_data_without_signature_field() -> None:
 def test_rejects_tampered_payload() -> None:
     init_data = sign(base_fields(signature="abc"))
     tampered = init_data.replace("151724313", "999999999")
-    with pytest.raises(ValueError, match="подпись"):
+    with pytest.raises(ValueError, match="bad_signature"):
         verify_init_data(tampered, TOKEN, 3600)
 
 
 def test_rejects_other_bots_token() -> None:
-    with pytest.raises(ValueError, match="подпись"):
+    with pytest.raises(ValueError, match="bad_signature"):
         verify_init_data(sign(base_fields()), "111:OTHER-TOKEN", 3600)
 
 
 def test_rejects_stale_init_data() -> None:
     old = base_fields(auth_date=str(int(time.time()) - 99_999))
-    with pytest.raises(ValueError, match="просрочен"):
+    with pytest.raises(ValueError, match="expired"):
         verify_init_data(sign(old), TOKEN, 3600)
 
 
 def test_rejects_missing_hash() -> None:
-    with pytest.raises(ValueError, match="без hash"):
+    with pytest.raises(ValueError, match="no_hash"):
         verify_init_data(urlencode(base_fields()), TOKEN, 3600)
 
 
 def test_rejects_missing_user_block() -> None:
     fields = {"auth_date": str(int(time.time())), "query_id": "AAHtest"}
-    with pytest.raises(ValueError, match="без блока user"):
+    with pytest.raises(ValueError, match="no_user"):
         verify_init_data(sign(fields), TOKEN, 3600)

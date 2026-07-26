@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { barcodeUrl, imageUrl } from '../../api'
+import { t } from '../../i18n'
+import { useOverlay } from '../../useOverlay'
 import ZoomableImage from '../ZoomableImage'
 
 /**
@@ -23,14 +25,7 @@ export default function ScanOverlay({
   // agrees, so the original picture stays one tap away.
   const [showPhoto, setShowPhoto] = useState(!hasBarcode)
 
-  // Keep the page underneath from scrolling while the overlay is up.
-  useEffect(() => {
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previous
-    }
-  }, [])
+  useOverlay(onClose)
 
   return (
     <div className="scan">
@@ -38,27 +33,25 @@ export default function ScanOverlay({
         key={showPhoto ? 'photo' : 'barcode'}
         className={`scan-image ${rotated ? 'rotated' : ''}`}
         src={showPhoto ? imageUrl(imageId) : barcodeUrl(imageId)}
-        alt={showPhoto ? 'Купон для сканирования' : 'Штрихкод карты'}
+        alt={showPhoto ? t.scan.photoAlt : t.scan.barcodeAlt}
         rotated={rotated}
       />
       {code && <div className="scan-code">{code}</div>}
       <div className="scan-actions">
         {hasBarcode && (
           <button className="btn" onClick={() => setShowPhoto(!showPhoto)}>
-            {showPhoto ? '▮▮ Код' : '🖼 Фото'}
+            {showPhoto ? t.scan.code : t.scan.photo}
           </button>
         )}
         <button className="btn" onClick={() => setRotated(!rotated)}>
-          ↻ Повернуть
+          {t.scan.rotate}
         </button>
         <button className="btn primary" onClick={onClose}>
-          Готово
+          {t.scan.done}
         </button>
       </div>
       <p className="scan-hint">
-        {showPhoto
-          ? 'Щипок или двойной тап — увеличить. Выкрутите яркость: так сканер читает надёжнее'
-          : 'Код перерисован из карты — чёткий на любом увеличении. Не читается? Переключитесь на фото'}
+        {showPhoto ? t.scan.hintPhoto : t.scan.hintBarcode}
       </p>
     </div>
   )

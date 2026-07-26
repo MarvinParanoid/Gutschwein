@@ -1,3 +1,4 @@
+import { locale, t } from './i18n'
 import { tg } from './telegram'
 import type {
   Comment,
@@ -12,6 +13,11 @@ import type {
 } from './types'
 
 export class ApiError extends Error {}
+
+/** The server answers errors in this language; it matches what the UI shows. */
+function languageHeader(): Record<string, string> {
+  return { 'Accept-Language': locale.startsWith('ru') ? 'ru' : 'en' }
+}
 
 function authHeaders(): Record<string, string> {
   const initData = tg?.initData
@@ -29,13 +35,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     credentials: 'same-origin',
     headers: {
       ...authHeaders(),
+      ...languageHeader(),
       ...(init.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
       ...init.headers,
     },
   })
 
   if (!response.ok) {
-    let detail = `Ошибка ${response.status}`
+    let detail = t.app.genericError(response.status)
     try {
       const body = await response.json()
       if (typeof body.detail === 'string') detail = body.detail

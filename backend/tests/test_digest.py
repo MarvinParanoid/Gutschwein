@@ -141,3 +141,19 @@ async def test_spent_and_archived_cards_stay_out_of_the_balance(
 
     assert "50 EUR" in text
     assert "999" not in text
+
+
+async def test_digest_in_english(session: AsyncSession, monkeypatch):
+    """DEFAULT_LANGUAGE switches the family chat, digest included."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "default_language", "en")
+    user = await make_user(session)
+    await add_card(session, user, "Rewe", "40")
+    await add_card(session, user, "Penny", "10")
+
+    text = await build_digest(session)
+
+    assert "The week in cards" in text
+    assert "across 2 of them" in text
+    assert "Nothing was spent this week" in text

@@ -59,6 +59,8 @@ class User(Base):
     first_name: Mapped[str] = mapped_column(String(128), default="")
     last_name: Mapped[str] = mapped_column(String(128), default="")
     username: Mapped[str] = mapped_column(String(128), default="")
+    # Telegram's language for this member; background jobs need it after the fact.
+    language: Mapped[str] = mapped_column(String(8), default="ru")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

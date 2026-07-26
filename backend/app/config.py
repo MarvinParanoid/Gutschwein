@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
     # Hour (UTC) of the nightly backup into FAMILY_CHAT_ID.
     backup_hour_utc: int = 4
+    # Group-chat messages have no single reader, so they use this language.
+    default_language: str = "ru"
     # Weekly digest: Sunday evening, before the week's shopping starts.
     digest_weekday: int = 6  # Monday is 0
     digest_hour_utc: int = 17

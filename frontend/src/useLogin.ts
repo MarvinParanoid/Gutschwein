@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { api } from './api'
+import { t } from './i18n'
 
 export type LoginState = 'idle' | 'working' | 'failed'
 
@@ -22,7 +23,7 @@ export function useLogin(): { state: LoginState; error: string | null } {
     const token = window.location.hash.replace(/^#/, '')
     if (!token) {
       setState('failed')
-      setError('В ссылке нет кода входа. Запросите новую: команда /login боту.')
+      setError(t.app.loginNoToken)
       return
     }
 

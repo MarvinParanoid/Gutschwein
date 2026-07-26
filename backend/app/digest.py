@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db import SessionLocal
+from app.i18n import group_t
 from app.models import Event, EventKind, Voucher, VoucherStatus, utcnow
 from app.services import format_amount
 from app.stats import collect_stats
@@ -68,45 +69,68 @@ async def build_digest(session: AsyncSession) -> str | None:
     week_before = await _spent_since(session, now - timedelta(days=14))
     currency = stats.currency
 
-    lines = ["🐷 <b>Сводка за неделю</b>", ""]
+    lines = [group_t("digest.title"), ""]
     lines.append(
-        f"На картах: <b>{format_amount(stats.on_cards)} {currency}</b> "
-        f"на {stats.cards_active} шт."
+        group_t(
+            "digest.on_cards_one" if stats.cards_active == 1 else "digest.on_cards",
+            amount=format_amount(stats.on_cards),
+            currency=currency,
+            cards=stats.cards_active,
+        )
     )
 
     if week > 0:
         change = week - (week_before - week)
         if week_before - week > 0 and abs(change) >= Decimal("0.01"):
-            direction = "больше" if change > 0 else "меньше"
             lines.append(
-                f"Потратили: {format_amount(week)} {currency} — "
-                f"на {format_amount(abs(change))} {direction}, чем неделей раньше"
+                group_t(
+                    "digest.spent_delta",
+                    amount=format_amount(week),
+                    currency=currency,
+                    diff=format_amount(abs(change)),
+                    direction=group_t("digest.more" if change > 0 else "digest.less"),
+                )
             )
         else:
-            lines.append(f"Потратили: {format_amount(week)} {currency}")
+            lines.append(
+                group_t("digest.spent", amount=format_amount(week), currency=currency)
+            )
     else:
-        lines.append("За неделю ничего не потратили")
+        lines.append(group_t("digest.spent_nothing"))
 
     if stats.expiring_soon > 0:
         names = await _expiring_names(session, stats.expiring_soon_days)
         shown = ", ".join(names[:NAMES_SHOWN])
-        more = f" и ещё {len(names) - NAMES_SHOWN}" if len(names) > NAMES_SHOWN else ""
+        if len(names) > NAMES_SHOWN:
+            shown += group_t("digest.and_more", count=len(names) - NAMES_SHOWN)
         lines += [
             "",
-            f"⏳ Истекает за {stats.expiring_soon_days} дней: "
-            f"<b>{format_amount(stats.expiring_soon)} {currency}</b> — {shown}{more}",
+            group_t(
+                "digest.expiring",
+                days=stats.expiring_soon_days,
+                amount=format_amount(stats.expiring_soon),
+                currency=currency,
+                names=shown,
+            ),
         ]
 
     if stats.uncertain_balance > 0:
         lines.append(
-            f"❔ Под вопросом: {format_amount(stats.uncertain_balance)} {currency} "
-            f"на {stats.cards_uncertain} карт(ах) — проверьте остаток"
+            group_t(
+                "digest.uncertain_one" if stats.cards_uncertain == 1 else "digest.uncertain",
+                amount=format_amount(stats.uncertain_balance),
+                currency=currency,
+                cards=stats.cards_uncertain,
+            )
         )
 
     if stats.expired_balance > 0:
         lines.append(
-            f"⚠️ Уже истекли, а деньги остались: "
-            f"<b>{format_amount(stats.expired_balance)} {currency}</b>"
+            group_t(
+                "digest.expired",
+                amount=format_amount(stats.expired_balance),
+                currency=currency,
+            )
         )
 
     return "\n".join(lines)
@@ -128,14 +152,14 @@ def _already_sent_this_week() -> bool:
 
 async def send_digest(bot: Bot, session: AsyncSession) -> str | None:
     if settings.family_chat_id is None:
-        raise RuntimeError("FAMILY_CHAT_ID не задан — сводку отправлять некуда")
+        raise RuntimeError(group_t("error.no_chat_for_digest"))
     text = await build_digest(session)
     if text is None:
         return None
     from app.bot import open_app_keyboard
 
     await bot.send_message(
-        settings.family_chat_id, text, reply_markup=open_app_keyboard("Открыть карты")
+        settings.family_chat_id, text, reply_markup=open_app_keyboard(group_t("bot.open_cards"))
     )
     return text
 

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import barcode, storage
 from app.expiry import default_expiry
+from app.i18n import Message, default_language, t
 from app.models import Comment, Event, EventKind, User, ValueKind, Voucher, utcnow
 
 CENT = Decimal("0.01")
@@ -17,7 +18,7 @@ CENT = Decimal("0.01")
 async def get_voucher_or_404(session: AsyncSession, voucher_id: int) -> Voucher:
     voucher = await session.get(Voucher, voucher_id)
     if voucher is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Купон не найден")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, Message("error.voucher_not_found"))
     return voucher
 
 
@@ -95,14 +96,15 @@ def format_amount(value: Decimal) -> str:
     return text.rstrip("0").rstrip(".") if "." in text else text
 
 
-def value_label(voucher: Voucher) -> str:
+def value_label(voucher: Voucher, language: str | None = None) -> str:
     if voucher.value_kind == ValueKind.amount and voucher.value_amount is not None:
         return f"{format_amount(voucher.value_amount)} {voucher.currency}"
     if voucher.value_kind == ValueKind.percent and voucher.value_amount is not None:
         return f"-{format_amount(voucher.value_amount)}%"
-    return voucher.title or "купон"
+    return voucher.title or t("label.voucher", language or default_language())
 
 
-def voucher_label(voucher: Voucher) -> str:
-    parts = [p for p in (voucher.merchant, value_label(voucher)) if p]
-    return " · ".join(parts) or f"Купон #{voucher.id}"
+def voucher_label(voucher: Voucher, language: str | None = None) -> str:
+    language = language or default_language()
+    parts = [p for p in (voucher.merchant, value_label(voucher, language)) if p]
+    return " · ".join(parts) or t("label.voucher_numbered", language, id=voucher.id)

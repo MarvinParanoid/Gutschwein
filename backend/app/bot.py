@@ -26,6 +26,7 @@ from app.backup import backup_loop, send_backup
 from app.config import settings
 from app.db import SessionLocal
 from app.digest import build_digest, digest_loop
+from app.i18n import default_language, group_t, language_for, t
 from app.models import EventKind, Voucher, VoucherStatus, utcnow
 from app.notify import notify
 from app.quickadd import QuickAdd, apply_quick_add, find_pending_draft, parse_quick_add
@@ -38,7 +39,8 @@ REMINDER_DAYS = 3
 REMINDER_INTERVAL = 6 * 3600
 
 
-def open_app_keyboard(text: str = "🐷 Открыть Sparschwein") -> InlineKeyboardMarkup | None:
+def open_app_keyboard(text: str | None = None) -> InlineKeyboardMarkup | None:
+    text = text or group_t("bot.open_app")
     if not settings.webapp_url.startswith("https://"):
         return None
     return InlineKeyboardMarkup(
@@ -54,12 +56,18 @@ def build_dispatcher() -> Dispatcher:
     def allowed(message: Message) -> bool:
         return bool(message.from_user and message.from_user.id in settings.allowed_ids)
 
+    def lang(message: Message) -> str:
+        """Whatever language their Telegram is in — same signal the Mini App uses."""
+        code = message.from_user.language_code if message.from_user else None
+        return language_for(code, default_language())
+
     @dp.message(Command("id"))
     async def cmd_id(message: Message) -> None:
         """Reports both ids needed to configure the app: the member and the chat."""
-        lines = [f"Ваш Telegram ID: <code>{message.from_user.id}</code> → ALLOWED_TELEGRAM_IDS"]
+        language = lang(message)
+        lines = [t("bot.your_id", language, user_id=message.from_user.id)]
         if message.chat.type in ("group", "supergroup"):
-            lines.append(f"ID этого чата: <code>{message.chat.id}</code> → FAMILY_CHAT_ID")
+            lines.append(t("bot.chat_id", language, chat_id=message.chat.id))
         await message.answer("\n".join(lines))
 
     @dp.message(Command("backup"))
@@ -67,27 +75,30 @@ def build_dispatcher() -> Dispatcher:
         """On-demand backup, so nobody has to wait until the nightly one."""
         if not allowed(message):
             return
+        language = lang(message)
         if settings.family_chat_id is None:
-            await message.answer("FAMILY_CHAT_ID не настроен — бэкап отправлять некуда.")
+            await message.answer(t("bot.backup_no_chat", language))
             return
-        await message.answer("Собираю бэкап…")
+        await message.answer(t("bot.backup_working", language))
         try:
-            summary = await send_backup(bot, f"по запросу от {message.from_user.first_name}")
-            await message.answer(f"Готово: {summary}")
+            reason = group_t("backup.reason_manual", name=message.from_user.first_name)
+            summary = await send_backup(bot, reason)
+            await message.answer(t("bot.backup_done", language, summary=summary))
         except Exception as exc:  # noqa: BLE001 - report the reason to the user
             log.warning("manual backup failed", exc_info=True)
-            await message.answer(f"Не получилось: {exc}")
+            await message.answer(t("bot.backup_failed", language, error=exc))
 
     @dp.message(Command("login"))
     async def cmd_login(message: Message) -> None:
         """A one-time link that turns a browser into a logged-in device."""
         if not allowed(message):
             return
+        language = lang(message)
         if message.chat.type != "private":
-            await message.answer("Ссылку для входа пришлю только в личку — напишите мне туда.")
+            await message.answer(t("bot.login_only_private", language))
             return
         if not settings.webapp_url.startswith("https://"):
-            await message.answer("WEBAPP_URL не настроен — ссылку сформировать не из чего.")
+            await message.answer(t("bot.login_no_url", language))
             return
 
         async with SessionLocal() as session:
@@ -96,10 +107,12 @@ def build_dispatcher() -> Dispatcher:
 
         minutes = int(LOGIN_TOKEN_TTL.total_seconds() // 60)
         await message.answer(
-            f"Ссылка для входа в браузере (действует {minutes} минут, один раз):\n"
-            f"{settings.webapp_url}/login#{token}\n\n"
-            "Откройте её в браузере телефона и добавьте приложение на домашний экран. "
-            "Никому не пересылайте — она пускает в наши карты.",
+            t(
+                "bot.login_link",
+                language,
+                minutes=minutes,
+                url=f"{settings.webapp_url}/login#{token}",
+            ),
             disable_web_page_preview=True,
         )
 
@@ -111,32 +124,26 @@ def build_dispatcher() -> Dispatcher:
         async with SessionLocal() as session:
             text = await build_digest(session)
         if text is None:
-            await message.answer("Пока не о чем рассказывать: активных карт нет.")
+            await message.answer(t("bot.digest_nothing", lang(message)))
             return
-        await message.answer(text, reply_markup=open_app_keyboard("Открыть карты"))
+        await message.answer(
+            text, reply_markup=open_app_keyboard(t("bot.open_cards", lang(message)))
+        )
 
     @dp.message(Command("start"))
     async def cmd_start(message: Message) -> None:
+        language = lang(message)
         if not allowed(message):
             await message.answer(
-                "Это семейное приложение для купонов. Доступа пока нет.\n"
-                f"Ваш Telegram ID: <code>{message.from_user.id}</code>"
+                t("bot.no_access", language, user_id=message.from_user.id)
             )
             return
-        keyboard = open_app_keyboard()
-        hint = (
-            "Купили карту — пришлите скрин <b>с подписью</b> «Rewe 50», "
-            "и она сразу появится в списке.\n\n"
-            "Без подписи получится черновик: тогда просто напишите следом "
-            "«Rewe 50» — или отдельно «Rewe», а потом «50».\n\n"
-            "Ещё умею /login (вход в браузере), /digest, /backup и /id."
-        )
+        keyboard = open_app_keyboard(t("bot.open_app", language))
+        hint = t("bot.start", language)
         if keyboard is None:
-            await message.answer(
-                f"{hint}\n\n⚠️ WEBAPP_URL не настроен, кнопка приложения недоступна."
-            )
+            await message.answer(hint + t("bot.no_webapp_url", language))
         else:
-            await message.answer(f"Привет! {hint}", reply_markup=keyboard)
+            await message.answer(hint, reply_markup=keyboard)
 
     @dp.message(F.photo | F.document.mime_type.startswith("image/"))
     async def on_image(message: Message, bot: Bot) -> None:
@@ -149,17 +156,7 @@ def build_dispatcher() -> Dispatcher:
         image_path = storage.save_bytes(buffer.read())
 
         async with SessionLocal() as session:
-            user = await upsert_user(
-                session,
-                TelegramUser(
-                    {
-                        "id": message.from_user.id,
-                        "first_name": message.from_user.first_name or "",
-                        "last_name": message.from_user.last_name or "",
-                        "username": message.from_user.username or "",
-                    }
-                ),
-            )
+            user = await upsert_user(session, _telegram_user(message))
             voucher = Voucher(
                 status=VoucherStatus.draft,
                 image_path=image_path,
@@ -174,27 +171,30 @@ def build_dispatcher() -> Dispatcher:
             # A caption like "Rewe 50" is all a gift card needs — no app required.
             parsed = parse_quick_add(message.caption or "")
             complete = await apply_quick_add(session, user, voucher, parsed)
-            reply = _describe(voucher, complete, parsed) + _barcode_note(voucher)
+            language = lang(message)
+            reply = _describe(voucher, complete, parsed, language) + _barcode_note(
+                voucher, language
+            )
             label = voucher_label(voucher)
             actor = user.display_name
 
-        await message.answer(reply, reply_markup=open_app_keyboard(
-            "Открыть карту" if complete else "Заполнить в приложении"
-        ))
+        await message.answer(reply, reply_markup=_card_keyboard(complete, language))
         if complete:
-            await _notify_family(message, f"🐷 {actor} добавил карту: <b>{label}</b>")
+            await _notify_family(
+                message, group_t("notify.card_added", actor=actor, label=label)
+            )
 
     @dp.message(F.text)
     async def on_text(message: Message) -> None:
         """Completes the draft the last photo created, or adds a card without a photo."""
         if not allowed(message):
             return
+        language = lang(message)
         parsed = parse_quick_add(message.text or "")
         if parsed.is_empty:
             await message.answer(
-                "Не понял. Пришлите скрин карты с подписью «Rewe 50» — "
-                "или напишите так же текстом.",
-                reply_markup=open_app_keyboard(),
+                t("bot.not_understood", language),
+                reply_markup=open_app_keyboard(t("bot.open_app", language)),
             )
             return
 
@@ -203,10 +203,7 @@ def build_dispatcher() -> Dispatcher:
             voucher = await find_pending_draft(session, user)
             if voucher is None:
                 if parsed.merchant is None or parsed.amount is None:
-                    await message.answer(
-                        "Черновиков нет. Пришлите скрин карты — можно сразу с подписью "
-                        "«Rewe 50»."
-                    )
+                    await message.answer(t("bot.no_drafts", language))
                     return
                 # No photo, but a complete card is still better than nothing.
                 voucher = Voucher(created_by_id=user.id, status=VoucherStatus.draft)
@@ -216,15 +213,15 @@ def build_dispatcher() -> Dispatcher:
                 await session.commit()
 
             complete = await apply_quick_add(session, user, voucher, parsed)
-            reply = _describe(voucher, complete, parsed)
+            reply = _describe(voucher, complete, parsed, language)
             label = voucher_label(voucher)
             actor = user.display_name
 
-        await message.answer(reply, reply_markup=open_app_keyboard(
-            "Открыть карту" if complete else "Заполнить в приложении"
-        ))
+        await message.answer(reply, reply_markup=_card_keyboard(complete, language))
         if complete:
-            await _notify_family(message, f"🐷 {actor} добавил карту: <b>{label}</b>")
+            await _notify_family(
+                message, group_t("notify.card_added", actor=actor, label=label)
+            )
 
     return dp
 
@@ -236,32 +233,41 @@ def _telegram_user(message: Message) -> TelegramUser:
             "first_name": message.from_user.first_name or "",
             "last_name": message.from_user.last_name or "",
             "username": message.from_user.username or "",
+            # Stored on the user so the digest and reminders can address them
+            # in the same language even when they are not the ones asking.
+            "language_code": message.from_user.language_code or "",
         }
     )
 
 
-def _describe(voucher: Voucher, complete: bool, parsed: QuickAdd) -> str:
+def _card_keyboard(complete: bool, language: str) -> InlineKeyboardMarkup | None:
+    return open_app_keyboard(
+        t("bot.open_card" if complete else "bot.fill_in_app", language)
+    )
+
+
+def _describe(voucher: Voucher, complete: bool, parsed: QuickAdd, language: str) -> str:
     """What the bot understood — so a misparse is obvious immediately."""
     if complete:
-        return (
-            f"✅ Добавил: <b>{voucher.merchant}</b> · "
-            f"{format_amount(voucher.balance_amount)} {voucher.currency}"
+        return t(
+            "bot.added",
+            language,
+            merchant=voucher.merchant,
+            amount=format_amount(voucher.balance_amount),
+            currency=voucher.currency,
         )
     if voucher.merchant and voucher.value_amount is None:
-        return f"Записал магазин: <b>{voucher.merchant}</b>. Теперь сумму — просто числом."
+        return t("bot.shop_noted", language, merchant=voucher.merchant)
     if parsed.amount is not None and not voucher.merchant:
-        return f"Записал сумму {format_amount(parsed.amount)}. Теперь название магазина."
-    return "📸 Черновик создан. Напишите магазин и сумму — например «Rewe 50»."
+        return t("bot.amount_noted", language, amount=format_amount(parsed.amount))
+    return t("bot.draft_created", language)
 
 
-def _barcode_note(voucher: Voucher) -> str:
+def _barcode_note(voucher: Voucher, language: str) -> str:
     """Say it now, at the kitchen table, rather than let it surprise you at the till."""
     if voucher.barcode_format:
-        return f"\n▮▮ Штрихкод распознан ({voucher.barcode_format}) — покажу его чётким."
-    return (
-        "\n⚠️ Штрихкод в скрине не читается — покажу саму картинку. "
-        "Пришлите скрин целиком, не обрезанный: в мелком коде штрихи теряются."
-    )
+        return t("bot.barcode_found", language, format=voucher.barcode_format)
+    return t("bot.barcode_missing", language)
 
 
 async def _notify_family(message: Message, text: str) -> None:
@@ -297,14 +303,25 @@ async def expiry_reminder_loop(bot: Bot) -> None:
 
             for voucher in expiring:
                 left = (voucher.valid_until - today).days
-                when = "истекает сегодня" if left == 0 else f"истекает через {left} дн."
+                if left == 0:
+                    when = group_t("notify.expires_today")
+                else:
+                    plural = "day" if left == 1 else "days"
+                    when = group_t(f"notify.expires_in_{plural}", days=left)
                 # Say when the date is ours, not the card's — otherwise a guess
                 # reads as a deadline and people throw away a working card.
-                caveat = " (срок по правилу магазина)" if voucher.expiry_estimated else ""
+                caveat = (
+                    group_t("notify.expiry_estimated") if voucher.expiry_estimated else ""
+                )
                 await bot.send_message(
                     settings.family_chat_id,
-                    f"⏳ <b>{voucher_label(voucher)}</b> {when}{caveat}",
-                    reply_markup=open_app_keyboard("Посмотреть"),
+                    group_t(
+                        "notify.expiring",
+                        label=voucher_label(voucher),
+                        when=when,
+                        caveat=caveat,
+                    ),
+                    reply_markup=open_app_keyboard(group_t("bot.look")),
                 )
         except asyncio.CancelledError:
             raise

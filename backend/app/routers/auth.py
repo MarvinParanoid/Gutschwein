@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import CurrentUser, TelegramUser, check_allowed, upsert_user
 from app.config import settings
 from app.db import get_session
+from app.i18n import Message
 from app.schemas import UserOut
 from app.sessions import (
     COOKIE_NAME,
@@ -39,7 +40,7 @@ async def login(payload: LoginRequest, response: Response, session: Session) -> 
     if user is None:
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
-            "Ссылка недействительна или уже использована. Запросите новую: /login боту",
+            Message("error.login_link_dead"),
         )
     check_allowed(user)
 

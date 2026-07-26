@@ -62,6 +62,8 @@ export interface Stats {
   currency: string
   on_cards: string
   cards_active: number
+  uncertain_balance: string
+  cards_uncertain: number
   expiring_soon: string
   expiring_soon_days: number
   expired_balance: string

@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse
 
 from app import storage
+from app.i18n import Message
 
 router = APIRouter(prefix="/api/images", tags=["images"])
 
@@ -17,8 +18,8 @@ router = APIRouter(prefix="/api/images", tags=["images"])
 @router.get("/{image_id:path}")
 async def get_image(image_id: str) -> FileResponse:
     if not storage.IMAGE_ID_RE.match(image_id):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Изображение не найдено")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, Message("error.image_not_found"))
     path = storage.absolute_path(image_id)
     if not path.is_file():
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Изображение не найдено")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, Message("error.image_not_found"))
     return FileResponse(path, headers={"Cache-Control": "private, max-age=31536000"})

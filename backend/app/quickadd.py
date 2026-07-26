@@ -17,7 +17,7 @@ from app.services import apply_expiry_rule, record_event
 
 # A bare number, optionally with two decimals: "50", "12.50", "12,50".
 AMOUNT_RE = re.compile(r"(?<![\d.,])(\d{1,6}(?:[.,]\d{1,2})?)(?![\d.,])")
-CURRENCY_WORDS = {"eur", "евро", "€", "e", "у.е.", "уе"}
+CURRENCY_WORDS = {"eur", "euro", "евро", "€", "e", "у.е.", "уе"}
 MAX_AMOUNT = Decimal("100000")
 
 
