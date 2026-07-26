@@ -75,7 +75,15 @@ async def lifespan(app: FastAPI):
             await bot.session.close()
 
 
-app = FastAPI(title="Sparschwein", lifespan=lifespan)
+# /docs, /redoc and /openapi.json are development tools. The URL is public and
+# gets scanned around the clock, so they are only mounted when DEV_MODE is on.
+app = FastAPI(
+    title="Sparschwein",
+    lifespan=lifespan,
+    docs_url="/docs" if settings.dev_mode else None,
+    redoc_url="/redoc" if settings.dev_mode else None,
+    openapi_url="/openapi.json" if settings.dev_mode else None,
+)
 
 if settings.cors_origin_list:
     app.add_middleware(

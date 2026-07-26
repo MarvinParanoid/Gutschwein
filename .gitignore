@@ -1,4 +1,5 @@
 .env
+.make.local
 data/
 backend/static/
 backend/.venv/

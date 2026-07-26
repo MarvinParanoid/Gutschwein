@@ -73,12 +73,12 @@ jobs:
         run: |
           for _ in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8000/healthz; then
-              echo " — поднялся"
+              echo " — up"
               exit 0
             fi
             sleep 2
           done
-          echo "контейнер не ответил на /healthz"
+          echo "the container never answered /healthz"
           docker logs app
           exit 1
 
@@ -91,12 +91,25 @@ jobs:
       - name: Unknown paths are 404, not the SPA
         run: |
           code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/.env)
-          test "$code" = "404" || { echo "/.env вернул $code вместо 404"; exit 1; }
+          test "$code" = "404" || { echo "/.env answered $code, expected 404"; exit 1; }
 
       - name: API requires auth
         run: |
           code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/vouchers)
-          test "$code" = "401" || { echo "/api/vouchers вернул $code вместо 401"; exit 1; }
+          test "$code" = "401" || { echo "/api/vouchers answered $code, expected 401"; exit 1; }
+
+      - name: The dev header is ignored when DEV_MODE is off
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H 'X-Dev-User: 1' \
+            http://127.0.0.1:8000/api/vouchers)
+          test "$code" = "401" || { echo "X-Dev-User was accepted: $code"; exit 1; }
+
+      - name: Schema and its UIs are not published
+        run: |
+          for path in /openapi.json /docs /redoc /api/auth/dev-token; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8000$path")
+            test "$code" = "404" || { echo "$path answered $code, expected 404"; exit 1; }
+          done
 
       - name: Container logs
         if: always()
@@ -157,7 +170,7 @@ jobs:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
-          test -n "$DEPLOY_HOST" || { echo "секрет DEPLOY_HOST не задан"; exit 1; }
+          test -n "$DEPLOY_HOST" || { echo "the DEPLOY_HOST secret is not set"; exit 1; }
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
           chmod 600 ~/.ssh/deploy

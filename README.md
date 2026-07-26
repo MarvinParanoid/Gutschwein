@@ -125,6 +125,12 @@ sparschwein.example.com {
     request_body {
         max_size 15MB
     }
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+        -Server
+    }
 }
 ```
 
