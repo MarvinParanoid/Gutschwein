@@ -1,3 +1,4 @@
+import { demoImageId } from './assets'
 import { t } from '../i18n'
 import type { Comment, User, Voucher, VoucherEvent } from '../types'
 
@@ -84,13 +85,16 @@ export function createSeed(): DemoState {
       valid_until: on(1150),
       expiry_estimated: true,
       notes: t.demo.seed.reweNote,
-      image_id: 'demo:rewe',
+      image_id: demoImageId('Rewe', '4012345678901'),
       code: '4012345678901',
       barcode_format: 'EAN_13',
       created_at: at(-190),
     }),
     blankVoucher(2, {
       merchant: 'Ikea',
+      image_id: demoImageId('Ikea', '4029764001807'),
+      code: '4029764001807',
+      barcode_format: 'EAN_13',
       value_amount: '40.00',
       balance_amount: '25.00',
       valid_until: on(980),
@@ -99,6 +103,9 @@ export function createSeed(): DemoState {
     }),
     blankVoucher(3, {
       merchant: 'Penny',
+      image_id: demoImageId('Penny', '4306188339458'),
+      code: '4306188339458',
+      barcode_format: 'EAN_13',
       value_amount: '30.00',
       balance_amount: '4.27',
       valid_until: on(640),
@@ -107,6 +114,9 @@ export function createSeed(): DemoState {
     }),
     blankVoucher(4, {
       merchant: 'Rossmann',
+      image_id: demoImageId('Rossmann', '4305615591261'),
+      code: '4305615591261',
+      barcode_format: 'EAN_13',
       value_amount: '10.00',
       balance_amount: '8.10',
       valid_until: on(1080),
@@ -115,6 +125,9 @@ export function createSeed(): DemoState {
     }),
     blankVoucher(5, {
       merchant: 'Jet',
+      image_id: demoImageId('Jet', '4260112349001'),
+      code: '4260112349001',
+      barcode_format: 'EAN_13',
       value_amount: '50.00',
       balance_amount: '50.00',
       valid_until: on(900),
@@ -124,6 +137,9 @@ export function createSeed(): DemoState {
     }),
     blankVoucher(6, {
       merchant: 'Kaufland',
+      image_id: demoImageId('Kaufland', '4337256112390'),
+      code: '4337256112390',
+      barcode_format: 'EAN_13',
       value_amount: '20.00',
       balance_amount: '20.00',
       valid_until: on(5),
@@ -132,6 +148,7 @@ export function createSeed(): DemoState {
     }),
     blankVoucher(7, {
       merchant: 'TotalEnergies',
+      image_id: demoImageId('TotalEnergies', ''),
       value_amount: '50.00',
       balance_amount: '50.00',
       balance_uncertain: true,
@@ -139,13 +156,16 @@ export function createSeed(): DemoState {
     }),
     blankVoucher(8, {
       status: 'draft',
-      image_id: 'demo:draft',
+      image_id: demoImageId('Aldi', '4260112340008'),
       created_at: at(-1),
       updated_at: at(-1),
     }),
     blankVoucher(9, {
       status: 'used',
       merchant: 'Lidl',
+      image_id: demoImageId('Lidl', '4056489472018'),
+      code: '4056489472018',
+      barcode_format: 'EAN_13',
       value_amount: '25.00',
       balance_amount: '0.00',
       used_at: at(-75),
