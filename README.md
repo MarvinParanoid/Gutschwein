@@ -7,7 +7,7 @@ cashier can scan. Runs as a Telegram Mini App and as an installable PWA.
 
 <img src="docs/demo.gif" alt="Finding a card, showing it at the till, writing down what is left" width="300">
 
-**[Try the demo](https://spar-schwein.duckdns.org/demo)** — made-up cards, no account, nothing saved.
+**[Try the demo](https://gutschwein.duckdns.org/demo)** — made-up cards, no account, nothing saved.
 
 ## Run it yourself
 
