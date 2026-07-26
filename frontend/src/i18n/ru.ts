@@ -245,6 +245,32 @@ export const ru = {
   common: {
     back: 'Назад',
   },
+
+  demo: {
+    banner: 'Демо: карты ненастоящие, ничего не сохраняется',
+    exit: 'Выйти',
+    enter: 'Посмотреть демо',
+    enterHint: 'Ненастоящие карты, но трогать можно всё',
+    you: 'Вы',
+    partner: 'Аня',
+    errors: {
+      spendTooMuch: (spent: string, current: string) =>
+        `Нельзя списать ${spent} — на карте ${current}`,
+      aboveFace: (face: string) => `Остаток больше номинала (${face}) — поправьте номинал`,
+    },
+    seed: {
+      reweNote: 'подарили на день рождения',
+      groceries: 'продукты',
+      weeklyShop: 'закупка на неделю',
+      shampoo: 'шампунь и зубная паста',
+      candles: 'свечки и рамка',
+      jetComment: 'кажется, уже потратили — надо проверить на кассе',
+      totalComment: 'лежит в бардачке',
+      kauflandComment: 'сгорает через неделю, давайте потратим',
+      lidlComment: 'всё, пусто',
+      douglasConditions: 'от 30 EUR',
+    },
+  },
 }
 
 /** Russian needs three forms; the helper stays here, next to the strings. */

@@ -21,8 +21,9 @@ from app.routers import auth, barcodes, images, uploads, users, vouchers
 logging.basicConfig(level=logging.INFO, format="%(levelname)-5.5s [%(name)s] %(message)s")
 log = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
-# Paths the SPA handles itself; "login" is where the bot's link lands.
-CLIENT_ROUTES = {"", "index.html", "login"}
+# Paths the SPA handles itself; "login" is where the bot's link lands and
+# "demo" is the shareable link into the made-up dataset.
+CLIENT_ROUTES = {"", "index.html", "login", "demo"}
 
 
 def _report_bot_exit(task: asyncio.Task) -> None:

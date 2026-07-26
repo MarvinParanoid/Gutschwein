@@ -1058,6 +1058,26 @@ button {
 }
 
 /* Shown when the browser reports no network: the list is cached, writes are not. */
+.demo-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-ink);
+  border-radius: 10px;
+  padding: 6px 8px 6px 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.demo-bar .btn.link {
+  /* The bar is thin: the button must not add height of its own. */
+  padding: 2px 8px;
+  font-size: 13px;
+  color: var(--accent-ink);
+}
+
 .offline {
   background: color-mix(in srgb, var(--warning) 18%, transparent);
   color: var(--warning);

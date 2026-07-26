@@ -243,4 +243,30 @@ export const en: Dictionary = {
   common: {
     back: 'Back',
   },
+
+  demo: {
+    banner: 'Demo: the cards are made up and nothing is saved',
+    exit: 'Leave',
+    enter: 'Try the demo',
+    enterHint: 'Made-up cards, but everything works',
+    you: 'You',
+    partner: 'Anna',
+    errors: {
+      spendTooMuch: (spent: string, current: string) =>
+        `Cannot spend ${spent} — the card holds ${current}`,
+      aboveFace: (face: string) => `The balance exceeds the face value (${face})`,
+    },
+    seed: {
+      reweNote: 'a birthday present',
+      groceries: 'groceries',
+      weeklyShop: 'the weekly shop',
+      shampoo: 'shampoo and toothpaste',
+      candles: 'candles and a frame',
+      jetComment: 'pretty sure this one is spent — check at the till',
+      totalComment: 'in the glovebox',
+      kauflandComment: 'burns in a week, let us spend it',
+      lidlComment: 'that is it, empty',
+      douglasConditions: 'from 30 EUR',
+    },
+  },
 }

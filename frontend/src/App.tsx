@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { api } from './api'
+import { isDemo, startDemo, stopDemo } from './demo/session'
 import { t } from './i18n'
 import ListPage from './pages/ListPage'
 import StatsPage from './pages/StatsPage'
@@ -24,6 +25,7 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null)
   const login = useLogin()
   const online = useOnline()
+  const demo = isDemo()
 
   // Tab, query and shop filter live here so they survive navigation into a
   // voucher and back — you pick Rewe, open a card, and come back to Rewe.
@@ -72,7 +74,15 @@ export default function App() {
           <span className="emoji">🔒</span>
           <p>{message}</p>
           {!inTelegram && (
-            <p className="muted">{t.app.noAccessHint}</p>
+            <>
+              <p className="muted">{t.app.noAccessHint}</p>
+              {/* Nobody without an invitation gets past this screen, so it is
+                  also the only place the demo needs to be offered. */}
+              <button className="btn" onClick={startDemo}>
+                {t.demo.enter}
+              </button>
+              <p className="muted">{t.demo.enterHint}</p>
+            </>
           )}
         </div>
       </div>
@@ -83,7 +93,15 @@ export default function App() {
 
   return (
     <div className="app">
-      {!online && (
+      {demo && (
+        <div className="demo-bar">
+          <span>{t.demo.banner}</span>
+          <button className="btn link" onClick={stopDemo}>
+            {t.demo.exit}
+          </button>
+        </div>
+      )}
+      {!online && !demo && (
         <div className="offline">{t.app.offline}</div>
       )}
       {view.name === 'list' && (

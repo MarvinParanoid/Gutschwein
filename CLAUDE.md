@@ -11,6 +11,9 @@ product description and deployment.
 - Comment the *why*, not the *what*. Existing comments explain non-obvious decisions
   (capability URLs for images, `render_as_batch` for SQLite, id tiebreak in event ordering).
 - Backend: async everywhere, SQLAlchemy 2 style (`Mapped[...]`, `select()`), no sync sessions.
+- Demo mode (`src/demo/`) swaps the whole API client for one that answers from memory.
+  If you add an endpoint, add it there too — `ApiClient` is `typeof httpApi`, so a gap
+  is a compile error. It must never make a request; `e2e/demo.spec.ts` enforces that.
 - Frontend: no router, no state library. Views are a discriminated union in `App.tsx`,
   server state is fetched per page with `useEffect`.
 - New user-facing string? Add the key to `ru.ts` (source of truth) and `en.ts`, or to

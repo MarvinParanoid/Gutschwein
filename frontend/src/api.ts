@@ -1,3 +1,6 @@
+import { createDemoApi } from './demo/api'
+import { demoBarcode, demoImage } from './demo/assets'
+import { isDemo } from './demo/session'
 import { locale, t } from './i18n'
 import { tg } from './telegram'
 import type {
@@ -56,7 +59,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>
 }
 
-export const api = {
+const httpApi = {
   /** Exchanges the one-time token from the bot's link for a session cookie. */
   login: (token: string) =>
     request<User>('/api/auth/login', { method: 'POST', body: JSON.stringify({ token }) }),
@@ -115,6 +118,14 @@ export const api = {
   },
 }
 
-export const imageUrl = (imageId: string) => `/api/images/${imageId}`
+/** The shape every screen talks to. The demo client has to satisfy it exactly. */
+export type ApiClient = typeof httpApi
+
+// Chosen once, at load: a demo session never has a code path back to the server.
+export const api: ApiClient = isDemo() ? createDemoApi() : httpApi
+
+export const imageUrl = (imageId: string) =>
+  isDemo() ? demoImage(imageId) : `/api/images/${imageId}`
 /** Barcode redrawn from the decoded code — sharp at any zoom, unlike the screenshot. */
-export const barcodeUrl = (imageId: string) => `/api/barcodes/${imageId}`
+export const barcodeUrl = (imageId: string) =>
+  isDemo() ? demoBarcode(imageId) : `/api/barcodes/${imageId}`
