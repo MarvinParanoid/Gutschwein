@@ -1,4 +1,4 @@
-.PHONY: install dev-api dev-web build test lint migration deploy deploy-vps demo-gif
+.PHONY: install dev-api dev-web build test lint migration deploy deploy-vps demo-gif stats
 
 # Machine-specific settings live outside the repository. Copy the three lines
 # below into .make.local (gitignored) with your own values.
@@ -58,6 +58,12 @@ deploy-vps:
 	done; \
 	echo "НЕ поднялся за минуту — смотрите: ssh $(VPS) 'cd $(REMOTE) && docker compose logs app'"; \
 	exit 1
+
+# Visitor counts from the reverse proxy log on the VPS.
+# make stats SINCE="3 days ago"
+SINCE ?= today
+stats:
+	@ssh $(VPS) 'demo-stats "$(SINCE)"'
 
 # Re-records the walkthrough GIFs from the demo dataset. Needs ffmpeg.
 # One language: make demo-gif LANGS=de
