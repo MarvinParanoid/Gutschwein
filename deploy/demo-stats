@@ -1,27 +1,102 @@
-#!/bin/sh
-# Who looked at Gutschwein. Usage: demo-stats [since]   e.g. demo-stats "3 days ago"
-#
-# Only a real browser fetches the JS bundle — scanners request "/" and leave, so
-# a hit on "/" proves nothing. And because the demo client never calls the API
-# while a signed-in member always does (/api/me on every load), an address that
-# fetched the bundle but never touched /api is exactly a demo-only visitor.
-#
-# Undercounts on purpose: the service worker caches the bundle, so someone
-# coming back a second time may not reach the server at all.
-since="${1:-today}"
-tmp=$(mktemp -d); trap "rm -rf $tmp" EXIT
+#!/usr/bin/env python3
+"""Who opened Gutschwein, read out of Caddy's access log in the journal.
 
-journalctl -u caddy --since "$since" -o cat --no-pager 2>/dev/null | grep http.log.access |
-  sed -n "s/.*\"client_ip\":\"\([^\"]*\)\".*\"uri\":\"\([^\"]*\)\".*/\1 \2/p" > "$tmp/all"
+Usage: demo-stats [since]      e.g. demo-stats "3 days ago"
 
-grep -E " /assets/index-.*\.js$" "$tmp/all" | cut -d" " -f1 | sort -u > "$tmp/browsers"
-grep -E " /api/" "$tmp/all" | cut -d" " -f1 | sort -u > "$tmp/signed_in"
-comm -23 "$tmp/browsers" "$tmp/signed_in" > "$tmp/visitors"
+How a visitor is told apart from a member: the demo client never calls the API,
+while a signed-in member calls /api/me on every load. So an address that fetched
+the app bundle and never touched /api saw nothing but the demo.
 
-n() { wc -l < "$1" | tr -d " "; }
-echo "since: $since"
-echo "  demo link (/demo) opened : $(grep -c " /demo$" "$tmp/all") times"
-echo "  real browsers loaded it  : $(n "$tmp/browsers") addresses"
-echo "    signed-in family       : $(n "$tmp/signed_in")"
-echo "    demo-only visitors     : $(n "$tmp/visitors")"
-echo "  requests to / (incl. scanners): $(grep -c " /$" "$tmp/all")"
+Two things the numbers are not:
+
+  * not people. A phone on mobile data changes address several times a day, so
+    "addresses" is an upper bound on how many humans that was;
+  * not complete. The service worker answers a repeat visit from cache without
+    asking the server, so every count here is a floor.
+"""
+
+import json
+import re
+import subprocess
+import sys
+from collections import Counter
+
+BUNDLE = re.compile(r"^/assets/index-.*\.js$")
+# Our own hosts: a referrer pointing at either is the app loading its own assets,
+# or the redirect from the name the project used to have — not an arrival.
+OWN_HOSTS = ("gutschwein.duckdns.org", "spar-schwein.duckdns.org")
+
+
+def records(since: str):
+    log = subprocess.run(
+        ["journalctl", "-u", "caddy", "--since", since, "-o", "cat", "--no-pager"],
+        capture_output=True,
+        text=True,
+    ).stdout
+    for line in log.splitlines():
+        if '"http.log.access"' not in line:
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        request = entry.get("request", {})
+        headers = request.get("headers", {})
+        yield {
+            "ip": request.get("client_ip", ""),
+            "uri": request.get("uri", ""),
+            "status": entry.get("status", 0),
+            "referer": (headers.get("Referer") or [""])[0],
+        }
+
+
+def main() -> None:
+    since = sys.argv[1] if len(sys.argv) > 1 else "today"
+    rows = list(records(since))
+    if not rows:
+        print(f"since: {since}\n  nothing logged (is `log` in the Caddyfile?)")
+        return
+
+    loaded = {r["ip"] for r in rows if BUNDLE.match(r["uri"])}
+    api = {r["ip"] for r in rows if r["uri"].startswith("/api/")}
+    # The three sets overlap, so they have to be intersected rather than counted
+    # side by side: a member whose bundle came from cache is in `api` but not in
+    # `loaded`, and reporting that as a visitor is how this got it wrong before.
+    members, visitors = loaded & api, loaded - api
+
+    demo = [r for r in rows if r["uri"] == "/demo"]
+    opens = sum(1 for r in rows if r["uri"] == "/api/me")
+    # Referrers pointing back at ourselves are just the app loading its own
+    # assets; anything else is somebody arriving from elsewhere.
+    sources = Counter(
+        r["referer"].split("/")[2]
+        for r in rows
+        if r["referer"].startswith("http")
+        and not any(host in r["referer"] for host in OWN_HOSTS)
+    )
+    errors = Counter(
+        "5xx" if r["status"] >= 500 else "4xx" for r in rows if r["status"] >= 400
+    )
+    # A bare 4xx count says nothing; the paths say whether it is scanners or us.
+    missing = Counter(r["uri"] for r in rows if r["status"] == 404)
+
+    print(f"since: {since}")
+    print(
+        f"  demo link opened : {len(demo)} times"
+        f" from {len({r['ip'] for r in demo})} addresses"
+    )
+    print(f"  app loaded       : {len(loaded)} addresses")
+    print(f"     members       : {len(members)}  (signed in, so ours)")
+    print(f"     visitors      : {len(visitors)}  (never called the API, demo only)")
+    print(f"  member app opens : {opens}  (/api/me, includes cached loads)")
+    print(f"  arrived from     : {', '.join(f'{k} ×{v}' for k, v in sources.most_common(5)) or '—'}")
+    print(
+        f"  noise            : {sum(1 for r in rows if r['uri'] == '/')} hits on /,"
+        f" {errors['4xx']} 4xx, {errors['5xx']} 5xx"
+    )
+    for uri, count in missing.most_common(3):
+        print(f"     404           : {count} × {uri[:60]}")
+
+
+if __name__ == "__main__":
+    main()
