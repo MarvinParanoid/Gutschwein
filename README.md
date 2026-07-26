@@ -218,7 +218,8 @@ That client reimplements the server's rules — spending writes an event, an emp
 closes itself, statistics are summed from the log — so a visitor tries the real behaviour,
 not a set of screens. The data lives in the tab and is gone when it closes; card pictures
 are drawn in the browser to keep other people's logos out of the repository.
-`make demo-gif` re-records the animation above from the same dataset.
+`make demo-gif` re-records the animation above from the same dataset, in every language
+(`docs/demo.gif`, `docs/demo-de.gif`).
 
 ## Languages
 

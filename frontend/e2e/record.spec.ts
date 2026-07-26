@@ -1,16 +1,25 @@
 import { test } from '@playwright/test'
 
+import { de } from '../src/i18n/de'
+import { en } from '../src/i18n/en'
+
 /**
  * Records the README walkthrough. Not part of the suite: `make demo-gif` sets
  * RECORD and converts the video ffmpeg leaves behind.
  *
  * It drives the demo dataset, so the recording can never contain real cards.
+ *
+ * The button labels come from the dictionaries rather than being typed out, so
+ * one script records every language and a renamed string breaks the recording
+ * instead of silently recording the wrong screen.
  */
 test.skip(!process.env.RECORD, 'recording only: RECORD=1 make demo-gif')
 
+const t = process.env.RECORD_LANG === 'de' ? de : en
+
 test.use({
   extraHTTPHeaders: {},
-  locale: 'en-GB',
+  locale: t.locale,
   video: { mode: 'on', size: { width: 420, height: 900 } },
 })
 
@@ -33,11 +42,11 @@ test('walkthrough', async ({ page }) => {
   await page.locator('.scan-actions button').last().click()
   await page.waitForTimeout(BEAT / 2)
 
-  await page.getByRole('button', { name: 'Update balance' }).click()
+  await page.getByRole('button', { name: t.balance.update }).click()
   await page.waitForTimeout(BEAT / 2)
   await page.locator('.balance-form input').first().pressSequentially('21.40', { delay: 120 })
   await page.waitForTimeout(BEAT / 2)
-  await page.getByRole('button', { name: 'Save' }).click()
+  await page.getByRole('button', { name: t.balance.save }).click()
   await page.waitForTimeout(BEAT * 2)
 
   // Back to the list, where the new balance is already showing.
@@ -46,7 +55,7 @@ test('walkthrough', async ({ page }) => {
 
   await page.locator('.burger').click()
   await page.waitForTimeout(BEAT / 2)
-  await page.locator('.sheet-item', { hasText: 'Statistics' }).click()
+  await page.locator('.sheet-item', { hasText: t.stats.title }).click()
   await page.locator('.stat-hero').waitFor()
   await page.waitForTimeout(BEAT)
   await page.mouse.wheel(0, 700)

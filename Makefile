@@ -59,11 +59,18 @@ deploy-vps:
 	echo "НЕ поднялся за минуту — смотрите: ssh $(VPS) 'cd $(REMOTE) && docker compose logs app'"; \
 	exit 1
 
-# Re-records docs/demo.gif from the demo dataset. Needs ffmpeg.
+# Re-records the walkthrough GIFs from the demo dataset. Needs ffmpeg.
+# One language: make demo-gif LANGS=de
+LANGS ?= en de
+GIF_FILTER := fps=10,scale=300:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=96[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3
+
 demo-gif:
 	cd frontend && npm run build
-	cd frontend && RECORD=1 npx playwright test e2e/record.spec.ts
-	ffmpeg -y -i frontend/test-results/record-walkthrough/video.webm \
-		-vf "fps=10,scale=300:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=96[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3" \
-		-loop 0 docs/demo.gif
-	rm -rf frontend/test-results
+	@for lang in $(LANGS); do \
+		out=docs/demo.gif; [ "$$lang" = en ] || out=docs/demo-$$lang.gif; \
+		echo "recording $$lang → $$out"; \
+		(cd frontend && RECORD=1 RECORD_LANG=$$lang npx playwright test e2e/record.spec.ts) || exit 1; \
+		ffmpeg -y -loglevel error -i frontend/test-results/record-walkthrough/video.webm \
+			-vf "$(GIF_FILTER)" -loop 0 $$out || exit 1; \
+		rm -rf frontend/test-results; \
+	done
