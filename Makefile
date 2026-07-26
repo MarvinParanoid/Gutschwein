@@ -1,4 +1,4 @@
-.PHONY: install dev-api dev-web build test lint migration deploy deploy-vps
+.PHONY: install dev-api dev-web build test lint migration deploy deploy-vps demo-gif
 
 VPS ?= root@185.142.99.209
 REMOTE ?= /root/sparschwein
@@ -55,3 +55,12 @@ deploy-vps:
 	done; \
 	echo "НЕ поднялся за минуту — смотрите: ssh $(VPS) 'cd $(REMOTE) && docker compose logs app'"; \
 	exit 1
+
+# Re-records docs/demo.gif from the demo dataset. Needs ffmpeg.
+demo-gif:
+	cd frontend && npm run build
+	cd frontend && RECORD=1 npx playwright test e2e/record.spec.ts
+	ffmpeg -y -i frontend/test-results/record-walkthrough/video.webm \
+		-vf "fps=10,scale=300:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=96[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3" \
+		-loop 0 docs/demo.gif
+	rm -rf frontend/test-results

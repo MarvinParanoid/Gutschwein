@@ -5,6 +5,7 @@ product description and deployment.
 
 ## Conventions
 
+- **README and all docs in English**, like the code. The user writes Russian; the repo does not.
 - **Comments and docstrings in English.** User-facing text is localized (ru/en), never
   written inline: the frontend reads `src/i18n/ru.ts` / `en.ts`, the backend raises
   `Message("error.…")` keys from `app/i18n.py`.
@@ -27,6 +28,7 @@ make dev-web          # Vite :5173, proxies /api
 make test             # pytest (backend/tests)
 make lint             # ruff + tsc --noEmit
 make migration m="…"  # autogenerate an Alembic revision
+make demo-gif         # re-record docs/demo.gif (Playwright + ffmpeg)
 ```
 
 Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
