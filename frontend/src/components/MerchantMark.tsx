@@ -9,8 +9,9 @@ import { brandFor, logoUrl } from '../brands'
  * screenshot is unreadable at 56px and looks the same for every card. The photo
  * is one tap away on the card itself, where it is large enough to matter.
  *
- * A real logo file in `public/logos/<slug>.png` wins if someone adds one;
- * otherwise a tile in the shop's colours, or its initial for an unknown shop.
+ * A real logo file in `src/logos/<slug>.png` wins if someone adds one; otherwise
+ * a tile in the shop's colours, or its initial for an unknown shop. Files are
+ * collected at build time, so a missing logo costs no request.
  */
 export default function MerchantMark({ merchant }: { merchant: string }) {
   const [logoFailed, setLogoFailed] = useState(false)
@@ -23,7 +24,7 @@ export default function MerchantMark({ merchant }: { merchant: string }) {
         src={logo}
         alt=""
         loading="lazy"
-        // No such file is the normal case, not an error worth showing.
+        // Only reachable if a file disappears between build and load.
         onError={() => setLogoFailed(true)}
       />
     )

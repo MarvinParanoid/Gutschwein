@@ -6,9 +6,9 @@
  * mostly from the colour anyway — the letters only separate the four German
  * retailers that are all red.
  *
- * To use actual logos, drop a PNG into `public/logos/<slug>.png` (the slug is the
- * shop name in lowercase, no spaces). The list picks it up automatically and
- * falls back to the tile when there is no such file.
+ * To use actual logos, drop a PNG into `src/logos/<slug>.png` (the slug is the
+ * shop name in lowercase, no spaces). It is collected at build time, so a shop
+ * without a file is never requested — the tile is drawn straight away.
  */
 
 export interface Brand {
@@ -45,8 +45,22 @@ export function brandFor(merchant: string): Brand | null {
   return null
 }
 
-/** Where a real logo file would live, if someone adds one. */
+// Resolved by Vite at build time: whatever PNGs sit in src/logos, keyed by slug.
+// An empty directory yields an empty map, and then no logo is ever requested.
+const LOGOS: Record<string, string> = Object.fromEntries(
+  Object.entries(
+    import.meta.glob<string>('./logos/*.png', {
+      eager: true,
+      query: '?url',
+      import: 'default',
+    }),
+  ).map(([path, url]) => [path.replace(/^.*\/|\.png$/g, ''), url]),
+)
+
+/** The real logo for a shop, when someone has added the file. */
 export function logoUrl(merchant: string): string | null {
-  const slug = tokens(merchant).at(-1)
-  return slug ? `/logos/${slug}.png` : null
+  for (const token of tokens(merchant)) {
+    if (LOGOS[token]) return LOGOS[token]
+  }
+  return null
 }
