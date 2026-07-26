@@ -46,3 +46,23 @@ test.describe('russian client', () => {
     await expect(page.getByRole('button', { name: 'Обновить остаток' })).toBeVisible()
   })
 })
+
+test.describe('german client', () => {
+  test.use({ locale: 'de-DE' })
+
+  test('a German browser gets German, not the English fallback', async ({ page, request }) => {
+    const merchant = uniqueMerchant('Kaufland')
+    await createCard(request, { merchant, value_amount: '20' })
+
+    await page.goto('/')
+    await expect(page.locator('.topbar h1')).toContainText('Aktiv')
+    await page.getByPlaceholder('Suche: Laden, Notiz…').fill(merchant)
+    await page.locator('.card', { hasText: merchant }).click()
+    await expect(page.getByRole('button', { name: 'Guthaben aktualisieren' })).toBeVisible()
+
+    const failed = await request.get('/api/vouchers/999999', {
+      headers: { 'Accept-Language': 'de-DE,de;q=0.9' },
+    })
+    expect((await failed.json()).detail).toBe('Karte nicht gefunden')
+  })
+})

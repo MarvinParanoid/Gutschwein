@@ -1,7 +1,7 @@
 import { createDemoApi } from './demo/api'
 import { demoBarcode, demoImage } from './demo/assets'
 import { isDemo } from './demo/session'
-import { locale, t } from './i18n'
+import { language, t } from './i18n'
 import { tg } from './telegram'
 import type {
   Comment,
@@ -19,7 +19,7 @@ export class ApiError extends Error {}
 
 /** The server answers errors in this language; it matches what the UI shows. */
 function languageHeader(): Record<string, string> {
-  return { 'Accept-Language': locale.startsWith('ru') ? 'ru' : 'en' }
+  return { 'Accept-Language': language }
 }
 
 function authHeaders(): Record<string, string> {

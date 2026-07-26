@@ -7,8 +7,8 @@ product description and deployment.
 
 - **README and all docs in English**, like the code. The user writes Russian; the repo does not.
 - **Comments and docstrings in English.** User-facing text is localized (ru/en), never
-  written inline: the frontend reads `src/i18n/ru.ts` / `en.ts`, the backend raises
-  `Message("error.…")` keys from `app/i18n.py`.
+  written inline: the frontend reads `src/i18n/ru.ts` (source of truth) plus `en.ts` / `de.ts`, the
+  backend raises `Message("error.…")` keys from `app/i18n.py`.
 - Comment the *why*, not the *what*. Existing comments explain non-obvious decisions
   (capability URLs for images, `render_as_batch` for SQLite, id tiebreak in event ordering).
 - Backend: async everywhere, SQLAlchemy 2 style (`Mapped[...]`, `select()`), no sync sessions.
@@ -17,8 +17,9 @@ product description and deployment.
   is a compile error. It must never make a request; `e2e/demo.spec.ts` enforces that.
 - Frontend: no router, no state library. Views are a discriminated union in `App.tsx`,
   server state is fetched per page with `useEffect`.
-- New user-facing string? Add the key to `ru.ts` (source of truth) and `en.ts`, or to
-  `MESSAGES` in `app/i18n.py`. Both halves are covered by tests that fail on a gap.
+- New user-facing string? Add the key to `ru.ts` (source of truth), `en.ts` and `de.ts`, or
+  to `MESSAGES` in `app/i18n.py` for all three languages. Both halves are covered by tests
+  that fail on a gap — the frontend at compile time, the backend in `test_i18n.py`.
 
 ## Commands
 

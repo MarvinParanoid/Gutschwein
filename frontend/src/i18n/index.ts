@@ -1,4 +1,5 @@
 import { tg } from '../telegram'
+import { de } from './de'
 import { en } from './en'
 import { ru, type Dictionary } from './ru'
 
@@ -13,13 +14,18 @@ function resolve(): Dictionary {
   const telegramLanguage = tg?.initDataUnsafe?.user?.language_code
   const browserLanguage = typeof navigator === 'undefined' ? '' : navigator.language
   const code = (telegramLanguage || browserLanguage || 'ru').toLowerCase()
-  return code.startsWith('ru') ? ru : en
+  if (code.startsWith('ru')) return ru
+  if (code.startsWith('de')) return de
+  return en
 }
 
 export const t: Dictionary = resolve()
 
 /** Locale for dates and numbers, taken from the same decision. */
 export const locale = t.locale
+
+/** The bare code the server understands: "de-DE" → "de". */
+export const language = locale.slice(0, 2)
 
 // index.html ships lang="ru"; correct it so hyphenation and screen readers
 // follow the language the app actually settled on.

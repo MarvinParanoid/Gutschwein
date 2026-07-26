@@ -30,7 +30,7 @@ card's history: who, how much, when, and what for.
   six-month chart
 - **Into the family chat**: new card, payment with the remainder, new comment, an expiry
   reminder, a weekly digest and a nightly backup file
-- **Two languages**, Russian and English, picked automatically with no switch to set
+- **Three languages** — English, German, Russian — picked automatically, no switch to set
 
 ## Stack
 
@@ -222,12 +222,12 @@ are drawn in the browser to keep other people's logos out of the repository.
 
 ## Languages
 
-Russian and English, with no switch by design: the language comes from wherever the app is
-open — `initDataUnsafe.user.language_code` in Telegram, `navigator.language` in the PWA.
-Anything that is neither `ru` nor `en` falls back to `DEFAULT_LANGUAGE`.
+English, German and Russian, with no switch by design: the language comes from wherever the
+app is open — `initDataUnsafe.user.language_code` in Telegram, `navigator.language` in the
+PWA. Anything else falls back to `DEFAULT_LANGUAGE`.
 
-- `src/i18n/ru.ts` is the source of truth; `en.ts` is typed as `Dictionary = typeof ru`, so
-  a forgotten key is a compile error rather than a blank.
+- `src/i18n/ru.ts` is the source of truth; `en.ts` and `de.ts` are typed as
+  `Dictionary = typeof ru`, so a forgotten key is a compile error rather than a blank.
 - API errors are raised as a **key** (`Message("error.…")`) and rendered once at the
   boundary by the handlers in `main.py`. No helper has to carry a language through.
 - The bot answers in the language of whoever wrote to it, and stores it on the user so

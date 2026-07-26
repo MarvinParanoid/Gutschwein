@@ -249,7 +249,7 @@ export const en: Dictionary = {
     exit: 'Leave',
     enter: 'Try the demo',
     enterHint: 'Made-up cards, but everything works',
-    you: 'You',
+    you: 'Max',
     partner: 'Anna',
     errors: {
       spendTooMuch: (spent: string, current: string) =>

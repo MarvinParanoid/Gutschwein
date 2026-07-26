@@ -5,7 +5,7 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
-from app.i18n import EN, LANGUAGES, MESSAGES, RU, Message, language_for, t
+from app.i18n import DE, EN, LANGUAGES, MESSAGES, RU, Message, language_for, t
 
 PLACEHOLDER = re.compile(r"{(\w+)}")
 
@@ -37,7 +37,9 @@ def test_translations_take_the_same_placeholders():
         ("ru-RU", RU),
         ("en", EN),
         ("en-GB,en;q=0.9,ru;q=0.8", EN),
-        ("de-DE", RU),  # nothing we speak: fall back to the default
+        ("de", DE),
+        ("de-AT,de;q=0.9,en;q=0.8", DE),
+        ("fr-FR", RU),  # nothing we speak: fall back to the default
         ("", RU),
         (None, RU),
     ],
@@ -64,6 +66,11 @@ def test_error_follows_accept_language(client: TestClient):
 
 def test_error_defaults_to_russian(client: TestClient):
     assert client.get("/api/vouchers/999999").json()["detail"] == "Купон не найден"
+
+
+def test_error_in_german(client: TestClient):
+    response = client.get("/api/vouchers/999999", headers={"Accept-Language": "de-DE"})
+    assert response.json()["detail"] == "Karte nicht gefunden"
 
 
 def test_parametrized_error_is_rendered_with_its_values(client: TestClient):

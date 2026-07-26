@@ -14,118 +14,149 @@ from fastapi import Header
 
 RU = "ru"
 EN = "en"
-LANGUAGES = (RU, EN)
+DE = "de"
+LANGUAGES = (RU, EN, DE)
 
 MESSAGES: dict[str, dict[str, str]] = {
     # --- API errors ---
     "error.voucher_not_found": {
         RU: "Купон не найден",
         EN: "Card not found",
+        DE: "Karte nicht gefunden",
     },
     "error.comment_not_found": {
         RU: "Комментарий не найден",
         EN: "Comment not found",
+        DE: "Kommentar nicht gefunden",
     },
     "error.comment_not_yours": {
         RU: "Удалять можно только свои комментарии",
         EN: "You can only delete your own comments",
+        DE: "Du kannst nur eigene Kommentare löschen",
     },
     "error.image_not_found": {
         RU: "Изображение не найдено",
         EN: "Image not found",
+        DE: "Bild nicht gefunden",
     },
     "error.image_unreadable": {
         RU: "Не удалось прочитать изображение",
         EN: "Could not read the image",
+        DE: "Das Bild konnte nicht gelesen werden",
     },
     "error.bad_path": {
         RU: "Некорректный путь к файлу",
         EN: "Invalid file path",
+        DE: "Ungültiger Dateipfad",
     },
     "error.unsupported_type": {
         RU: "Неподдерживаемый тип файла: {content_type}",
         EN: "Unsupported file type: {content_type}",
+        DE: "Nicht unterstützter Dateityp: {content_type}",
     },
     "error.file_too_big": {
         RU: "Файл больше {limit} МБ",
         EN: "The file is larger than {limit} MB",
+        DE: "Die Datei ist größer als {limit} MB",
     },
     "error.empty_file": {
         RU: "Пустой файл",
         EN: "Empty file",
+        DE: "Leere Datei",
     },
     "error.already_used": {
         RU: "Купон уже отмечен использованным",
         EN: "This card is already marked as used",
+        DE: "Diese Karte ist bereits als verbraucht markiert",
     },
     "error.not_a_draft": {
         RU: "Это не черновик",
         EN: "This is not a draft",
+        DE: "Das ist kein Entwurf",
     },
     "error.balance_amount_only": {
         RU: "Остаток есть только у купонов на сумму",
         EN: "Only cards with a money value have a balance",
+        DE: "Nur Karten mit Geldwert haben ein Guthaben",
     },
     "error.no_face_value": {
         RU: "У купона не указан номинал — сначала заполните его",
         EN: "This card has no face value — fill it in first",
+        DE: "Für diese Karte ist kein Nennwert hinterlegt — trag ihn zuerst ein",
     },
     "error.spend_too_much": {
         RU: "Нельзя списать {spent} — на купоне {current} {currency}",
         EN: "Cannot spend {spent} — the card holds {current} {currency}",
+        DE: "{spent} geht nicht — auf der Karte sind {current} {currency}",
     },
     "error.above_face_value": {
         RU: "Остаток больше номинала ({face} {currency}) — поправьте номинал в купоне",
         EN: "The balance exceeds the face value ({face} {currency}) — fix the face value first",
+        DE: (
+            "Das Guthaben liegt über dem Nennwert ({face} {currency}) — korrigiere zuerst den "
+            "Nennwert"
+        ),
     },
     "error.barcode_not_found": {
         RU: "Штрихкод не найден",
         EN: "Barcode not found",
+        DE: "Barcode nicht gefunden",
     },
     "error.barcode_not_drawable": {
         RU: "Этот формат не перерисовывается",
         EN: "This symbology cannot be redrawn",
+        DE: "Dieser Barcode-Typ lässt sich nicht neu zeichnen",
     },
     "error.auth_required": {
         RU: "Нужен вход: откройте приложение через бота или войдите по ссылке из чата",
         EN: "Sign in: open the app from the bot, or use the login link from the chat",
+        DE: "Anmeldung nötig: öffne die App über den Bot oder nutze den Login-Link aus dem Chat",
     },
     "error.no_access": {
         RU: "Нет доступа. Передайте администратору свой Telegram ID: {telegram_id}",
         EN: "No access. Give your Telegram ID to the admin: {telegram_id}",
+        DE: "Kein Zugang. Gib dem Admin deine Telegram-ID: {telegram_id}",
     },
     "error.no_bot_token": {
         RU: "BOT_TOKEN не сконфигурирован",
         EN: "BOT_TOKEN is not configured",
+        DE: "BOT_TOKEN ist nicht konfiguriert",
     },
     "error.login_link_dead": {
         RU: "Ссылка недействительна или уже использована. Запросите новую: /login боту",
         EN: "This link is invalid or already used. Ask the bot for a new one: /login",
+        DE: "Dieser Link ist ungültig oder schon benutzt. Hol dir einen neuen: /login an den Bot",
     },
     "error.init_data_no_hash": {
         RU: "initData без hash",
         EN: "initData without a hash",
+        DE: "initData ohne hash",
     },
     "error.init_data_bad_signature": {
         RU: "Неверная подпись initData",
         EN: "Invalid initData signature",
+        DE: "Ungültige initData-Signatur",
     },
     "error.init_data_expired": {
         RU: "initData просрочен",
         EN: "initData has expired",
+        DE: "initData ist abgelaufen",
     },
     "error.init_data_no_user": {
         RU: "initData без блока user",
         EN: "initData without a user block",
+        DE: "initData ohne user-Block",
     },
     # --- bot ---
     "bot.your_id": {
         RU: "Ваш Telegram ID: <code>{user_id}</code> → ALLOWED_TELEGRAM_IDS",
         EN: "Your Telegram ID: <code>{user_id}</code> → ALLOWED_TELEGRAM_IDS",
+        DE: "Deine Telegram-ID: <code>{user_id}</code> → ALLOWED_TELEGRAM_IDS",
     },
     "bot.chat_id": {
         RU: "ID этого чата: <code>{chat_id}</code> → FAMILY_CHAT_ID",
         EN: "This chat's ID: <code>{chat_id}</code> → FAMILY_CHAT_ID",
+        DE: "ID dieses Chats: <code>{chat_id}</code> → FAMILY_CHAT_ID",
     },
     "bot.no_access": {
         RU: (
@@ -135,6 +166,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         EN: (
             "This is a family gift-card app. You do not have access yet.\n"
             "Your Telegram ID: <code>{user_id}</code>"
+        ),
+        DE: (
+            "Das ist eine Familien-App für Geschenkkarten. Du hast noch keinen Zugang.\nDeine "
+            "Telegram-ID: <code>{user_id}</code>"
         ),
     },
     "bot.start": {
@@ -152,35 +187,55 @@ MESSAGES: dict[str, dict[str, str]] = {
             "or “Rewe” first and “50” after.\n\n"
             "I also do /login (browser access), /digest, /backup and /id."
         ),
+        DE: (
+            "Karte gekauft? Schick einen Screenshot <b>mit der Bildunterschrift</b> „Rewe 50“, "
+            "dann steht sie sofort in der Liste.\n\nOhne Bildunterschrift wird daraus ein Entwurf: "
+            "schreib einfach „Rewe 50“ hinterher — oder erst „Rewe“ und dann „50“.\n\nIch kann "
+            "außerdem /login (Zugang im Browser), /digest, /backup und /id."
+        ),
     },
-    "bot.open_app": {RU: "🐷 Открыть Sparschwein", EN: "🐷 Open Sparschwein"},
-    "bot.open_card": {RU: "Открыть карту", EN: "Open the card"},
-    "bot.fill_in_app": {RU: "Заполнить в приложении", EN: "Fill it in the app"},
-    "bot.open_cards": {RU: "Открыть карты", EN: "Open the cards"},
-    "bot.look": {RU: "Посмотреть", EN: "Take a look"},
+    "bot.open_app": {
+        RU: "🐷 Открыть Sparschwein",
+        EN: "🐷 Open Sparschwein",
+        DE: "🐷 Sparschwein öffnen",
+    },
+    "bot.open_card": {RU: "Открыть карту", EN: "Open the card", DE: "Karte öffnen"},
+    "bot.fill_in_app": {
+        RU: "Заполнить в приложении",
+        EN: "Fill it in the app",
+        DE: "In der App ausfüllen",
+    },
+    "bot.open_cards": {RU: "Открыть карты", EN: "Open the cards", DE: "Karten öffnen"},
+    "bot.look": {RU: "Посмотреть", EN: "Take a look", DE: "Ansehen"},
     "bot.no_webapp_url": {
         RU: "\n\n⚠️ WEBAPP_URL не настроен, кнопка приложения недоступна.",
         EN: "\n\n⚠️ WEBAPP_URL is not set, so the app button is unavailable.",
+        DE: "\n\n⚠️ WEBAPP_URL ist nicht gesetzt, der App-Button fehlt deshalb.",
     },
     "bot.added": {
         RU: "✅ Добавил: <b>{merchant}</b> · {amount} {currency}",
         EN: "✅ Added: <b>{merchant}</b> · {amount} {currency}",
+        DE: "✅ Hinzugefügt: <b>{merchant}</b> · {amount} {currency}",
     },
     "bot.shop_noted": {
         RU: "Записал магазин: <b>{merchant}</b>. Теперь сумму — просто числом.",
         EN: "Shop noted: <b>{merchant}</b>. Now the amount — just the number.",
+        DE: "Laden notiert: <b>{merchant}</b>. Jetzt den Betrag — einfach als Zahl.",
     },
     "bot.amount_noted": {
         RU: "Записал сумму {amount}. Теперь название магазина.",
         EN: "Amount noted: {amount}. Now the shop name.",
+        DE: "Betrag notiert: {amount}. Jetzt der Name des Ladens.",
     },
     "bot.draft_created": {
         RU: "📸 Черновик создан. Напишите магазин и сумму — например «Rewe 50».",
         EN: "📸 Draft created. Write the shop and the amount — for example “Rewe 50”.",
+        DE: "📸 Entwurf angelegt. Schreib Laden und Betrag — zum Beispiel „Rewe 50“.",
     },
     "bot.barcode_found": {
         RU: "\n▮▮ Штрихкод распознан ({format}) — покажу его чётким.",
         EN: "\n▮▮ Barcode decoded ({format}) — I will show it sharp.",
+        DE: "\n▮▮ Barcode erkannt ({format}) — ich zeige ihn gestochen scharf.",
     },
     "bot.barcode_missing": {
         RU: (
@@ -191,22 +246,36 @@ MESSAGES: dict[str, dict[str, str]] = {
             "\n⚠️ No readable barcode in that screenshot — I will show the picture itself. "
             "Send the full screen, uncropped: thin bars are lost at small sizes."
         ),
+        DE: (
+            "\n⚠️ Im Screenshot ist kein lesbarer Barcode — ich zeige das Bild selbst. Schick den "
+            "ganzen Bildschirm, nicht zugeschnitten: bei kleinen Codes gehen die Striche verloren."
+        ),
     },
     "bot.not_understood": {
         RU: "Не понял. Пришлите скрин карты с подписью «Rewe 50» — или напишите так же текстом.",
         EN: "I did not get that. Send a card screenshot captioned “Rewe 50” — or just write it.",
+        DE: (
+            "Das habe ich nicht verstanden. Schick einen Screenshot mit „Rewe 50“ als "
+            "Bildunterschrift — oder schreib es einfach."
+        ),
     },
     "bot.no_drafts": {
         RU: "Черновиков нет. Пришлите скрин карты — можно сразу с подписью «Rewe 50».",
         EN: "No drafts. Send a card screenshot — with a caption like “Rewe 50” if you like.",
+        DE: (
+            "Keine Entwürfe. Schick einen Screenshot der Karte — gern gleich mit „Rewe 50“ als "
+            "Bildunterschrift."
+        ),
     },
     "bot.login_only_private": {
         RU: "Ссылку для входа пришлю только в личку — напишите мне туда.",
         EN: "I only send login links in a private chat — message me there.",
+        DE: "Login-Links schicke ich nur privat — schreib mir direkt.",
     },
     "bot.login_no_url": {
         RU: "WEBAPP_URL не настроен — ссылку сформировать не из чего.",
         EN: "WEBAPP_URL is not set — there is no address to build a link from.",
+        DE: "WEBAPP_URL ist nicht gesetzt — daraus lässt sich kein Link bauen.",
     },
     "bot.login_link": {
         RU: (
@@ -219,85 +288,115 @@ MESSAGES: dict[str, dict[str, str]] = {
             "Open it in your phone's browser and add the app to the home screen. "
             "Do not forward it — it opens our cards."
         ),
+        DE: (
+            "Login-Link für den Browser (gültig {minutes} Minuten, einmalig):\n{url}\n\nÖffne ihn "
+            "im Browser deines Handys und leg die App auf den Startbildschirm. Nicht weiterleiten "
+            "— damit kommt man an unsere Karten."
+        ),
     },
     "bot.backup_no_chat": {
         RU: "FAMILY_CHAT_ID не настроен — бэкап отправлять некуда.",
         EN: "FAMILY_CHAT_ID is not set — there is nowhere to send the backup.",
+        DE: "FAMILY_CHAT_ID ist nicht gesetzt — es gibt keinen Ort für das Backup.",
     },
-    "bot.backup_working": {RU: "Собираю бэкап…", EN: "Building the backup…"},
-    "bot.backup_done": {RU: "Готово: {summary}", EN: "Done: {summary}"},
-    "bot.backup_failed": {RU: "Не получилось: {error}", EN: "It did not work: {error}"},
+    "bot.backup_working": {
+        RU: "Собираю бэкап…",
+        EN: "Building the backup…",
+        DE: "Erstelle das Backup…",
+    },
+    "bot.backup_done": {RU: "Готово: {summary}", EN: "Done: {summary}", DE: "Fertig: {summary}"},
+    "bot.backup_failed": {
+        RU: "Не получилось: {error}",
+        EN: "It did not work: {error}",
+        DE: "Hat nicht geklappt: {error}",
+    },
     "bot.digest_nothing": {
         RU: "Пока не о чем рассказывать: активных карт нет.",
         EN: "Nothing to report yet: no active cards.",
+        DE: "Noch nichts zu berichten: keine aktiven Karten.",
     },
     # --- validation ---
     "error.new_voucher_status": {
         RU: "Новый купон может быть только черновиком или активным",
         EN: "A new card can only be a draft or active",
+        DE: "Eine neue Karte kann nur Entwurf oder aktiv sein",
     },
     "error.spent_or_remaining": {
         RU: "Укажите либо потраченную сумму, либо остаток",
         EN: "Give either the amount spent or the remaining balance",
+        DE: "Gib entweder den bezahlten Betrag oder das Restguthaben an",
     },
     "error.empty_comment": {
         RU: "Пустой комментарий",
         EN: "Empty comment",
+        DE: "Leerer Kommentar",
     },
     # --- labels ---
-    "label.voucher": {RU: "купон", EN: "card"},
-    "label.voucher_numbered": {RU: "Купон #{id}", EN: "Card #{id}"},
-    "label.someone": {RU: "Кто-то", EN: "Someone"},
+    "label.voucher": {RU: "купон", EN: "card", DE: "Karte"},
+    "label.voucher_numbered": {RU: "Купон #{id}", EN: "Card #{id}", DE: "Karte #{id}"},
+    "label.someone": {RU: "Кто-то", EN: "Someone", DE: "Jemand"},
     # --- family-chat notifications ---
     "notify.card_added": {
         RU: "🐷 {actor} добавил карту: <b>{label}</b>",
         EN: "🐷 {actor} added a card: <b>{label}</b>",
+        DE: "🐷 {actor} hat eine Karte angelegt: <b>{label}</b>",
     },
     "notify.card_used": {
         RU: "✅ {actor} использовал карту: <b>{label}</b>",
         EN: "✅ {actor} used a card: <b>{label}</b>",
+        DE: "✅ {actor} hat eine Karte verbraucht: <b>{label}</b>",
     },
     "notify.balance_emptied": {
         RU: "💳 {actor} потратил <b>{label}</b> до конца",
         EN: "💳 {actor} spent <b>{label}</b> down to zero",
+        DE: "💳 {actor} hat <b>{label}</b> komplett ausgegeben",
     },
     "notify.balance_spent": {
         RU: "💳 {actor}: −{spent} {currency} с <b>{label}</b>, осталось {remaining} {currency}",
         EN: "💳 {actor}: −{spent} {currency} off <b>{label}</b>, {remaining} {currency} left",
+        DE: "💳 {actor}: −{spent} {currency} von <b>{label}</b>, {remaining} {currency} übrig",
     },
     "notify.balance_fixed": {
         RU: "💳 {actor} поправил остаток <b>{label}</b>: {remaining} {currency}",
         EN: "💳 {actor} corrected the balance of <b>{label}</b>: {remaining} {currency}",
+        DE: "💳 {actor} hat das Guthaben von <b>{label}</b> korrigiert: {remaining} {currency}",
     },
     "notify.comment": {
         RU: "💬 {actor} к карте <b>{label}</b>: {text}",
         EN: "💬 {actor} on <b>{label}</b>: {text}",
+        DE: "💬 {actor} zu <b>{label}</b>: {text}",
     },
     "notify.expiring": {
         RU: "⏳ <b>{label}</b> {when}{caveat}",
         EN: "⏳ <b>{label}</b> {when}{caveat}",
+        DE: "⏳ <b>{label}</b> {when}{caveat}",
     },
-    "notify.expires_today": {RU: "истекает сегодня", EN: "expires today"},
+    "notify.expires_today": {RU: "истекает сегодня", EN: "expires today", DE: "läuft heute ab"},
     "notify.expires_in_day": {
         RU: "истекает через {days} дн.",
         EN: "expires in {days} day",
+        DE: "läuft in {days} Tag ab",
     },
     "notify.expires_in_days": {
         RU: "истекает через {days} дн.",
         EN: "expires in {days} days",
+        DE: "läuft in {days} Tagen ab",
     },
     "notify.expiry_estimated": {
         RU: " (срок по правилу магазина)",
         EN: " (date from the shop's rule)",
+        DE: " (Datum laut Ladenregel)",
     },
     # --- backup ---
     "error.no_chat_for_backup": {
         RU: "FAMILY_CHAT_ID не задан — некуда отправлять бэкап",
         EN: "FAMILY_CHAT_ID is not set — there is nowhere to send the backup",
+        DE: "FAMILY_CHAT_ID ist nicht gesetzt — es gibt keinen Ort für das Backup",
     },
     "error.no_chat_for_digest": {
         RU: "FAMILY_CHAT_ID не задан — сводку отправлять некуда",
         EN: "FAMILY_CHAT_ID is not set — there is nowhere to send the digest",
+        DE: "FAMILY_CHAT_ID ist nicht gesetzt — es gibt keinen Ort für die Übersicht",
     },
     "backup.images_dropped": {
         RU: (
@@ -308,57 +407,80 @@ MESSAGES: dict[str, dict[str, str]] = {
             "\n⚠️ The images did not fit Telegram's limit ({limit} MB) "
             "— the archive holds the database only. The photos are in this chat above."
         ),
+        DE: (
+            "\n⚠️ Die Bilder passen nicht in das Telegram-Limit ({limit} MB) — im Archiv ist nur "
+            "die Datenbank. Die Fotos stehen oben in diesem Chat."
+        ),
     },
     "backup.summary": {
         RU: "{size} МБ, картинок: {images}{note}",
         EN: "{size} MB, images: {images}{note}",
+        DE: "{size} MB, Bilder: {images}{note}",
     },
     "backup.caption": {
         RU: "💾 Бэкап Sparschwein · {stamp}\n{summary}\n{reason}",
         EN: "💾 Sparschwein backup · {stamp}\n{summary}\n{reason}",
+        DE: "💾 Sparschwein-Backup · {stamp}\n{summary}\n{reason}",
     },
-    "backup.reason_manual": {RU: "по запросу от {name}", EN: "requested by {name}"},
-    "backup.reason_scheduled": {RU: "по расписанию", EN: "scheduled"},
+    "backup.reason_manual": {
+        RU: "по запросу от {name}",
+        EN: "requested by {name}",
+        DE: "auf Anfrage von {name}",
+    },
+    "backup.reason_scheduled": {RU: "по расписанию", EN: "scheduled", DE: "planmäßig"},
     # --- weekly digest ---
     "digest.title": {
         RU: "🐷 <b>Сводка за неделю</b>",
         EN: "🐷 <b>The week in cards</b>",
+        DE: "🐷 <b>Die Woche in Karten</b>",
     },
     "digest.on_cards": {
         RU: "На картах: <b>{amount} {currency}</b> на {cards} шт.",
         EN: "On the cards: <b>{amount} {currency}</b> across {cards} of them",
+        DE: "Auf den Karten: <b>{amount} {currency}</b> auf {cards} Stück",
     },
     "digest.on_cards_one": {
         RU: "На картах: <b>{amount} {currency}</b> на 1 шт.",
         EN: "On the cards: <b>{amount} {currency}</b> on a single one",
+        DE: "Auf den Karten: <b>{amount} {currency}</b> auf einer einzigen",
     },
-    "digest.spent": {RU: "Потратили: {amount} {currency}", EN: "Spent: {amount} {currency}"},
+    "digest.spent": {
+        RU: "Потратили: {amount} {currency}",
+        EN: "Spent: {amount} {currency}",
+        DE: "Ausgegeben: {amount} {currency}",
+    },
     "digest.spent_delta": {
         RU: "Потратили: {amount} {currency} — на {diff} {direction}, чем неделей раньше",
         EN: "Spent: {amount} {currency} — {diff} {direction} than the week before",
+        DE: "Ausgegeben: {amount} {currency} — {diff} {direction} als in der Woche davor",
     },
-    "digest.more": {RU: "больше", EN: "more"},
-    "digest.less": {RU: "меньше", EN: "less"},
+    "digest.more": {RU: "больше", EN: "more", DE: "mehr"},
+    "digest.less": {RU: "меньше", EN: "less", DE: "weniger"},
     "digest.spent_nothing": {
         RU: "За неделю ничего не потратили",
         EN: "Nothing was spent this week",
+        DE: "Diese Woche wurde nichts ausgegeben",
     },
     "digest.expiring": {
         RU: "⏳ Истекает за {days} дней: <b>{amount} {currency}</b> — {names}",
         EN: "⏳ Expiring within {days} days: <b>{amount} {currency}</b> — {names}",
+        DE: "⏳ Läuft in {days} Tagen ab: <b>{amount} {currency}</b> — {names}",
     },
-    "digest.and_more": {RU: " и ещё {count}", EN: " and {count} more"},
+    "digest.and_more": {RU: " и ещё {count}", EN: " and {count} more", DE: " und {count} weitere"},
     "digest.uncertain": {
         RU: "❔ Под вопросом: {amount} {currency} на {cards} карт(ах) — проверьте остаток",
         EN: "❔ In question: {amount} {currency} on {cards} cards — check the balance",
+        DE: "❔ Unklar: {amount} {currency} auf {cards} Karten — Guthaben prüfen",
     },
     "digest.uncertain_one": {
         RU: "❔ Под вопросом: {amount} {currency} на одной карте — проверьте остаток",
         EN: "❔ In question: {amount} {currency} on one card — check the balance",
+        DE: "❔ Unklar: {amount} {currency} auf einer Karte — Guthaben prüfen",
     },
     "digest.expired": {
         RU: "⚠️ Уже истекли, а деньги остались: <b>{amount} {currency}</b>",
         EN: "⚠️ Already expired with money left: <b>{amount} {currency}</b>",
+        DE: "⚠️ Bereits abgelaufen, Geld noch drauf: <b>{amount} {currency}</b>",
     },
 }
 
@@ -368,7 +490,10 @@ def language_for(code: str | None, default: str = RU) -> str:
     if not code:
         return default
     first = code.split(",")[0].strip().lower()
-    return EN if first.startswith("en") else RU if first.startswith("ru") else default
+    for language in LANGUAGES:
+        if first.startswith(language):
+            return language
+    return default
 
 
 def t(key: str, language: str = RU, **params: Any) -> str:

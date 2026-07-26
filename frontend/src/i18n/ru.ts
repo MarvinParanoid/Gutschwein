@@ -247,11 +247,13 @@ export const ru = {
   },
 
   demo: {
+    // A name, not "you": the history reads "<member> created the card", and a
+    // pronoun there breaks verb agreement in both Russian and German.
     banner: 'Демо: карты ненастоящие, ничего не сохраняется',
     exit: 'Выйти',
     enter: 'Посмотреть демо',
     enterHint: 'Ненастоящие карты, но трогать можно всё',
-    you: 'Вы',
+    you: 'Макс',
     partner: 'Аня',
     errors: {
       spendTooMuch: (spent: string, current: string) =>
