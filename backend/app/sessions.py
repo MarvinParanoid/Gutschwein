@@ -26,7 +26,8 @@ LOGIN_TOKEN_TTL = timedelta(minutes=10)
 SESSION_TTL = timedelta(days=90)
 
 
-def _digest(token: str) -> str:
+def digest(token: str) -> str:
+    """The only form a token is ever stored or compared in."""
     return hashlib.sha256(token.encode()).hexdigest()
 
 
@@ -44,7 +45,7 @@ async def issue_login_token(session: AsyncSession, user: User) -> str:
     token = secrets.token_urlsafe(32)
     session.add(
         LoginToken(
-            token_hash=_digest(token),
+            token_hash=digest(token),
             user_id=user.id,
             expires_at=utcnow() + LOGIN_TOKEN_TTL,
         )
@@ -57,7 +58,7 @@ async def redeem_login_token(session: AsyncSession, token: str) -> User | None:
     """Exchange a link token for a session. Returns None for anything suspect."""
     row = (
         await session.execute(
-            select(LoginToken).where(LoginToken.token_hash == _digest(token))
+            select(LoginToken).where(LoginToken.token_hash == digest(token))
         )
     ).scalar_one_or_none()
 
@@ -76,7 +77,7 @@ async def open_session(session: AsyncSession, user: User) -> str:
     token = secrets.token_urlsafe(32)
     session.add(
         Session(
-            token_hash=_digest(token),
+            token_hash=digest(token),
             user_id=user.id,
             expires_at=utcnow() + SESSION_TTL,
         )
@@ -87,7 +88,7 @@ async def open_session(session: AsyncSession, user: User) -> str:
 
 async def resolve_session(session: AsyncSession, token: str) -> User | None:
     row = (
-        await session.execute(select(Session).where(Session.token_hash == _digest(token)))
+        await session.execute(select(Session).where(Session.token_hash == digest(token)))
     ).scalar_one_or_none()
     if row is None or _as_utc(row.expires_at) < utcnow():
         return None
@@ -98,7 +99,7 @@ async def resolve_session(session: AsyncSession, token: str) -> User | None:
 
 async def close_session(session: AsyncSession, token: str) -> None:
     row = (
-        await session.execute(select(Session).where(Session.token_hash == _digest(token)))
+        await session.execute(select(Session).where(Session.token_hash == digest(token)))
     ).scalar_one_or_none()
     if row is not None:
         await session.delete(row)

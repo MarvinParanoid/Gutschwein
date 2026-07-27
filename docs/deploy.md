@@ -135,6 +135,12 @@ docker compose exec app python -m app.invite --list
 docker compose exec app python -m app.invite --revoke 3
 ```
 
+The console is only needed for the **first** member. After that the app itself does it:
+*Access* in the burger menu mints the same link for a new member or for another of your own
+devices, and lists every signed-in browser with a way to sign one out — the answer to a
+lost phone. Every invitation is announced in the family chat, because minting a way in is
+the one event nobody should miss.
+
 The link is the same credential the bot hands out: 256 bits of randomness, stored only as
 a SHA-256 digest, valid ten minutes, single use, carried in the URL fragment so it never
 reaches a server log. Opening it sets the same session cookie. Only the trust anchor moves

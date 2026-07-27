@@ -43,6 +43,8 @@ export const de: Dictionary = {
     menu: 'Menü',
     add: 'Karte hinzufügen',
     stats: '📊 Statistik',
+    access: '🔑 Zugang',
+    accessHint: 'wer hereinkommt und von welchen Geräten',
     statsHint: 'was da ist, wohin es geht, wer ausgibt',
     close: 'Schließen',
     inArchive: (amount: string) =>
@@ -242,6 +244,25 @@ export const de: Dictionary = {
     notes: 'die Notiz',
     balance_uncertain: 'die Markierung „Guthaben nicht bestätigt“',
     balance_amount: 'das Guthaben',
+  },
+
+  access: {
+    title: 'Zugang',
+    devices: 'Geräte',
+    thisDevice: 'dieses Gerät',
+    lastSeen: (date: string) => `zuletzt ${date}`,
+    never: 'noch nicht benutzt',
+    revoke: 'Abmelden',
+    revokeOthers: 'Alle anderen Geräte abmelden',
+    revokeOthersConfirm: 'Alle Geräte außer diesem abmelden?',
+    empty: 'Aus dem Browser hat sich noch niemand angemeldet.',
+    telegramNote: 'Telegram braucht keine Sitzung — hier stehen nur Browser.',
+    inviteTitle: 'Einladen',
+    namePlaceholder: 'Name des neuen Mitglieds',
+    invite: 'Link erstellen',
+    myDevice: 'Link für ein weiteres Gerät von mir',
+    linkNote: (minutes: number) =>
+      `Der Link gilt einmalig und ${minutes} Minuten. Nicht weiterleiten — er öffnet unsere Karten.`,
   },
 
   common: {

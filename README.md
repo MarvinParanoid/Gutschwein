@@ -52,6 +52,8 @@ card's history: who, how much, when, and what for.
   printed date, and the chat gets a reminder three days before
 - **Comments** shared with the family, **history** of every change, **statistics** with a
   six-month chart
+- **Access**: invite a member or another of your devices from inside the app, see every
+  signed-in browser, sign a lost one out
 - **Into the family chat**: new card, payment with the remainder, new comment, an expiry
   reminder, a weekly digest and a nightly backup file
 - **Three languages** — English, German, Russian — picked automatically, no switch to set

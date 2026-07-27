@@ -168,3 +168,121 @@ async def test_an_extra_link_does_not_disturb_the_first(client: TestClient) -> N
     assert client.post("/api/auth/login", json={"token": first}).status_code == 200
     client.post("/api/auth/logout")
     client.cookies.clear()
+
+
+# --- minted from inside the app, instead of over ssh ------------------------
+
+
+async def _signed_in(client: TestClient) -> None:
+    """Swap the dev header for a real session cookie, as a browser would have."""
+    _user, token = await _console_member("Хозяйка")
+    client.post("/api/auth/login", json={"token": token})
+    client.headers.pop("X-Dev-User", None)
+
+
+def _dev_header_back(client: TestClient) -> None:
+    client.post("/api/auth/logout")
+    client.cookies.clear()
+    client.headers["X-Dev-User"] = "1000"
+
+
+async def test_a_member_can_invite_without_touching_the_server(
+    client: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setattr(settings, "webapp_url", "https://example.com")
+    await _signed_in(client)
+    try:
+        created = client.post("/api/auth/invite", json={"name": "Гость"})
+        assert created.status_code == 200
+        body = created.json()
+        assert body["member"] == "Гость"
+        assert body["minutes"] == 10
+
+        # The link works, and it belongs to the new member rather than the inviter.
+        token = body["url"].split("/login#")[1]
+        client.cookies.clear()
+        assert client.post("/api/auth/login", json={"token": token}).status_code == 200
+        assert client.get("/api/me").json()["user"]["display_name"] == "Гость"
+    finally:
+        _dev_header_back(client)
+
+
+async def test_a_link_without_a_name_is_a_second_device_for_the_caller(
+    client: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setattr(settings, "webapp_url", "https://example.com")
+    await _signed_in(client)
+    try:
+        body = client.post("/api/auth/invite", json={}).json()
+        assert body["member"] == "Хозяйка"
+        token = body["url"].split("/login#")[1]
+        client.cookies.clear()
+        assert client.post("/api/auth/login", json={"token": token}).status_code == 200
+        assert client.get("/api/me").json()["user"]["display_name"] == "Хозяйка"
+    finally:
+        _dev_header_back(client)
+
+
+async def test_inviting_needs_a_public_url_to_put_in_the_link(
+    client: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setattr(settings, "webapp_url", "")
+    await _signed_in(client)
+    try:
+        assert client.post("/api/auth/invite", json={"name": "Никто"}).status_code == 409
+    finally:
+        _dev_header_back(client)
+
+
+async def test_the_session_list_shows_this_device_and_hides_the_hashes(
+    client: TestClient,
+) -> None:
+    await _signed_in(client)
+    try:
+        sessions = client.get("/api/auth/sessions")
+        assert sessions.status_code == 200
+        rows = sessions.json()
+        assert any(row["current"] for row in rows)
+        # Nothing that could be replayed leaks into the list.
+        assert "token_hash" not in sessions.text
+        assert all({"id", "member", "created_at", "current"} <= set(row) for row in rows)
+    finally:
+        _dev_header_back(client)
+
+
+async def test_the_current_device_cannot_be_revoked_from_the_list(client: TestClient) -> None:
+    await _signed_in(client)
+    try:
+        mine = next(row for row in client.get("/api/auth/sessions").json() if row["current"])
+        assert client.delete(f"/api/auth/sessions/{mine['id']}").status_code == 400
+        # Still signed in.
+        assert client.get("/api/me").status_code == 200
+    finally:
+        _dev_header_back(client)
+
+
+async def test_a_lost_phone_is_signed_out_and_this_browser_survives(
+    client: TestClient,
+) -> None:
+    lost, lost_token = await _console_member("Потерянный телефон")
+    with TestClient(app_for_phone(), base_url="https://testserver") as phone:
+        phone.post("/api/auth/login", json={"token": lost_token})
+        assert phone.get("/api/me").status_code == 200
+
+        await _signed_in(client)
+        try:
+            assert client.post("/api/auth/sessions/others").status_code == 204
+            assert client.get("/api/me").status_code == 200
+        finally:
+            _dev_header_back(client)
+
+        # The phone's cookie is still in its jar and no longer opens anything.
+        assert phone.get("/api/me").status_code == 401
+    async with SessionLocal() as session:
+        assert await session.get(User, lost.id) is not None  # the member stays, the device goes
+
+
+def app_for_phone():
+    from app.main import app
+
+    return app

@@ -117,6 +117,21 @@ MESSAGES: dict[str, dict[str, str]] = {
         EN: "No access. Give your Telegram ID to the admin: {telegram_id}",
         DE: "Kein Zugang. Gib dem Admin deine Telegram-ID: {telegram_id}",
     },
+    "error.session_not_found": {
+        RU: "Сессия не найдена",
+        EN: "Session not found",
+        DE: "Sitzung nicht gefunden",
+    },
+    "error.session_is_current": {
+        RU: "Это устройство, с которого вы сейчас работаете — используйте «Выйти»",
+        EN: "That is the device you are using — sign out instead",
+        DE: "Das ist das Gerät, an dem du gerade sitzt — nutze „Abmelden“",
+    },
+    "error.no_webapp_url": {
+        RU: "WEBAPP_URL не настроен — ссылку сформировать не из чего",
+        EN: "WEBAPP_URL is not set — there is no address to build a link from",
+        DE: "WEBAPP_URL ist nicht gesetzt — daraus lässt sich kein Link bauen",
+    },
     "error.no_bot_token": {
         RU: "BOT_TOKEN не сконфигурирован",
         EN: "BOT_TOKEN is not configured",
@@ -340,6 +355,16 @@ MESSAGES: dict[str, dict[str, str]] = {
         RU: "🐷 {actor} добавил карту: <b>{label}</b>",
         EN: "🐷 {actor} added a card: <b>{label}</b>",
         DE: "🐷 {actor} hat eine Karte angelegt: <b>{label}</b>",
+    },
+    "notify.invited": {
+        RU: "🔑 {actor} добавил участника: <b>{member}</b>",
+        EN: "🔑 {actor} added a member: <b>{member}</b>",
+        DE: "🔑 {actor} hat ein Mitglied hinzugefügt: <b>{member}</b>",
+    },
+    "notify.new_device": {
+        RU: "🔑 {actor} завёл ссылку для входа на новом устройстве",
+        EN: "🔑 {actor} created a login link for another device",
+        DE: "🔑 {actor} hat einen Login-Link für ein weiteres Gerät erstellt",
     },
     "notify.card_used": {
         RU: "✅ {actor} использовал карту: <b>{label}</b>",

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from './api'
 import { isDemo, startDemo, stopDemo } from './demo/session'
 import { t } from './i18n'
+import AccessPage from './pages/AccessPage'
 import ListPage from './pages/ListPage'
 import StatsPage from './pages/StatsPage'
 import VoucherForm from './pages/VoucherForm'
@@ -19,6 +20,7 @@ type View =
   | { name: 'voucher'; id: number }
   | { name: 'form'; id?: number }
   | { name: 'stats' }
+  | { name: 'access' }
 
 export default function App() {
   const [view, setView] = useState<View>({ name: 'list' })
@@ -121,10 +123,13 @@ export default function App() {
           onOpen={(id) => navigate({ name: 'voucher', id })}
           onCreate={() => navigate({ name: 'form' })}
           onStats={() => navigate({ name: 'stats' })}
+          onAccess={() => navigate({ name: 'access' })}
         />
       )}
 
       {view.name === 'stats' && <StatsPage onBack={goBack} />}
+
+      {view.name === 'access' && <AccessPage onBack={goBack} />}
 
       {view.name === 'voucher' && (
         <VoucherPage

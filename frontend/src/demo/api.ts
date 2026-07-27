@@ -110,6 +110,22 @@ export function createDemoApi(): ApiClient {
     logout: async () => undefined,
     me: async () => ({ user: YOU, members: [YOU, PARTNER] }),
 
+    sessions: async () => state.sessions,
+    revokeSession: async (id) => {
+      if (state.sessions.find((s) => s.id === id)?.current) fail(t.app.genericError(400))
+      state.sessions = state.sessions.filter((s) => s.id !== id)
+    },
+    revokeOtherSessions: async () => {
+      state.sessions = state.sessions.filter((s) => s.current)
+    },
+    invite: async (name = '') => ({
+      // A link shaped like the real one, on this very page, so the screen can be
+      // tried out; the token behind it means nothing.
+      url: `${location.origin}/login#demo-${Math.random().toString(36).slice(2, 14)}`,
+      minutes: 10,
+      member: name.trim() || YOU.display_name,
+    }),
+
     listVouchers: async (status, q, merchant) => {
       let found = state.vouchers.filter(
         (v) => status === "all" || v.status === status,

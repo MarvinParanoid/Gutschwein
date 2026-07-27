@@ -95,6 +95,21 @@ export interface Counts {
   currency: string
 }
 
+export interface Session {
+  id: number
+  member: string
+  created_at: string
+  last_used_at: string | null
+  /** The browser asking. It cannot revoke itself from the list. */
+  current: boolean
+}
+
+export interface Invite {
+  url: string
+  minutes: number
+  member: string
+}
+
 export interface Comment {
   id: number
   text: string

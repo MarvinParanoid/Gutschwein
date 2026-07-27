@@ -6,6 +6,32 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.models import EventKind, ValueKind, VoucherStatus
 
 
+class SessionOut(BaseModel):
+    """A signed-in browser, as the access screen shows it."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    member: str
+    created_at: datetime
+    last_used_at: datetime | None
+    # The one asking. It is offered last and cannot be revoked from the list,
+    # because signing yourself out of the screen you are standing on is a trap.
+    current: bool
+
+
+class InviteRequest(BaseModel):
+    """A name creates a new member; without one the link is for the caller."""
+
+    name: str = Field(default="", max_length=128)
+
+
+class InviteOut(BaseModel):
+    url: str
+    minutes: int
+    member: str
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -28,6 +28,7 @@ interface Props {
   onOpen: (id: number) => void
   onCreate: () => void
   onStats: () => void
+  onAccess: () => void
 }
 
 const EMPTY_EMOJI: Record<VoucherStatus, string> = {
@@ -48,6 +49,7 @@ export default function ListPage({
   onOpen,
   onCreate,
   onStats,
+  onAccess,
 }: Props) {
   const [vouchers, setVouchers] = useState<Voucher[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -135,6 +137,11 @@ export default function ListPage({
             haptic()
             setMenuOpen(false)
             onStats()
+          }}
+          onAccess={() => {
+            haptic()
+            setMenuOpen(false)
+            onAccess()
           }}
           onClose={() => setMenuOpen(false)}
         />
@@ -246,12 +253,14 @@ function TabMenu({
   counts,
   onSelect,
   onStats,
+  onAccess,
   onClose,
 }: {
   current: VoucherStatus
   counts: Counts | null
   onSelect: (tab: VoucherStatus) => void
   onStats: () => void
+  onAccess: () => void
   onClose: () => void
 }) {
   useOverlay(onClose)
@@ -292,6 +301,13 @@ function TabMenu({
           <span className="sheet-label">
             {t.list.stats}
             <span className="sheet-hint">{t.list.statsHint}</span>
+          </span>
+        </button>
+
+        <button className="sheet-item" onClick={onAccess}>
+          <span className="sheet-label">
+            {t.list.access}
+            <span className="sheet-hint">{t.list.accessHint}</span>
           </span>
         </button>
 

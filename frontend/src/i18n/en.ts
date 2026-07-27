@@ -40,6 +40,8 @@ export const en: Dictionary = {
     menu: 'Menu',
     add: 'Add a card',
     stats: '📊 Statistics',
+    access: '🔑 Access',
+    accessHint: 'who gets in, and from which devices',
     statsHint: 'what you have, where it goes, who spends',
     close: 'Close',
     inArchive: (amount: string) =>
@@ -238,6 +240,25 @@ export const en: Dictionary = {
     notes: 'the note',
     balance_uncertain: 'the “balance not confirmed” mark',
     balance_amount: 'the balance',
+  },
+
+  access: {
+    title: 'Access',
+    devices: 'Devices',
+    thisDevice: 'this device',
+    lastSeen: (date: string) => `last seen ${date}`,
+    never: 'never used yet',
+    revoke: 'Sign out',
+    revokeOthers: 'Sign out every other device',
+    revokeOthersConfirm: 'Sign out every device except this one?',
+    empty: 'Nobody has signed in from a browser yet.',
+    telegramNote: 'Telegram needs no session, so only browsers show up here.',
+    inviteTitle: 'Invite',
+    namePlaceholder: 'Name of the new member',
+    invite: 'Create a link',
+    myDevice: 'Link for another device of mine',
+    linkNote: (minutes: number) =>
+      `The link is single use and lives ${minutes} minutes. Do not forward it — it opens our cards.`,
   },
 
   common: {

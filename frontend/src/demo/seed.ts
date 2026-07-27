@@ -1,6 +1,6 @@
 import { demoImageId } from './assets'
 import { t } from '../i18n'
-import type { Comment, User, Voucher, VoucherEvent } from '../types'
+import type { Comment, Session, User, Voucher, VoucherEvent } from '../types'
 
 export interface DemoComment extends Comment {
   voucher_id: number
@@ -14,6 +14,7 @@ export interface DemoState {
   vouchers: Voucher[]
   comments: DemoComment[]
   events: DemoEvent[]
+  sessions: Session[]
   nextId: number
 }
 
@@ -232,5 +233,10 @@ export function createSeed(): DemoState {
     created_at: at(-75),
   })
 
-  return { vouchers, comments, events, nextId: 100 }
+  const sessions: Session[] = [
+    { id: 1, member: YOU.display_name, created_at: at(-40), last_used_at: at(0), current: true },
+    { id: 2, member: PARTNER.display_name, created_at: at(-88), last_used_at: at(-2), current: false },
+  ]
+
+  return { vouchers, comments, events, sessions, nextId: 100 }
 }

@@ -458,6 +458,64 @@ body.scrolled .topbar {
   color: var(--success);
 }
 
+/* ---------- access ---------- */
+
+/* Same treatment as a form field: inside a panel an input has to differ from it,
+   and .search shares the panel's own background. */
+.invite-name {
+  border: 0;
+  background: var(--secondary-bg);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 12px;
+  font: inherit;
+  width: 100%;
+}
+
+.access-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.access-actions .btn {
+  flex: 1;
+  min-width: 140px;
+}
+
+.invite-link {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--secondary-bg);
+  border-radius: 12px;
+}
+
+.invite-link code {
+  display: block;
+  /* A link is long and must not be truncated: it is the whole credential. */
+  word-break: break-all;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.device {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--secondary-bg);
+}
+
+.device:last-of-type {
+  border-bottom: 0;
+}
+
+.btn.link.danger {
+  color: var(--danger);
+}
+
 /* ---------- detail ---------- */
 
 .panel {

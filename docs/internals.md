@@ -55,6 +55,11 @@ login:
 
 Neither path may become a way around the other; `tests/test_invite.py` asserts that.
 
+Sessions are visible and revocable from *Access* in the app: the household sees every
+signed-in browser, not only its own, because the point is to notice a device that should
+not be there. The browser making the request cannot revoke itself from that list — logging
+out is a different button, and a screen that signs you out of itself reads as a crash.
+
 The PWA has no `initData`, so it uses a one-time link — from the bot's `/login` or from the
 console — exchanged for an httpOnly, Secure, SameSite=Lax cookie. Tokens are stored as
 SHA-256 digests and die on first use, and they travel in the URL fragment, which browsers

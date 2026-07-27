@@ -40,6 +40,8 @@ export const ru = {
     menu: 'Меню',
     add: 'Добавить купон',
     stats: '📊 Статистика',
+    access: '🔑 Доступ',
+    accessHint: 'кто заходит и с каких устройств',
     statsHint: 'сколько лежит, куда уходит, кто тратит',
     close: 'Закрыть',
     inArchive: (amount: string) =>
@@ -240,6 +242,25 @@ export const ru = {
     notes: 'заметку',
     balance_uncertain: 'пометку «остаток не подтверждён»',
     balance_amount: 'остаток',
+  },
+
+  access: {
+    title: 'Доступ',
+    devices: 'Устройства',
+    thisDevice: 'это устройство',
+    lastSeen: (date: string) => `последний вход ${date}`,
+    never: 'ещё не заходили',
+    revoke: 'Отключить',
+    revokeOthers: 'Выйти на всех других устройствах',
+    revokeOthersConfirm: 'Отключить все устройства, кроме этого?',
+    empty: 'В браузере пока никто не входил.',
+    telegramNote: 'Вход через Telegram сессий не создаёт — здесь только браузеры.',
+    inviteTitle: 'Пригласить',
+    namePlaceholder: 'Имя нового участника',
+    invite: 'Создать ссылку',
+    myDevice: 'Ссылка для моего устройства',
+    linkNote: (minutes: number) =>
+      `Ссылка одноразовая и живёт ${minutes} минут. Не пересылайте её никому лишнему — она пускает в наши карты.`,
   },
 
   common: {

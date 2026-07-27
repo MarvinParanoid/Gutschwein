@@ -6,7 +6,9 @@ import { tg } from './telegram'
 import type {
   Comment,
   Counts,
+  Invite,
   MerchantStat,
+  Session,
   Stats,
   User,
   Voucher,
@@ -66,6 +68,15 @@ const httpApi = {
   logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
 
   me: () => request<{ user: User; members: User[] }>('/api/me'),
+
+  /** Signed-in browsers, the whole household's — see routers/auth.py. */
+  sessions: () => request<Session[]>('/api/auth/sessions'),
+  revokeSession: (id: number) =>
+    request<void>(`/api/auth/sessions/${id}`, { method: 'DELETE' }),
+  revokeOtherSessions: () => request<void>('/api/auth/sessions/others', { method: 'POST' }),
+  /** A name invites someone new; without one the link is another of your devices. */
+  invite: (name = '') =>
+    request<Invite>('/api/auth/invite', { method: 'POST', body: JSON.stringify({ name }) }),
 
   listVouchers: (status: VoucherStatus | 'all', q?: string, merchant?: string | null) => {
     const params = new URLSearchParams({ status })
