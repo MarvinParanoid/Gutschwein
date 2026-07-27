@@ -9,7 +9,7 @@ export default defineConfig({
       // The app updates itself: nobody is going to hunt for a refresh button
       // while standing at a till.
       registerType: 'autoUpdate',
-      includeAssets: ['icon-192.png', 'icon-512.png', 'icon-maskable.png'],
+      includeAssets: ['icon-192.png', 'icon-512.png', 'icon-maskable.png', 'favicon-32.png'],
       manifest: {
         name: 'Gutschwein — карты и купоны',
         short_name: 'Gutschwein',
