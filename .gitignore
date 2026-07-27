@@ -17,6 +17,8 @@ frontend/dist/
 # Personal Claude Code permissions; .claude/settings.json is shared and stays tracked.
 .claude/settings.local.json
 test-results/
+# Скриншоты для обсуждения: не код, в репозиторий не едут.
+preview/
 playwright-report/
 frontend/test-results/
 frontend/playwright-report/

@@ -1,5 +1,9 @@
 services:
   app:
+    # Both, on purpose: `docker compose pull` takes the image CI published, and
+    # `docker compose up --build` still builds from this checkout — which is what
+    # a developer wants, and the only way to deploy work that is not pushed yet.
+    image: ghcr.io/marvinparanoid/gutschwein:latest
     build: .
     restart: unless-stopped
     env_file: .env

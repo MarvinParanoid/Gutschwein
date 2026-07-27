@@ -19,9 +19,12 @@ screen:
 ```bash
 git clone https://github.com/MarvinParanoid/Gutschwein && cd Gutschwein
 cp .env.example .env
-docker compose up -d --build
+docker compose pull && docker compose up -d
 # then open http://localhost:8000/demo
 ```
+
+That pulls the published image (`ghcr.io/marvinparanoid/gutschwein`), so nothing is built
+locally. Swap the last line for `docker compose up -d --build` to build from the checkout.
 
 For a real installation you need a bot token and a public HTTPS domain: see
 [docs/deploy.md](docs/deploy.md). It can also run [without Telegram

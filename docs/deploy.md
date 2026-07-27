@@ -45,10 +45,21 @@ mkdir -p data && sudo chown -R 10001:10001 data
 ## 4. Start
 
 ```bash
-docker compose up -d --build
+docker compose pull && docker compose up -d
 docker compose logs -f            # "running database migrations", then "telegram bot started"
 curl -s localhost:8000/healthz    # {"status":"ok"}
 ```
+
+The image comes from `ghcr.io/marvinparanoid/gutschwein:latest`, published by CI only
+after it has built the image, started it and watched it answer — see the `docker` job.
+Nothing is compiled on your server, which matters on a small one: the frontend build is
+what once ran a 1 GB VPS out of memory.
+
+`docker compose up -d --build` still builds from the checkout instead, which is what a
+developer wants and the only way to run changes that are not pushed yet.
+
+Every commit on `main` is also tagged with its first twelve characters, so a rollback is
+`docker compose up -d` after pointing the image at `:<sha>`.
 
 Migrations apply themselves on startup. The container listens on `127.0.0.1:8000` only; the
 reverse proxy is what faces the world.
@@ -113,6 +124,9 @@ app says you have no access, the message carries your Telegram id — add it to
 ```bash
 make deploy-vps    # rsync + rebuild + wait for /healthz
 ```
+
+This one deliberately still builds on the server: its whole purpose is deploying work that
+has not been pushed, and an unpushed commit is by definition not in the registry.
 
 The sync path is pinned to the Makefile's own directory, so it can be run from anywhere.
 `data/` is excluded, and rsync never deletes excluded paths. Machine-specific values live

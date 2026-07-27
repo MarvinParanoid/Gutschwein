@@ -54,6 +54,10 @@ jobs:
   docker:
     name: docker image + smoke test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Only this job may write packages, and only to publish the image below.
+      packages: write
     steps:
       - uses: actions/checkout@v7
 
@@ -114,6 +118,22 @@ jobs:
             code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8000$path")
             test "$code" = "404" || { echo "$path answered $code, expected 404"; exit 1; }
           done
+
+      # Published only after the smoke test above has run the thing: whatever is
+      # on :latest has answered /healthz, served the app and refused an
+      # unauthenticated request at least once.
+      - name: Publish to ghcr.io
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          echo "${{ github.token }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          image=ghcr.io/${{ github.repository_owner }}/gutschwein
+          # Lowercase: registries reject capitals in a repository name.
+          image=$(echo "$image" | tr '[:upper:]' '[:lower:]')
+          docker tag gutschwein:ci "$image:latest"
+          # A sha tag is what a rollback needs: "the one from before" by name.
+          docker tag gutschwein:ci "$image:${GITHUB_SHA::12}"
+          docker push "$image:latest"
+          docker push "$image:${GITHUB_SHA::12}"
 
       - name: Container logs
         if: always()

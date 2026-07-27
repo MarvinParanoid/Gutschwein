@@ -1,0 +1,31 @@
+# The build context is the repository root, and everything in it is uploaded to
+# the Docker daemon before the first instruction runs. Two reasons to be strict:
+# .env carries the bot token and has no business leaving this directory, and the
+# heavy directories below make every build slower for nothing.
+.env
+.env.*
+.make.local
+
+.git
+.github
+.claude
+.vscode
+
+frontend/node_modules
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+backend/.venv
+backend/static
+backend/.e2e-data
+backend/.pytest_cache
+backend/.ruff_cache
+backend/*.egg-info
+**/__pycache__
+
+# Runtime state and things only humans read.
+data
+preview
+docs
+*.md
+LICENSE
