@@ -72,7 +72,7 @@ card's history: who, how much, when, and what for.
 make install          # venv + npm install
 make dev-api          # FastAPI :8000, DEV_MODE=true, bot off
 make dev-web          # Vite :5173, proxies /api to :8000
-make test             # pytest
+make test             # pytest + vitest
 make lint             # ruff + tsc
 make migration m="…"  # alembic revision --autogenerate
 ```

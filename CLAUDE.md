@@ -27,7 +27,7 @@ the demo mode, the languages and the access model.
 ```bash
 make dev-api          # FastAPI :8000 with DEV_MODE=true, bot off
 make dev-web          # Vite :5173, proxies /api
-make test             # pytest (backend/tests)
+make test             # pytest (backend/tests) + vitest (frontend/src/**/*.test.ts)
 make lint             # ruff + tsc --noEmit
 make migration m="…"  # autogenerate an Alembic revision
 make demo-gif         # re-record docs/demo.gif (Playwright + ffmpeg)

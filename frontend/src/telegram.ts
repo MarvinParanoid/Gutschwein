@@ -36,7 +36,9 @@ declare global {
   }
 }
 
-export const tg = window.Telegram?.WebApp
+// Guarded like the navigator and document lookups in i18n: the module is also
+// imported where there is no window at all, such as a unit test.
+export const tg = typeof window === 'undefined' ? undefined : window.Telegram?.WebApp
 export const inTelegram = Boolean(tg?.initData)
 
 export function initTelegram(): void {

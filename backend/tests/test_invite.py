@@ -107,3 +107,64 @@ async def test_a_fresh_link_can_be_issued_for_an_existing_member(client: TestCli
     assert client.post("/api/auth/login", json={"token": second}).status_code == 200
     client.post("/api/auth/logout")
     client.cookies.clear()
+
+
+async def test_creating_a_member_prints_a_usable_link(
+    client: TestClient, capsys, monkeypatch
+) -> None:
+    monkeypatch.setattr(settings, "webapp_url", "https://example.com")
+    await invite.create("Ли")
+
+    printed = capsys.readouterr().out
+    assert "https://example.com/login#" in printed
+    token = printed.split("/login#")[1].split()[0]
+
+    # The link the operator reads out of the terminal is the one that works.
+    assert client.post("/api/auth/login", json={"token": token}).status_code == 200
+    client.post("/api/auth/logout")
+    client.cookies.clear()
+
+
+async def test_without_a_public_url_the_token_still_comes_out(capsys, monkeypatch) -> None:
+    """A server without WEBAPP_URL can still hand someone a session by hand."""
+    monkeypatch.setattr(settings, "webapp_url", "")
+    await invite.create("Без домена")
+
+    printed = capsys.readouterr().out
+    assert "<WEBAPP_URL>/login#" in printed
+
+
+async def test_listing_tells_the_two_kinds_apart(capsys) -> None:
+    async with SessionLocal() as session:
+        await upsert_user(session, TelegramUser({"id": 424244, "first_name": "Z"}))
+    console, _token = await _console_member("Консоль")
+
+    await invite.listing()
+    printed = capsys.readouterr().out
+
+    assert f"{console.id}" in printed
+    assert "console" in printed and "telegram" in printed
+
+
+async def test_a_missing_member_is_an_error_not_a_traceback(capsys) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        await invite.link(999_999)
+    assert "999999" in str(exit_info.value)
+
+    with pytest.raises(SystemExit):
+        await invite.revoke(999_999)
+
+
+async def test_an_extra_link_does_not_disturb_the_first(client: TestClient) -> None:
+    """Losing the link should not lock a member out of their own account."""
+    user, first = await _console_member("Два ключа")
+    async with SessionLocal() as session:
+        second = await issue_login_token(session, await session.get(User, user.id))
+
+    assert client.post("/api/auth/login", json={"token": second}).status_code == 200
+    client.post("/api/auth/logout")
+    client.cookies.clear()
+    # The earlier link is still unused, so it still opens the door.
+    assert client.post("/api/auth/login", json={"token": first}).status_code == 200
+    client.post("/api/auth/logout")
+    client.cookies.clear()

@@ -32,6 +32,7 @@ build:
 
 test:
 	cd backend && .venv/bin/python -m pytest -q
+	cd frontend && npm run test:unit
 
 lint:
 	cd backend && .venv/bin/ruff check app tests
