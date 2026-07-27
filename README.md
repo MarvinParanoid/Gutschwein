@@ -1,4 +1,6 @@
-# 🐷 Gutschwein
+<img src="frontend/public/icon-192.png" alt="" width="88">
+
+# Gutschwein
 
 A family gift-card manager: what is left on each card, who spent what, and a screen the
 cashier can scan. Runs as a Telegram Mini App and as an installable PWA.
