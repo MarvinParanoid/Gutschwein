@@ -43,6 +43,10 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
   with `Missing: … from lock file`), while `--package-lock-only` resolves for this platform
   only and leaves out `@rollup/rollup-linux-x64-musl`, which the alpine image needs and
   nothing else does. The first breaks all three node jobs, the second only the image.
+- The backend reads `env_file=(".env", "../.env")`, so a process started from `backend/`
+  picks up the repository's real `.env`. The Playwright `webServer` therefore pins every
+  setting it relies on: without that, a suite passes locally on a developer's own
+  configuration and fails in CI, where there is no `.env` at all.
 - `settings` is a module-level singleton built at import time. Tests must set the environment
   in `tests/conftest.py` *before* importing anything from `app`.
 - Migrations run inside the app's lifespan via `asyncio.to_thread` (Alembic is sync).

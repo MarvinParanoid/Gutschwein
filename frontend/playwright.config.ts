@@ -48,6 +48,12 @@ export default defineConfig({
     stdout: 'pipe',
     stderr: 'pipe',
     env: {
+      // Every setting the tests depend on is pinned here. The backend also reads
+      // ../.env relative to its own directory, which on a developer machine is
+      // the real one — a suite that quietly borrows it passes locally and fails
+      // in CI, where no such file exists.
+      WEBAPP_URL: 'https://e2e.invalid',
+      DEFAULT_LANGUAGE: 'ru',
       DEV_MODE: 'true',
       // The dev user has to be a member: the whitelist is enforced on the
       // cookie path too, not only at login.
