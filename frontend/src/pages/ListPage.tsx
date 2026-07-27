@@ -30,7 +30,8 @@ interface Props {
 }
 
 const EMPTY_EMOJI: Record<VoucherStatus, string> = {
-  active: '🐷',
+  // Empty: the active tab shows the app's own mark instead, see below.
+  active: '',
   draft: '📸',
   used: '✅',
   archived: '📦',
@@ -107,8 +108,11 @@ export default function ListPage({
     <>
       <div className="topbar">
         {/* Inside Telegram the app name is already in its header, so this row
-            carries the current list instead of repeating the title. */}
-        <h1>{inTelegram ? currentLabel : `🐷 ${currentLabel}`}</h1>
+            carries the current list instead of repeating the title. Outside it,
+            the mark stands in for the missing header — the app's own icon rather
+            than an emoji, which is drawn differently on every platform. */}
+        {!inTelegram && <img className="mark" src="/icon-192.png" alt="" />}
+        <h1>{currentLabel}</h1>
         <button
           className="burger"
           onClick={() => {
@@ -203,7 +207,11 @@ export default function ListPage({
           </div>
         ) : (
           <div className="empty">
-            <span className="emoji">{emptyEmoji}</span>
+            {emptyEmoji ? (
+              <span className="emoji">{emptyEmoji}</span>
+            ) : (
+              <img className="mark-big" src="/icon-192.png" alt="" />
+            )}
             <p>{t.empty[tab]}</p>
           </div>
         ))}

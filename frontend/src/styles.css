@@ -100,6 +100,13 @@ button {
   flex-shrink: 0;
 }
 
+/* The app's own mark instead of an emoji: one drawing on every platform. */
+.topbar .mark {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
 .topbar h1 {
   font-size: 20px;
   margin: 0;
@@ -1021,6 +1028,13 @@ button {
   font-size: 40px;
   display: block;
   margin-bottom: 10px;
+}
+
+.empty .mark-big {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 10px;
+  display: block;
 }
 
 .error {
