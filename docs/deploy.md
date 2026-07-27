@@ -58,7 +58,9 @@ what once ran a 1 GB VPS out of memory.
 `docker compose up -d --build` still builds from the checkout instead, which is what a
 developer wants and the only way to run changes that are not pushed yet.
 
-Every commit on `main` is also tagged with its first twelve characters, and the deploy is
+A git tag `v*` publishes an image under that name and deliberately leaves `:latest` alone,
+which belongs to `main`. Every commit on `main` is also tagged with its first twelve
+characters, and the deploy is
 pinned to the commit that produced it rather than to whatever `:latest` points at by the
 time the server gets round to pulling. Rolling back is therefore a tag:
 

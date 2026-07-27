@@ -2,6 +2,10 @@
 
 # Gutschwein
 
+[![CI](https://github.com/MarvinParanoid/Gutschwein/actions/workflows/ci.yml/badge.svg)](https://github.com/MarvinParanoid/Gutschwein/actions/workflows/ci.yml)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+[![Image](https://img.shields.io/badge/ghcr.io-gutschwein-2496ed?logo=docker&logoColor=white)](https://github.com/MarvinParanoid/Gutschwein/pkgs/container/gutschwein)
+
 A family gift-card manager: what is left on each card, who spent what, and a screen the
 cashier can scan. Runs as a Telegram Mini App and as an installable PWA.
 
@@ -60,6 +64,19 @@ card's history: who, how much, when, and what for.
 - **Into the family chat**: new card, payment with the remainder, new comment, an expiry
   reminder, a weekly digest and a nightly backup file
 - **Three languages** — English, German, Russian — picked automatically, no switch to set
+
+## Screenshots
+
+The demo dataset, so every figure here is made up.
+
+| | | |
+|---|---|---|
+| [<img src="docs/screenshots/01-list.png" width="200">](docs/screenshots/01-list.png) | [<img src="docs/screenshots/02-scan.png" width="200">](docs/screenshots/02-scan.png) | [<img src="docs/screenshots/03-card.png" width="200">](docs/screenshots/03-card.png) |
+| The list: soonest expiry first, what is left in large type | Scan mode: the barcode redrawn from the screenshot | A card: balance, history, comments |
+| [<img src="docs/screenshots/04-stats.png" width="200">](docs/screenshots/04-stats.png) | [<img src="docs/screenshots/05-form.png" width="200">](docs/screenshots/05-form.png) | [<img src="docs/screenshots/06-access.png" width="200">](docs/screenshots/06-access.png) |
+| Statistics: what you hold, where it goes, who spends | Adding a card by hand — two fields is the usual case | Access: invitations and signed-in devices |
+| [<img src="docs/screenshots/07-dark.png" width="200">](docs/screenshots/07-dark.png) | | |
+| Dark mode, following the phone or Telegram | | |
 
 ## Stack
 

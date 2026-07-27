@@ -28,6 +28,9 @@ const BEAT = 900
 
 test('walkthrough', async ({ page }) => {
   await page.goto('/demo')
+  // The demo banner belongs to the demo, not to the app; on a recording meant to
+  // show the product it would read as part of it.
+  await page.addStyleTag({ content: '.demo-bar { display: none !important; }' })
   await page.locator('.card').first().waitFor()
   await page.waitForTimeout(BEAT * 2)
 

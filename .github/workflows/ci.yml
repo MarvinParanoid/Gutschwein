@@ -123,17 +123,27 @@ jobs:
       # on :latest has answered /healthz, served the app and refused an
       # unauthenticated request at least once.
       - name: Publish to ghcr.io
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         run: |
           echo "${{ github.token }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           image=ghcr.io/${{ github.repository_owner }}/gutschwein
           # Lowercase: registries reject capitals in a repository name.
           image=$(echo "$image" | tr '[:upper:]' '[:lower:]')
-          docker tag gutschwein:ci "$image:latest"
-          # A sha tag is what a rollback needs: "the one from before" by name.
-          docker tag gutschwein:ci "$image:${GITHUB_SHA::12}"
-          docker push "$image:latest"
-          docker push "$image:${GITHUB_SHA::12}"
+
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            # :latest tracks main, and a sha tag is what a rollback needs — "the
+            # one from before" by name rather than by rebuilding it.
+            docker tag gutschwein:ci "$image:latest"
+            docker tag gutschwein:ci "$image:${GITHUB_SHA::12}"
+            docker push "$image:latest"
+            docker push "$image:${GITHUB_SHA::12}"
+          else
+            # A release tag gets its own name and deliberately does not move
+            # :latest, which belongs to main.
+            version=${GITHUB_REF#refs/tags/}
+            docker tag gutschwein:ci "$image:$version"
+            docker push "$image:$version"
+          fi
 
       - name: Container logs
         if: always()
