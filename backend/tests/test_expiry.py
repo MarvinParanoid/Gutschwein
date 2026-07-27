@@ -105,3 +105,37 @@ def test_unknown_shop_stays_without_a_date(client: TestClient) -> None:
 
     assert card["valid_until"] is None
     assert card["expiry_estimated"] is False
+
+
+# --- shops added later ------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "merchant",
+    [
+        "Douglas",
+        "MediaMarkt",
+        "Media Markt",
+        "OBI",
+        "H&M",
+        "Decathlon",
+        "TK Maxx",
+        "Louis",
+        "Primark",
+        "Lieferando",
+        "Airbnb",
+        "Zalando",
+        "Otto",
+        "Wolt",
+    ],
+)
+def test_a_shop_without_a_printed_rule_gets_the_statutory_one(merchant: str) -> None:
+    """§195 with §199 BGB: three years counted from the end of the year of purchase."""
+    assert default_expiry(merchant, date(2026, 3, 5)) == date(2029, 12, 31)
+
+
+@pytest.mark.parametrize("merchant", ["Amazon", "Google Play", "amazon.de"])
+def test_a_balance_that_does_not_expire_gets_no_date(merchant: str) -> None:
+    """Known-unlimited, which is not the same as unknown — see Rule.never."""
+    assert rule_for(merchant) is Rule.never
+    assert default_expiry(merchant, date(2026, 3, 5)) is None

@@ -20,10 +20,17 @@ from enum import StrEnum
 class Rule(StrEnum):
     three_years = "three_years"
     end_of_third_year = "end_of_third_year"
+    # Known not to expire, as opposed to a shop we simply have no rule for. Both
+    # end up without a date; the difference is whether we know why.
+    never = "never"
 
 
 # Keyed by normalised shop name. Aliases exist because the same shop gets typed in
 # several ways: "Jet", "Jet Tankstelle", "TotalEnergies", "Total Energies".
+#
+# Where a shop prints no rule of its own, the statutory one applies: three years
+# counted from the end of the year of purchase (§195 with §199 BGB), which is why
+# so many entries below are `end_of_third_year` rather than three years to the day.
 EXPIRY_RULES: dict[str, Rule] = {
     "rewe": Rule.three_years,
     "penny": Rule.three_years,
@@ -34,6 +41,28 @@ EXPIRY_RULES: dict[str, Rule] = {
     "jet": Rule.end_of_third_year,
     "totalenergies": Rule.end_of_third_year,
     "total": Rule.end_of_third_year,
+    # Digital balances that are not time-limited.
+    "amazon": Rule.never,
+    "googleplay": Rule.never,
+    "google": Rule.never,
+    "play": Rule.never,
+    # The rest follow the statutory limitation unless their card says otherwise.
+    "douglas": Rule.end_of_third_year,
+    "mediamarkt": Rule.end_of_third_year,
+    "media": Rule.end_of_third_year,
+    "saturn": Rule.end_of_third_year,
+    "obi": Rule.end_of_third_year,
+    "hm": Rule.end_of_third_year,
+    "decathlon": Rule.end_of_third_year,
+    "tkmaxx": Rule.end_of_third_year,
+    "tk": Rule.end_of_third_year,
+    "louis": Rule.end_of_third_year,
+    "primark": Rule.end_of_third_year,
+    "lieferando": Rule.end_of_third_year,
+    "airbnb": Rule.end_of_third_year,
+    "zalando": Rule.end_of_third_year,
+    "otto": Rule.end_of_third_year,
+    "wolt": Rule.end_of_third_year,
 }
 
 
@@ -72,4 +101,5 @@ def default_expiry(merchant: str, purchased_on: date) -> date | None:
         return _plus_years(purchased_on, 3)
     if rule is Rule.end_of_third_year:
         return date(purchased_on.year + 3, 12, 31)
+    # Rule.never and an unknown shop both mean "do not invent a date".
     return None
