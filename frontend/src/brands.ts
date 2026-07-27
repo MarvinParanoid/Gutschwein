@@ -7,9 +7,14 @@
  * whose brand is some shade of red or orange.
  *
  * The colours are the brands' own, except where their own pairing is unreadable
- * at 17px: Decathlon's blue and Airbnb's coral are both adjusted, since a tile
+ * at 17px: Decathlon's #0082c3 and Airbnb's coral are both adjusted, since a tile
  * nobody can read defeats the purpose. `brands.test.ts` keeps every pair above
  * 4.5:1.
+ *
+ * What a tile should match is the card in your hand, not the logo on a white
+ * page — those differ. Douglas is the example: a black wordmark on a mint card,
+ * so the tile is mint. Where no card was to hand, the logo colour is the best
+ * available guess; see the note in docs/internals.md.
  *
  * To use actual logos, drop a PNG into `src/logos/<slug>.png` (the slug is the
  * shop name in lowercase, no spaces). It is collected at build time, so a shop
@@ -35,22 +40,22 @@ export const BRANDS: Record<string, Brand> = {
   dm: { label: 'DM', background: '#00427d', color: '#ffffff' },
   lidl: { label: 'LD', background: '#0050aa', color: '#ffe500' },
   aldi: { label: 'AL', background: '#00005f', color: '#f7941e' },
-  douglas: { label: 'DG', background: '#e5007e', color: '#ffffff' },
+  douglas: { label: 'DG', background: '#c9e8dd', color: '#161615' },
   amazon: { label: 'AMZ', background: '#ff9900', color: '#232f3e' },
   mediamarkt: { label: 'MM', background: '#df0000', color: '#ffffff' },
   media: { label: 'MM', background: '#df0000', color: '#ffffff' },
   saturn: { label: 'SAT', background: '#eb680b', color: '#1a1a1a' },
   obi: { label: 'OBI', background: '#ff7f00', color: '#1a1a1a' },
-  hm: { label: 'HM', background: '#e50010', color: '#ffffff' },
+  hm: { label: 'HM', background: '#cd2026', color: '#ffffff' },
   decathlon: { label: 'DEC', background: '#0072ad', color: '#ffffff' },
-  tkmaxx: { label: 'TKM', background: '#e4002b', color: '#ffffff' },
+  tkmaxx: { label: 'TKM', background: '#c40d11', color: '#ffffff' },
   louis: { label: 'LO', background: '#f2a900', color: '#1a1a1a' },
-  primark: { label: 'PRI', background: '#00263a', color: '#ffffff' },
+  primark: { label: 'PRI', background: '#01abdd', color: '#00344a' },
   lieferando: { label: 'LFR', background: '#ff8000', color: '#1a1a1a' },
   googleplay: { label: 'GP', background: '#01875f', color: '#ffffff' },
   airbnb: { label: 'AIR', background: '#ff5a5f', color: '#4a1113' },
   zalando: { label: 'ZAL', background: '#ff6900', color: '#1a1a1a' },
-  otto: { label: 'OT', background: '#d4021d', color: '#ffffff' },
+  otto: { label: 'OT', background: '#e4001e', color: '#ffffff' },
   wolt: { label: 'WLT', background: '#00c2e8', color: '#00374a' },
 }
 

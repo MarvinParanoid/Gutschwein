@@ -40,6 +40,23 @@ the PWA. Anything else falls back to `DEFAULT_LANGUAGE`.
   background jobs know it without an incoming message. The family chat has no single
   reader, so its messages use `DEFAULT_LANGUAGE`.
 
+## Shop tiles
+
+The square in front of a card carries the shop's colours and two or three letters, never the
+voucher photo — a barcode screenshot is unreadable at 56px and looks the same on every card.
+
+What the tile should match is the **card in your hand, not the logo on a white page**: the
+two often differ. Douglas is the example — a black wordmark on a mint card, so the tile is
+mint. Colours were taken from the cards where one was available and from brand references
+otherwise; the ones still resting on a reference alone are MediaMarkt, Saturn, OBI, Louis,
+Google Play, Wolt and the German grocers. Correct any of them freely: `brands.test.ts`
+checks every pair for 4.5:1 contrast, so the only way to get it wrong is to make it
+unreadable, and that fails the build.
+
+Two colours are deliberately not the brand's own, because theirs cannot be read at this
+size: Decathlon's `#0082c3` is darkened, and Airbnb's coral keeps its hue but takes dark
+letters instead of white (white on it is 3.05:1).
+
 ## Access model
 
 One shared household: everyone sees and edits every card. There are no groups or roles — a
