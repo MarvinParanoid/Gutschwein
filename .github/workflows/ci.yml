@@ -202,5 +202,7 @@ jobs:
           cp .github/ssh_known_hosts ~/.ssh/known_hosts
           # The key is locked to /root/deploy.sh by a forced command, so whatever
           # we pass is ignored — the server decides what "deploy" means.
+          # The exact image this run published, not whatever :latest points at by
+          # the time the server gets round to pulling.
           ssh -i ~/.ssh/deploy -o BatchMode=yes -o ConnectTimeout=15 \
-            "root@$DEPLOY_HOST" deploy
+            "root@$DEPLOY_HOST" "deploy ${GITHUB_SHA::12}"

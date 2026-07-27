@@ -58,8 +58,14 @@ what once ran a 1 GB VPS out of memory.
 `docker compose up -d --build` still builds from the checkout instead, which is what a
 developer wants and the only way to run changes that are not pushed yet.
 
-Every commit on `main` is also tagged with its first twelve characters, so a rollback is
-`docker compose up -d` after pointing the image at `:<sha>`.
+Every commit on `main` is also tagged with its first twelve characters, and the deploy is
+pinned to the commit that produced it rather than to whatever `:latest` points at by the
+time the server gets round to pulling. Rolling back is therefore a tag:
+
+```bash
+ssh root@your-server "deploy <older-sha>"      # the same path CI uses
+ssh root@your-server dry-run                   # what is running, with its digest
+```
 
 Migrations apply themselves on startup. The container listens on `127.0.0.1:8000` only; the
 reverse proxy is what faces the world.
@@ -118,6 +124,13 @@ app says you have no access, the message carries your Telegram id — add it to
   (`ProtectSystem`). A bare `log` goes to the journal, which is what you want anyway.
 - **Watch the disk.** Rebuilds leave dangling images behind; both deploy paths end with
   `docker image prune -f && docker builder prune -f`, and compose caps the json log files.
+  Pulled images are *tagged*, so prune ignores them — the deploy script keeps the three
+  most recent sha tags and deletes the rest.
+- **Snap Docker also strips the environment.** `GUTSCHWEIN_TAG=… docker compose config`
+  comes out with `:latest` regardless: the variable never crosses the confinement, so
+  compose interpolation cannot be driven from the shell. The deploy script therefore pulls
+  `:<sha>` and renames it to `:latest` locally, deciding on this machine what `:latest`
+  means. On an unconfined Docker the variable works as written in `docker-compose.yml`.
 
 ## Updating
 

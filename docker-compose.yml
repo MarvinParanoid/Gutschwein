@@ -3,7 +3,9 @@ services:
     # Both, on purpose: `docker compose pull` takes the image CI published, and
     # `docker compose up --build` still builds from this checkout — which is what
     # a developer wants, and the only way to deploy work that is not pushed yet.
-    image: ghcr.io/marvinparanoid/gutschwein:latest
+    # The tag is a variable so a rollback is a tag, not a rebuild: the deploy
+    # script passes the commit it was asked for.
+    image: ghcr.io/marvinparanoid/gutschwein:${GUTSCHWEIN_TAG:-latest}
     build: .
     restart: unless-stopped
     env_file: .env
