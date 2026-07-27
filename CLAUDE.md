@@ -37,6 +37,10 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
 
 ## Things that will bite
 
+- **Regenerate `frontend/package-lock.json` with npm 10**, the version CI and the Docker
+  image use (`npx npm@10 install --package-lock-only`). Newer npm prunes the platform
+  variants of optional deps such as `@esbuild/win32-x64`, and `npm ci` on npm 10 then
+  fails with `Missing: … from lock file` — in all three node jobs at once.
 - `settings` is a module-level singleton built at import time. Tests must set the environment
   in `tests/conftest.py` *before* importing anything from `app`.
 - Migrations run inside the app's lifespan via `asyncio.to_thread` (Alembic is sync).
