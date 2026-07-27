@@ -52,13 +52,17 @@ cd Gutschwein
 
 cp .env.example .env
 
+# The container runs as uid 10001, and docker would create ./data as root.
+mkdir -p data && sudo chown -R 10001:10001 data
+
 docker compose pull
 docker compose up -d
 
 # open http://localhost:8000/demo
 ```
 
-Nothing is built locally.
+Nothing is built locally. Skip the `chown` and the app says so on startup instead of
+starting; the deployment guide explains why in more detail.
 
 The image is `linux/amd64` only for now. On ARM — a Raspberry Pi or an ARM server — build
 from source instead, which is also what you want while changing anything:
@@ -67,13 +71,14 @@ from source instead, which is also what you want while changing anything:
 docker compose up -d --build
 ```
 
-For a real installation you'll need a Telegram bot token and a public HTTPS domain.
+A real installation needs a public HTTPS domain: a PWA will not install without one, and
+Telegram opens a Mini App over nothing else. See [docs/deploy.md](docs/deploy.md).
 
-See [docs/deploy.md](docs/deploy.md).
-
-Telegram is optional. The first member is invited from the server console; after that the
-app does it itself — *Access* mints one-time login links for a new member or for another of
-your own devices, and lists every signed-in browser with a way to sign one out.
+A bot token is needed only for the Telegram half — the Mini App, adding a card by
+screenshot, and everything the family chat delivers. Without one the app still runs: the
+first member is created from the server console, and after that *Access* mints one-time
+login links for a new member or for another of your own devices, and lists every signed-in
+browser with a way to sign one out.
 
 ---
 
@@ -191,13 +196,15 @@ The demo dataset is used throughout, so every value shown here is fictional.
 ## Local development
 
 ```bash
-make install
-make dev-api
-make dev-web
-make test
-make lint
-make migration m="description"
+make install                   # venv + npm install
+make dev-api                   # FastAPI on :8000, bot off
+make dev-web                   # Vite on :5173, proxying /api
+make test                      # pytest + vitest
+make lint                      # ruff + tsc
+make migration m="description" # autogenerate an Alembic revision
 ```
+
+The two `dev-` targets are servers and stay in the foreground, so they want a terminal each.
 
 Outside Telegram there is no `initData`, so during development the frontend sends
 `X-Dev-User: 1000`.

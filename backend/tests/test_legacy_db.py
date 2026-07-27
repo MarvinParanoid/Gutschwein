@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from app.config import settings
 from app.migrations import LEGACY_DB_NAME, adopt_legacy_database
 
@@ -39,3 +41,22 @@ def test_a_fresh_install_is_left_alone(monkeypatch, tmp_path: Path) -> None:
     current = _point_at(monkeypatch, tmp_path)
     adopt_legacy_database()
     assert not current.exists()
+
+
+def test_an_unwritable_volume_says_what_to_do(monkeypatch, tmp_path: Path) -> None:
+    """The first thing a wrong-owner bind mount does is crash the app on startup.
+
+    A bare PermissionError is a traceback in a restart loop; what the reader needs
+    is the one command that fixes it.
+    """
+    from app.config import Settings, ensure_data_dir
+
+    def refuse(*_args, **_kwargs):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(Path, "mkdir", refuse)
+    with pytest.raises(RuntimeError) as failure:
+        ensure_data_dir(Settings(data_dir=tmp_path))
+
+    assert "chown" in str(failure.value)
+    assert str(tmp_path) in str(failure.value)

@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -63,10 +64,28 @@ class Settings(BaseSettings):
         return self.data_dir / "uploads"
 
 
+def ensure_data_dir(settings: "Settings") -> None:
+    """Create the upload directory, or explain why it cannot be created.
+
+    With a bind mount, docker creates the host directory as root while this
+    process runs as uid 10001, so the first thing the app does is fail. Left as a
+    bare PermissionError it is a traceback in a crash loop; the fix is one command
+    and belongs in the message.
+    """
+    try:
+        settings.upload_dir.mkdir(parents=True, exist_ok=True)
+    except PermissionError as exc:
+        raise RuntimeError(
+            f"cannot write to {settings.data_dir} as uid {os.getuid()}. "
+            f"The volume belongs to someone else — run: "
+            f"sudo chown -R {os.getuid()}:{os.getgid()} <the data directory>"
+        ) from exc
+
+
 @lru_cache
 def get_settings() -> Settings:
     settings = Settings()
-    settings.upload_dir.mkdir(parents=True, exist_ok=True)
+    ensure_data_dir(settings)
     return settings
 
 
