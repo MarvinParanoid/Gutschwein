@@ -12,6 +12,7 @@ import type { User, VoucherStatus } from './types'
 import { useBackButton } from './useBackButton'
 import { useLogin } from './useLogin'
 import { useOnline } from './useOnline'
+import { useScrolled } from './useScrolled'
 
 type View =
   | { name: 'list' }
@@ -26,6 +27,7 @@ export default function App() {
   const login = useLogin()
   const online = useOnline()
   const demo = isDemo()
+  useScrolled()
 
   // Tab, query and shop filter live here so they survive navigation into a
   // voucher and back — you pick Rewe, open a card, and come back to Rewe.

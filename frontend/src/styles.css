@@ -84,7 +84,22 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: var(--gap);
+  /* Stays put while the list scrolls: the burger and the back arrow are the way
+     out of every screen, and hunting for them by scrolling up is a chore.
+     Negative margins plus matching padding let it cover the app's own gutter,
+     so nothing slides out from underneath it. */
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: calc(var(--gap) * -1) calc(var(--gap) * -1) var(--gap);
+  padding: var(--gap);
+  background: var(--secondary-bg);
+}
+
+/* Only once something is actually sliding underneath: at the top of the page a
+   shadow would be a line drawn under nothing. */
+body.scrolled .topbar {
+  box-shadow: 0 6px 12px -8px rgba(0, 0, 0, 0.45);
 }
 
 .topbar .back {
@@ -147,6 +162,15 @@ button {
   max-height: 85vh;
   overflow-y: auto;
   animation: sheet-up 0.18s ease-out;
+  transition: transform 0.2s ease-out;
+  /* The browser must not claim the vertical gesture for its own scrolling or
+     pull-to-refresh while the sheet is being dragged. */
+  touch-action: pan-y;
+}
+
+.sheet.dragging {
+  touch-action: none;
+  user-select: none;
 }
 
 @keyframes sheet-up {
@@ -161,6 +185,11 @@ button {
   border-radius: 2px;
   background: var(--secondary-bg);
   margin: 0 auto 12px;
+}
+
+/* A dragged sheet is being pulled, not read. */
+.sheet.dragging .sheet-handle {
+  background: var(--hint);
 }
 
 .sheet-item {

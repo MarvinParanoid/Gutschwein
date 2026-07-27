@@ -15,6 +15,7 @@ import {
 import { t } from '../i18n'
 import { haptic, inTelegram } from '../telegram'
 import { useOverlay } from '../useOverlay'
+import { useSheetDrag } from '../useSheetDrag'
 import type { Counts, MerchantStat, Voucher, VoucherStatus } from '../types'
 
 interface Props {
@@ -254,12 +255,18 @@ function TabMenu({
   onClose: () => void
 }) {
   useOverlay(onClose)
+  const drag = useSheetDrag(onClose)
 
   const leftInArchive = counts && Number(counts.archived_balance) > 0
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+      <div
+        className={`sheet ${drag.dragging ? 'dragging' : ''}`}
+        style={drag.style}
+        onClick={(e) => e.stopPropagation()}
+        {...drag.handlers}
+      >
         <div className="sheet-handle" />
         {STATUS_TABS.map((item) => (
           <button
