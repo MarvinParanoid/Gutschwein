@@ -43,6 +43,11 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
   with `Missing: … from lock file`), while `--package-lock-only` resolves for this platform
   only and leaves out `@rollup/rollup-linux-x64-musl`, which the alpine image needs and
   nothing else does. The first breaks all three node jobs, the second only the image.
+- In a Playwright test, never compute a click from a `boundingBox()` taken while something
+  is animating — the bottom sheet slides in over 0.18s, and a press aimed at the handle
+  lands on the first menu item instead, closing the sheet through `onSelect`. That fails
+  intermittently in one test and *passes for the wrong reason* in another. `hover()` first:
+  it waits for the element to stop moving.
 - The backend reads `env_file=(".env", "../.env")`, so a process started from `backend/`
   picks up the repository's real `.env`. The Playwright `webServer` therefore pins every
   setting it relies on: without that, a suite passes locally on a developer's own
