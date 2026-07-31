@@ -27,6 +27,7 @@ from app.schemas import (
     CountsOut,
     EventOut,
     MerchantStat,
+    Money,
     StatsOut,
     VoucherCreate,
     VoucherOut,
@@ -41,7 +42,7 @@ from app.services import (
     record_event,
     voucher_label,
 )
-from app.stats import collect_stats
+from app.stats import FALLBACK_CURRENCY, collect_stats
 
 router = APIRouter(prefix="/api/vouchers", tags=["vouchers"])
 
@@ -119,14 +120,23 @@ async def stats(user: CurrentUser, session: Session, lang: Lang) -> StatsOut:
 @router.get("/counts", response_model=CountsOut)
 async def counts(user: CurrentUser, session: Session) -> CountsOut:
     rows = await session.execute(
-        select(Voucher.status, func.count(), func.coalesce(func.sum(Voucher.balance_amount), 0))
-        .group_by(Voucher.status)
+        select(Voucher.status, func.count()).group_by(Voucher.status)
     )
     result = CountsOut()
-    for status_value, count, balance in rows.all():
+    for status_value, count in rows.all():
         setattr(result, VoucherStatus(status_value).value, count)
-        if status_value == VoucherStatus.archived:
-            result.archived_balance = Decimal(balance or 0)
+
+    archived = await session.execute(
+        select(Voucher.currency, func.coalesce(func.sum(Voucher.balance_amount), 0))
+        .where(Voucher.status == VoucherStatus.archived)
+        .group_by(Voucher.currency)
+        .order_by(Voucher.currency)
+    )
+    result.archived_balance = [
+        Money(amount=Decimal(balance or 0), currency=currency or FALLBACK_CURRENCY)
+        for currency, balance in archived.all()
+        if Decimal(balance or 0) > 0
+    ]
     return result
 
 
@@ -141,14 +151,17 @@ async def merchant_stats(
     Frequency comes from the event log rather than a counter we maintain: every
     payment is already recorded as a `balance_updated` event.
     """
+    # Grouped by currency as well, so a shop with cards in two of them is visible
+    # as such instead of having its balances silently added together.
     stmt = select(
         Voucher.merchant,
+        Voucher.currency,
         func.count(),
         func.coalesce(func.sum(Voucher.balance_amount), 0),
     ).where(Voucher.merchant != "")
     if status_filter != "all":
         stmt = stmt.where(Voucher.status == VoucherStatus(status_filter))
-    rows = (await session.execute(stmt.group_by(Voucher.merchant))).all()
+    rows = (await session.execute(stmt.group_by(Voucher.merchant, Voucher.currency))).all()
 
     uses_rows = await session.execute(
         select(Voucher.merchant, func.count())
@@ -158,15 +171,25 @@ async def merchant_stats(
     )
     uses = dict(uses_rows.all())
 
-    stats = [
-        MerchantStat(
-            merchant=merchant,
-            count=count,
-            balance=Decimal(balance or 0),
-            uses=uses.get(merchant, 0),
-        )
-        for merchant, count, balance in rows
-    ]
+    per_merchant: dict[str, MerchantStat] = {}
+    for merchant, currency, count, balance in rows:
+        stat = per_merchant.get(merchant)
+        if stat is None:
+            per_merchant[merchant] = MerchantStat(
+                merchant=merchant,
+                count=count,
+                balance=Decimal(balance or 0),
+                currency=currency or FALLBACK_CURRENCY,
+                uses=uses.get(merchant, 0),
+            )
+            continue
+        # A second currency for the same shop: the count still means "cards here",
+        # but there is no honest single amount to show, so the chip shows none.
+        stat.count += count
+        stat.balance = Decimal(0)
+        stat.currency = ""
+
+    stats = list(per_merchant.values())
     # Regulars float up on their own; one-off shops sink to the end of the row.
     stats.sort(key=lambda s: (-s.uses, -s.count, s.merchant.lower()))
     return stats

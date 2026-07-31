@@ -59,14 +59,19 @@ export interface VoucherDraft {
   balance_uncertain?: boolean
 }
 
-export interface Stats {
+/**
+ * Every money figure of one currency.
+ *
+ * Amounts are never added across currencies and never converted: a złoty card
+ * cannot be spent at a euro shop, so one number for both would mean nothing.
+ */
+export interface CurrencyStats {
   currency: string
   on_cards: string
   cards_active: number
   uncertain_balance: string
   cards_uncertain: number
   expiring_soon: string
-  expiring_soon_days: number
   expired_balance: string
   archived_balance: string
   spent_total: string
@@ -77,10 +82,23 @@ export interface Stats {
   monthly: { month: string; spent: string }[]
 }
 
+export interface Stats {
+  expiring_soon_days: number
+  /** Busiest currency first, and never empty. */
+  currencies: CurrencyStats[]
+}
+
+export interface Money {
+  amount: string
+  currency: string
+}
+
 export interface MerchantStat {
   merchant: string
   count: number
   balance: string
+  /** Empty when this shop has cards in several currencies; so is the balance. */
+  currency: string
   /** Payments ever made here — the chip order is based on this. */
   uses: number
 }
@@ -90,9 +108,8 @@ export interface Counts {
   draft: number
   used: number
   archived: number
-  /** Money still left on archived gift cards. */
-  archived_balance: string
-  currency: string
+  /** Money still left on archived gift cards, one entry per currency. */
+  archived_balance: Money[]
 }
 
 export interface Session {

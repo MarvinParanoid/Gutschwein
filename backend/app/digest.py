@@ -10,6 +10,8 @@ just noise that trains people to ignore the bot.
 
 import asyncio
 import logging
+from collections import defaultdict
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -21,8 +23,9 @@ from app.config import settings
 from app.db import SessionLocal
 from app.i18n import group_t
 from app.models import Event, EventKind, Voucher, VoucherStatus, utcnow
+from app.schemas import CurrencyStats
 from app.services import format_amount
-from app.stats import collect_stats
+from app.stats import FALLBACK_CURRENCY, collect_stats
 
 log = logging.getLogger(__name__)
 
@@ -31,16 +34,32 @@ MARKER = ".last_digest"
 NAMES_SHOWN = 3
 
 
-async def _spent_since(session: AsyncSession, since: datetime) -> Decimal:
+async def _spent_since(session: AsyncSession, since: datetime) -> dict[str, Decimal]:
+    """What left the cards since `since`, one total per currency."""
     rows = await session.execute(
-        select(Event.payload).where(
-            Event.kind == EventKind.balance_updated, Event.created_at >= since
-        )
+        select(Voucher.currency, Event.payload)
+        .join(Event, Event.voucher_id == Voucher.id)
+        .where(Event.kind == EventKind.balance_updated, Event.created_at >= since)
     )
-    return sum(
-        (Decimal(str(payload.get("spent", "0") or "0")) for payload in rows.scalars()),
-        Decimal(0),
-    )
+    spent: dict[str, Decimal] = defaultdict(Decimal)
+    for currency, payload in rows.all():
+        spent[currency or FALLBACK_CURRENCY] += Decimal(str(payload.get("spent", "0") or "0"))
+    return spent
+
+
+def _money(blocks: list[CurrencyStats], pick: Callable[[CurrencyStats], Decimal]) -> str:
+    """One amount per currency, for a sentence that used to name exactly one.
+
+    Nothing is added up across currencies — that sum is what this replaced. With a
+    single currency, which is the normal case, the text is unchanged.
+
+    Everything zero means there is no money to name at all; the sentence still has
+    to read, so it gets a zero in the family's main currency.
+    """
+    parts = [
+        f"{format_amount(pick(block))} {block.currency}" for block in blocks if pick(block) > 0
+    ]
+    return " · ".join(parts) or f"{format_amount(Decimal(0))} {blocks[0].currency}"
 
 
 async def _expiring_names(session: AsyncSession, within_days: int) -> list[str]:
@@ -61,44 +80,56 @@ async def _expiring_names(session: AsyncSession, within_days: int) -> list[str]:
 async def build_digest(session: AsyncSession) -> str | None:
     """The weekly message, or None when there is nothing worth sending."""
     stats = await collect_stats(session)
-    if stats.cards_active == 0 and stats.expired_balance == 0:
+    blocks = stats.currencies
+    cards_active = sum(block.cards_active for block in blocks)
+    expired = sum((block.expired_balance for block in blocks), Decimal(0))
+    if cards_active == 0 and expired == 0:
         return None
 
     now = utcnow()
     week = await _spent_since(session, now - timedelta(days=7))
     week_before = await _spent_since(session, now - timedelta(days=14))
-    currency = stats.currency
+    cards_uncertain = sum(block.cards_uncertain for block in blocks)
 
     lines = [group_t("digest.title"), ""]
     lines.append(
         group_t(
-            "digest.on_cards_one" if stats.cards_active == 1 else "digest.on_cards",
-            amount=format_amount(stats.on_cards),
-            currency=currency,
-            cards=stats.cards_active,
+            "digest.on_cards_one" if cards_active == 1 else "digest.on_cards",
+            amount=_money(blocks, lambda block: block.on_cards),
+            cards=cards_active,
         )
     )
 
-    if week > 0:
-        change = week - (week_before - week)
-        if week_before - week > 0 and abs(change) >= Decimal("0.01"):
+    spent_this_week = {
+        currency: amount for currency, amount in week.items() if amount > 0
+    }
+    if spent_this_week:
+        amount = " · ".join(
+            f"{format_amount(spent_this_week[currency])} {currency}"
+            for currency in sorted(spent_this_week)
+        )
+        # The comparison with the week before needs one number on each side, so it
+        # is offered only when a single currency was spent in both weeks. Two
+        # currencies moving in opposite directions is not a sentence.
+        currencies = set(spent_this_week) | {c for c, a in week_before.items() if a > 0}
+        one = next(iter(currencies)) if len(currencies) == 1 else None
+        previous = week_before.get(one, Decimal(0)) - week[one] if one else Decimal(0)
+        change = week[one] - previous if one else Decimal(0)
+        if one and previous > 0 and abs(change) >= Decimal("0.01"):
             lines.append(
                 group_t(
                     "digest.spent_delta",
-                    amount=format_amount(week),
-                    currency=currency,
+                    amount=amount,
                     diff=format_amount(abs(change)),
                     direction=group_t("digest.more" if change > 0 else "digest.less"),
                 )
             )
         else:
-            lines.append(
-                group_t("digest.spent", amount=format_amount(week), currency=currency)
-            )
+            lines.append(group_t("digest.spent", amount=amount))
     else:
         lines.append(group_t("digest.spent_nothing"))
 
-    if stats.expiring_soon > 0:
+    if any(block.expiring_soon > 0 for block in blocks):
         names = await _expiring_names(session, stats.expiring_soon_days)
         shown = ", ".join(names[:NAMES_SHOWN])
         if len(names) > NAMES_SHOWN:
@@ -108,28 +139,25 @@ async def build_digest(session: AsyncSession) -> str | None:
             group_t(
                 "digest.expiring",
                 days=stats.expiring_soon_days,
-                amount=format_amount(stats.expiring_soon),
-                currency=currency,
+                amount=_money(blocks, lambda block: block.expiring_soon),
                 names=shown,
             ),
         ]
 
-    if stats.uncertain_balance > 0:
+    if cards_uncertain > 0:
         lines.append(
             group_t(
-                "digest.uncertain_one" if stats.cards_uncertain == 1 else "digest.uncertain",
-                amount=format_amount(stats.uncertain_balance),
-                currency=currency,
-                cards=stats.cards_uncertain,
+                "digest.uncertain_one" if cards_uncertain == 1 else "digest.uncertain",
+                amount=_money(blocks, lambda block: block.uncertain_balance),
+                cards=cards_uncertain,
             )
         )
 
-    if stats.expired_balance > 0:
+    if expired > 0:
         lines.append(
             group_t(
                 "digest.expired",
-                amount=format_amount(stats.expired_balance),
-                currency=currency,
+                amount=_money(blocks, lambda block: block.expired_balance),
             )
         )
 

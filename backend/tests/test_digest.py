@@ -45,6 +45,7 @@ async def add_card(
     balance: str,
     *,
     valid_until=None,
+    currency: str = "EUR",
     status: VoucherStatus = VoucherStatus.active,
 ) -> Voucher:
     card = Voucher(
@@ -52,6 +53,7 @@ async def add_card(
         value_kind=ValueKind.amount,
         value_amount=Decimal(balance),
         balance_amount=Decimal(balance),
+        currency=currency,
         valid_until=valid_until,
         status=status,
         created_by_id=user.id,
@@ -141,6 +143,40 @@ async def test_spent_and_archived_cards_stay_out_of_the_balance(
 
     assert "50 EUR" in text
     assert "999" not in text
+
+
+async def test_every_currency_is_named_on_its_own(session: AsyncSession) -> None:
+    """One sentence, two amounts — never one amount made of two currencies."""
+    user = await make_user(session)
+    euro = await add_card(session, user, "Rewe", "30")
+    zloty = await add_card(session, user, "Biedronka", "200", currency="PLN")
+    await add_spend(session, euro, user, "10", days_ago=2)
+    await add_spend(session, zloty, user, "115.73", days_ago=2)
+
+    text = await build_digest(session)
+
+    assert "30 EUR · 200 PLN" in text
+    assert "Потратили: 10 EUR · 115.73 PLN" in text
+    # 230 would be the old answer: a złoty added to a euro, labelled with whichever
+    # currency the database returned first.
+    assert "230" not in text
+    # No comparison with the week before: two currencies moving at once is not a
+    # sentence, and there is nothing to compare them against as one number.
+    assert "чем неделей раньше" not in text
+
+
+async def test_the_week_before_is_compared_while_one_currency_is_in_play(
+    session: AsyncSession,
+) -> None:
+    user = await make_user(session)
+    card = await add_card(session, user, "Biedronka", "300", currency="PLN")
+    await add_spend(session, card, user, "20", days_ago=2)
+    await add_spend(session, card, user, "50", days_ago=10)
+
+    text = await build_digest(session)
+
+    assert "Потратили: 20 PLN" in text
+    assert "на 30 меньше" in text
 
 
 async def test_digest_in_english(session: AsyncSession, monkeypatch):

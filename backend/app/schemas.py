@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -42,6 +43,22 @@ class UserOut(BaseModel):
     display_name: str
 
 
+def normalize_currency(value: object) -> object:
+    """Uppercase a three-letter code, or leave it for the field to reject.
+
+    The field is typed by hand in the form, so it arrives as whatever was typed:
+    'eur', ' pln', 'PLZ'. Case and spacing are ours to fix. A wrong-but-plausible
+    code is not — statistics groups by this string, so 'eur' and 'EUR' have to be
+    one currency, while 'PLZ' can only be steered by the form's suggestions.
+    """
+    return value.strip().upper() if isinstance(value, str) else value
+
+
+"""Checked where a currency is typed in, not where one is read back: a database
+written before this rule still has to serialize."""
+Currency = Annotated[str, Field(pattern=r"^[A-Z]{3}$")]
+
+
 class VoucherFields(BaseModel):
     merchant: str = Field("", max_length=128)
     title: str = Field("", max_length=256)
@@ -59,11 +76,14 @@ class VoucherFields(BaseModel):
     def strip_text(cls, value: object) -> object:
         return value.strip() if isinstance(value, str) else value
 
+    normalize_currency = field_validator("currency", mode="before")(normalize_currency)
+
 
 class VoucherCreate(VoucherFields):
     # Relative path returned by POST /api/uploads.
     image_id: str | None = None
     status: VoucherStatus = VoucherStatus.active
+    currency: Currency = "EUR"
 
     @field_validator("status")
     @classmethod
@@ -81,7 +101,7 @@ class VoucherUpdate(BaseModel):
     code: str | None = Field(None, max_length=128)
     value_kind: ValueKind | None = None
     value_amount: Decimal | None = None
-    currency: str | None = Field(None, max_length=8)
+    currency: Currency | None = None
     valid_from: date | None = None
     valid_until: date | None = None
     conditions: str | None = None
@@ -89,6 +109,8 @@ class VoucherUpdate(BaseModel):
     image_id: str | None = None
     balance_amount: Decimal | None = None
     balance_uncertain: bool | None = None
+
+    normalize_currency = field_validator("currency", mode="before")(normalize_currency)
 
 
 class VoucherOut(VoucherFields):
@@ -174,7 +196,14 @@ class MonthSpend(BaseModel):
     spent: Decimal = Decimal("0")
 
 
-class StatsOut(BaseModel):
+class CurrencyStats(BaseModel):
+    """Every money figure of one currency.
+
+    Gift cards are not a bank balance: 200 zł at Biedronka buys nothing at Rewe, so
+    the currencies are never added up and never converted. Each gets its own block,
+    and the client shows one at a time.
+    """
+
     currency: str = "EUR"
 
     # What is available right now.
@@ -186,7 +215,6 @@ class StatsOut(BaseModel):
 
     # Money at risk of quietly evaporating.
     expiring_soon: Decimal = Decimal("0")
-    expiring_soon_days: int = 30
     expired_balance: Decimal = Decimal("0")
     archived_balance: Decimal = Decimal("0")
 
@@ -200,14 +228,30 @@ class StatsOut(BaseModel):
     monthly: list[MonthSpend] = []
 
 
+class StatsOut(BaseModel):
+    expiring_soon_days: int = 30
+    # Busiest currency first — by card count, not by amount: ranking currencies by
+    # their numbers is the very comparison this split exists to refuse. Always at
+    # least one block, so a family with no cards still gets a page.
+    currencies: list[CurrencyStats] = []
+
+
 class MerchantStat(BaseModel):
     """One shop chip on the main screen."""
 
     merchant: str
     count: int
     balance: Decimal = Decimal("0")
+    # Empty, with a zero balance, when this shop's cards are in several currencies:
+    # one chip has room for one sum, and the wrong currency beats no currency.
+    currency: str = ""
     # How many times money was ever spent here — the frequency the order is based on.
     uses: int = 0
+
+
+class Money(BaseModel):
+    amount: Decimal = Decimal("0")
+    currency: str = "EUR"
 
 
 class CountsOut(BaseModel):
@@ -217,9 +261,8 @@ class CountsOut(BaseModel):
     draft: int = 0
     used: int = 0
     archived: int = 0
-    # Sum of remaining balances of archived gift cards — money not yet spent.
-    archived_balance: Decimal = Decimal("0")
-    currency: str = "EUR"
+    # Remaining balances of archived gift cards — money not yet spent, per currency.
+    archived_balance: list[Money] = []
 
 
 class UploadOut(BaseModel):

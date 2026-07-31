@@ -18,6 +18,14 @@ const VALUE_KINDS: { key: ValueKind; label: string }[] = [
   { key: 'other', label: t.form.kindOther },
 ]
 
+/**
+ * Suggestions for the currency field, not a permitted list: any three-letter code
+ * is accepted. These are the ones a card bought around here is actually in — the
+ * euro neighbours plus the currencies Bitrefill sells in. A suggestion is the only
+ * defence against a plausible-looking wrong code, since PLZ is as well-formed as PLN.
+ */
+const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'PLN', 'CZK', 'SEK', 'DKK', 'NOK', 'RON', 'HUF']
+
 // Placeholders rotate on every open: they show the format and make a form nobody
 // wants to fill in slightly less of a chore.
 const pick = (options: readonly string[]) =>
@@ -219,9 +227,23 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
                 <label htmlFor="currency">{t.form.currency}</label>
                 <input
                   id="currency"
+                  list="currencies"
+                  maxLength={3}
+                  autoCapitalize="characters"
+                  spellCheck={false}
                   value={draft.currency}
-                  onChange={(e) => set('currency', e.target.value)}
+                  // Statistics groups by this code, so a stray case would split a
+                  // currency in two. The server insists on three letters; letting
+                  // anything else be typed only to be rejected on save is unkind.
+                  onChange={(e) =>
+                    set('currency', e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase())
+                  }
                 />
+                <datalist id="currencies">
+                  {CURRENCIES.map((code) => (
+                    <option key={code} value={code} />
+                  ))}
+                </datalist>
               </div>
             )}
           </div>

@@ -17,6 +17,7 @@ import type { Stats } from '../types'
 export default function StatsPage({ onBack }: { onBack: () => void }) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [picked, setPicked] = useState<string | null>(null)
 
   useEffect(() => {
     api.stats().then(setStats).catch((e: Error) => setError(e.message))
@@ -25,15 +26,19 @@ export default function StatsPage({ onBack }: { onBack: () => void }) {
   if (error) return <div className="error">{error}</div>
   if (!stats) return <div className="spinner" />
 
-  const { currency } = stats
-  const thisMonth = Number(stats.spent_this_month)
-  const prevMonth = Number(stats.spent_prev_month)
+  // One currency at a time, because that is how the money works: nothing here can
+  // be added to a figure from another currency, so nothing here is. The first block
+  // is the family's busiest currency, which for most families is the only one.
+  const block = stats.currencies.find((c) => c.currency === picked) ?? stats.currencies[0]
+  const { currency } = block
+  const thisMonth = Number(block.spent_this_month)
+  const prevMonth = Number(block.spent_prev_month)
   const atRisk =
-    Number(stats.expired_balance) +
-    Number(stats.expiring_soon) +
-    Number(stats.uncertain_balance)
+    Number(block.expired_balance) +
+    Number(block.expiring_soon) +
+    Number(block.uncertain_balance)
   // A shop nothing was ever spent at says nothing about where money goes.
-  const spentByMerchant = stats.by_merchant.filter((m) => Number(m.spent) > 0)
+  const spentByMerchant = block.by_merchant.filter((m) => Number(m.spent) > 0)
 
   return (
     <>
@@ -46,21 +51,35 @@ export default function StatsPage({ onBack }: { onBack: () => void }) {
         <h1>{t.stats.title}</h1>
       </div>
 
+      {stats.currencies.length > 1 && (
+        <div className="segmented currencies">
+          {stats.currencies.map((option) => (
+            <button
+              className={option.currency === currency ? 'active' : ''}
+              key={option.currency}
+              onClick={() => setPicked(option.currency)}
+            >
+              {option.currency}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="panel">
-        <div className="stat-hero">{money(stats.on_cards, currency)}</div>
+        <div className="stat-hero">{money(block.on_cards, currency)}</div>
         <div className="stat-hero-caption">
-          {t.stats.onCards} · {t.stats.activeCards(stats.cards_active)}
+          {t.stats.onCards} · {t.stats.activeCards(block.cards_active)}
         </div>
       </div>
 
       <div className="kpi-row">
         <div className="kpi">
-          <div className="kpi-value">{money(stats.spent_this_month, currency)}</div>
+          <div className="kpi-value">{money(block.spent_this_month, currency)}</div>
           <div className="kpi-label">{t.stats.thisMonth}</div>
           {prevMonth > 0 && <MonthDelta current={thisMonth} previous={prevMonth} />}
         </div>
         <div className="kpi">
-          <div className="kpi-value">{money(stats.spent_total, currency)}</div>
+          <div className="kpi-value">{money(block.spent_total, currency)}</div>
           <div className="kpi-label">{t.stats.allTime}</div>
         </div>
       </div>
@@ -69,28 +88,28 @@ export default function StatsPage({ onBack }: { onBack: () => void }) {
         <div className="panel">
           <h2>{t.stats.atRisk}</h2>
           <div className="rows">
-            {Number(stats.expired_balance) > 0 && (
+            {Number(block.expired_balance) > 0 && (
               <div className="row">
                 <span className="label">{t.stats.expired}</span>
-                <span className="val">{money(stats.expired_balance, currency)}</span>
+                <span className="val">{money(block.expired_balance, currency)}</span>
               </div>
             )}
-            {Number(stats.expiring_soon) > 0 && (
+            {Number(block.expiring_soon) > 0 && (
               <div className="row">
                 <span className="label">{t.stats.expiringIn(stats.expiring_soon_days)}</span>
-                <span className="val">{money(stats.expiring_soon, currency)}</span>
+                <span className="val">{money(block.expiring_soon, currency)}</span>
               </div>
             )}
-            {Number(stats.uncertain_balance) > 0 && (
+            {Number(block.uncertain_balance) > 0 && (
               <div className="row">
                 <span className="label">{t.stats.uncertain}</span>
-                <span className="val">{money(stats.uncertain_balance, currency)}</span>
+                <span className="val">{money(block.uncertain_balance, currency)}</span>
               </div>
             )}
-            {Number(stats.archived_balance) > 0 && (
+            {Number(block.archived_balance) > 0 && (
               <div className="row">
                 <span className="label">{t.stats.inArchive}</span>
-                <span className="val">{money(stats.archived_balance, currency)}</span>
+                <span className="val">{money(block.archived_balance, currency)}</span>
               </div>
             )}
           </div>
@@ -111,11 +130,11 @@ export default function StatsPage({ onBack }: { onBack: () => void }) {
         </div>
       )}
 
-      {stats.by_member.length > 0 && (
+      {block.by_member.length > 0 && (
         <div className="panel">
           <h2>{t.stats.whoSpends}</h2>
           <BarList
-            items={stats.by_member.map((m) => ({
+            items={block.by_member.map((m) => ({
               label: m.name,
               value: Number(m.spent),
               text: money(m.spent, currency),
@@ -127,7 +146,7 @@ export default function StatsPage({ onBack }: { onBack: () => void }) {
 
       <div className="panel">
         <h2>{t.stats.byMonth}</h2>
-        <MonthlyChart months={stats.monthly} currency={currency} />
+        <MonthlyChart months={block.monthly} currency={currency} />
       </div>
     </>
   )

@@ -180,7 +180,11 @@ export default function ListPage({
           {t.list.shopSummary(
             selectedShop.merchant,
             t.list.cards(selectedShop.count),
-            Number(selectedShop.balance) > 0 ? money(selectedShop.balance, 'EUR') : null,
+            // No currency means this shop's cards are in more than one, and the
+            // chip has room for a single sum — so it names none.
+            Number(selectedShop.balance) > 0 && selectedShop.currency
+              ? money(selectedShop.balance, selectedShop.currency)
+              : null,
           )}
         </p>
       )}
@@ -266,7 +270,7 @@ function TabMenu({
   useOverlay(onClose)
   const drag = useSheetDrag(onClose)
 
-  const leftInArchive = counts && Number(counts.archived_balance) > 0
+  const leftInArchive = counts?.archived_balance.length ? counts.archived_balance : null
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -293,7 +297,11 @@ function TabMenu({
 
         {leftInArchive && (
           <p className="sheet-note">
-            {t.list.inArchive(money(counts.archived_balance, counts.currency))}
+            {/* Each currency named separately: added together they would be a
+                number the archive does not contain. */}
+            {t.list.inArchive(
+              leftInArchive.map((left) => money(left.amount, left.currency)).join(' · '),
+            )}
           </p>
         )}
 

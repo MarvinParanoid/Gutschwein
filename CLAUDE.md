@@ -71,6 +71,12 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
 - API errors carry a key, not a sentence: `raise HTTPException(404, Message("error.x"))`.
   `main.py` renders it in the reader's language at the boundary, so helpers stay language-free.
   Family-chat messages have no reader, so they use `group_t()` / `DEFAULT_LANGUAGE`.
+- Every money figure is per currency, and currencies are never added or converted:
+  `StatsOut.currencies` is a list of `CurrencyStats`, `CountsOut.archived_balance` a list of
+  `Money`, and a shop chip whose cards span two currencies shows no amount at all. A card's
+  money is only spendable at its own shops, so one total for two currencies means nothing —
+  which is what the page used to show, labelled with whichever voucher the database returned
+  first. The code is validated (`^[A-Z]{3}$`) because statistics groups by that string.
 - Gift card balance: `vouchers.balance_amount` is the current truth, and every change is an
   append-only `balance_updated` event carrying `{spent, remaining, note}` — there is no
   separate ledger table. Corrections are ordinary updates, so never mutate past events.

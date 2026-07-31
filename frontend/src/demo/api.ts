@@ -27,10 +27,24 @@ const TOP_MERCHANTS = 8;
 const EXPIRING_SOON_DAYS = 30;
 /** What most German retailers do; enough of the rule to demonstrate the "≈". */
 const DEFAULT_EXPIRY_YEARS = 3;
+/** Where a card saved without a currency belongs, same as on the server. */
+const FALLBACK_CURRENCY = "EUR";
 
 const cents = (amount: string | null | undefined) =>
   Math.round(Number(amount ?? 0) * 100);
 const money = (value: number) => (value / 100).toFixed(2);
+/** Balances of a set of cards, one entry per currency and none for the empty ones. */
+const byCurrency = (vouchers: Voucher[]) => {
+  const totals = new Map<string, number>();
+  for (const voucher of vouchers) {
+    const code = voucher.currency || FALLBACK_CURRENCY;
+    totals.set(code, (totals.get(code) ?? 0) + cents(voucher.balance_amount));
+  }
+  return [...totals.entries()]
+    .filter(([, amount]) => amount > 0)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([currency, amount]) => ({ amount: money(amount), currency }));
+};
 const now = () => new Date().toISOString();
 const today = () => new Date(new Date().toISOString().slice(0, 10));
 
@@ -163,10 +177,7 @@ export function createDemoApi(): ApiClient {
         draft: of("draft").length,
         used: of("used").length,
         archived: of("archived").length,
-        archived_balance: money(
-          of("archived").reduce((sum, v) => sum + cents(v.balance_amount), 0),
-        ),
-        currency: "EUR",
+        archived_balance: byCurrency(of("archived")),
       };
     },
 
@@ -180,22 +191,37 @@ export function createDemoApi(): ApiClient {
         if (shop) uses.set(shop, (uses.get(shop) ?? 0) + 1);
       }
 
-      const shops = new Map<string, { count: number; balance: number }>();
+      const shops = new Map<
+        string,
+        { count: number; balance: number; currency: string }
+      >();
       for (const voucher of state.vouchers) {
         if (!voucher.merchant) continue;
         if (status !== "all" && voucher.status !== status) continue;
-        const entry = shops.get(voucher.merchant) ?? { count: 0, balance: 0 };
+        const currency = voucher.currency || FALLBACK_CURRENCY;
+        const entry = shops.get(voucher.merchant) ?? {
+          count: 0,
+          balance: 0,
+          currency,
+        };
         entry.count += 1;
-        entry.balance += cents(voucher.balance_amount);
+        // One chip holds one sum. A shop with cards in two currencies has no
+        // honest single amount, so it shows none.
+        if (entry.currency === currency) entry.balance += cents(voucher.balance_amount);
+        else {
+          entry.currency = "";
+          entry.balance = 0;
+        }
         shops.set(voucher.merchant, entry);
       }
 
       return (
         [...shops.entries()]
-          .map(([merchant, { count, balance }]) => ({
+          .map(([merchant, { count, balance, currency }]) => ({
             merchant,
             count,
             balance: money(balance),
+            currency,
             uses: uses.get(merchant) ?? 0,
           }))
           // Regulars float up; one-off shops sink to the end of the row.
@@ -398,112 +424,169 @@ export function createDemoApi(): ApiClient {
   };
 }
 
+/** Every figure of one currency, while it is still being counted in cents. */
+interface Bucket {
+  cards: number;
+  onCards: number;
+  cardsActive: number;
+  uncertain: number;
+  cardsUncertain: number;
+  expiring: number;
+  expired: number;
+  archived: number;
+  spentTotal: number;
+  onCardsByShop: Map<string, number>;
+  byShop: Map<string, number>;
+  byMember: Map<string, { spent: number; payments: number }>;
+  byMonth: Map<string, number>;
+}
+
+/**
+ * The statistics, grouped by currency exactly as the server groups them.
+ *
+ * Nothing is added across currencies and nothing is converted: a złoty card buys
+ * nothing at a euro shop, so a single total would be a number the family does not
+ * have. The demo lets you type any currency in the form, so this is reachable here
+ * too, not only in a real installation.
+ */
 function buildStats(state: DemoState): Stats {
   const soon = new Date(today().getTime() + EXPIRING_SOON_DAYS * 86_400_000)
     .toISOString()
     .slice(0, 10);
   const startOfToday = today().toISOString().slice(0, 10);
 
-  let onCards = 0;
-  let cardsActive = 0;
-  let uncertain = 0;
-  let cardsUncertain = 0;
-  let expiring = 0;
-  let expired = 0;
-  const onCardsByShop = new Map<string, number>();
+  const buckets = new Map<string, Bucket>();
+  const bucketFor = (currency: string): Bucket => {
+    const code = currency || FALLBACK_CURRENCY;
+    let bucket = buckets.get(code);
+    if (!bucket) {
+      bucket = {
+        cards: 0,
+        onCards: 0,
+        cardsActive: 0,
+        uncertain: 0,
+        cardsUncertain: 0,
+        expiring: 0,
+        expired: 0,
+        archived: 0,
+        spentTotal: 0,
+        onCardsByShop: new Map(),
+        byShop: new Map(),
+        byMember: new Map(),
+        byMonth: new Map(),
+      };
+      buckets.set(code, bucket);
+    }
+    return bucket;
+  };
 
-  for (const voucher of state.vouchers.filter((v) => v.status === "active")) {
+  for (const voucher of state.vouchers) {
+    const bucket = bucketFor(voucher.currency);
+    bucket.cards += 1;
     const amount = cents(voucher.balance_amount);
-    cardsActive += 1;
+    if (voucher.status === "archived") bucket.archived += amount;
+    if (voucher.status !== "active") continue;
+
+    bucket.cardsActive += 1;
     if (voucher.balance_uncertain) {
       // Money you are unsure about is not money you can plan with: it gets its
       // own line instead of joining the total.
-      uncertain += amount;
-      cardsUncertain += 1;
+      bucket.uncertain += amount;
+      bucket.cardsUncertain += 1;
       continue;
     }
-    onCards += amount;
+    bucket.onCards += amount;
     if (voucher.merchant) {
-      onCardsByShop.set(
+      bucket.onCardsByShop.set(
         voucher.merchant,
-        (onCardsByShop.get(voucher.merchant) ?? 0) + amount,
+        (bucket.onCardsByShop.get(voucher.merchant) ?? 0) + amount,
       );
     }
     if (voucher.valid_until && amount > 0) {
-      if (voucher.valid_until < startOfToday) expired += amount;
-      else if (voucher.valid_until <= soon) expiring += amount;
+      if (voucher.valid_until < startOfToday) bucket.expired += amount;
+      else if (voucher.valid_until <= soon) bucket.expiring += amount;
     }
   }
-
-  let spentTotal = 0;
-  const byShop = new Map<string, number>();
-  const byMember = new Map<string, { spent: number; payments: number }>();
-  const byMonth = new Map<string, number>();
 
   for (const event of state.events) {
     if (event.kind !== "balance_updated") continue;
     const amount = cents(String(event.payload.spent ?? "0"));
     if (amount <= 0) continue;
-    spentTotal += amount;
+    const voucher = state.vouchers.find((v) => v.id === event.voucher_id);
+    if (!voucher) continue;
+    const bucket = bucketFor(voucher.currency);
+    bucket.spentTotal += amount;
 
     const month = monthKey(event.created_at);
-    byMonth.set(month, (byMonth.get(month) ?? 0) + amount);
+    bucket.byMonth.set(month, (bucket.byMonth.get(month) ?? 0) + amount);
 
-    const shop = state.vouchers.find(
-      (v) => v.id === event.voucher_id,
-    )?.merchant;
-    if (shop) byShop.set(shop, (byShop.get(shop) ?? 0) + amount);
+    if (voucher.merchant) {
+      bucket.byShop.set(
+        voucher.merchant,
+        (bucket.byShop.get(voucher.merchant) ?? 0) + amount,
+      );
+    }
 
     const name = event.actor?.display_name ?? YOU.display_name;
-    const member = byMember.get(name) ?? { spent: 0, payments: 0 };
+    const member = bucket.byMember.get(name) ?? { spent: 0, payments: 0 };
     member.spent += amount;
     member.payments += 1;
-    byMember.set(name, member);
+    bucket.byMember.set(name, member);
   }
 
-  const shops = new Set([...byShop.keys(), ...onCardsByShop.keys()]);
+  // No cards at all still opens the screen, and an empty page says nothing.
+  if (buckets.size === 0) bucketFor(FALLBACK_CURRENCY);
+
   return {
-    currency: "EUR",
-    on_cards: money(onCards),
-    cards_active: cardsActive,
-    uncertain_balance: money(uncertain),
-    cards_uncertain: cardsUncertain,
-    expiring_soon: money(expiring),
     expiring_soon_days: EXPIRING_SOON_DAYS,
-    expired_balance: money(expired),
-    archived_balance: money(
-      state.vouchers
-        .filter((v) => v.status === "archived")
-        .reduce((sum, v) => sum + cents(v.balance_amount), 0),
-    ),
-    spent_total: money(spentTotal),
-    spent_this_month: money(byMonth.get(shiftMonth(0)) ?? 0),
-    spent_prev_month: money(byMonth.get(shiftMonth(-1)) ?? 0),
-    by_merchant: [...shops]
-      .map((merchant) => ({
-        merchant,
-        spent: money(byShop.get(merchant) ?? 0),
-        on_cards: money(onCardsByShop.get(merchant) ?? 0),
-      }))
-      .sort(
-        (a, b) =>
-          Number(b.spent) - Number(a.spent) ||
-          Number(b.on_cards) - Number(a.on_cards) ||
-          a.merchant.localeCompare(b.merchant),
-      )
-      .slice(0, TOP_MERCHANTS),
-    by_member: [...byMember.entries()]
-      .map(([name, { spent, payments }]) => ({
-        name,
-        spent: money(spent),
-        payments,
-      }))
-      .sort((a, b) => Number(b.spent) - Number(a.spent)),
-    // A continuous axis: a month with no spending has to render as zero rather
-    // than disappear.
-    monthly: Array.from({ length: MONTHS_BACK }, (_, index) => {
-      const month = shiftMonth(index - (MONTHS_BACK - 1));
-      return { month, spent: money(byMonth.get(month) ?? 0) };
-    }),
+    // Busiest currency first, by card count — ordering by amount would be the
+    // cross-currency comparison this split refuses to make.
+    currencies: [...buckets.entries()]
+      .sort(([left, a], [right, b]) => b.cards - a.cards || left.localeCompare(right))
+      .map(([currency, bucket]) => {
+        const shops = new Set([
+          ...bucket.byShop.keys(),
+          ...bucket.onCardsByShop.keys(),
+        ]);
+        return {
+          currency,
+          on_cards: money(bucket.onCards),
+          cards_active: bucket.cardsActive,
+          uncertain_balance: money(bucket.uncertain),
+          cards_uncertain: bucket.cardsUncertain,
+          expiring_soon: money(bucket.expiring),
+          expired_balance: money(bucket.expired),
+          archived_balance: money(bucket.archived),
+          spent_total: money(bucket.spentTotal),
+          spent_this_month: money(bucket.byMonth.get(shiftMonth(0)) ?? 0),
+          spent_prev_month: money(bucket.byMonth.get(shiftMonth(-1)) ?? 0),
+          by_merchant: [...shops]
+            .map((merchant) => ({
+              merchant,
+              spent: money(bucket.byShop.get(merchant) ?? 0),
+              on_cards: money(bucket.onCardsByShop.get(merchant) ?? 0),
+            }))
+            .sort(
+              (a, b) =>
+                Number(b.spent) - Number(a.spent) ||
+                Number(b.on_cards) - Number(a.on_cards) ||
+                a.merchant.localeCompare(b.merchant),
+            )
+            .slice(0, TOP_MERCHANTS),
+          by_member: [...bucket.byMember.entries()]
+            .map(([name, { spent, payments }]) => ({
+              name,
+              spent: money(spent),
+              payments,
+            }))
+            .sort((a, b) => Number(b.spent) - Number(a.spent)),
+          // A continuous axis: a month with no spending has to render as zero
+          // rather than disappear.
+          monthly: Array.from({ length: MONTHS_BACK }, (_, index) => {
+            const month = shiftMonth(index - (MONTHS_BACK - 1));
+            return { month, spent: money(bucket.byMonth.get(month) ?? 0) };
+          }),
+        };
+      }),
   };
 }

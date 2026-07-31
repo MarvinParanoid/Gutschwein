@@ -1080,6 +1080,12 @@ body.scrolled .topbar {
   font-weight: 600;
 }
 
+/* The currency switcher stands between the title and the first panel, so it
+   carries the panel's own bottom margin rather than sitting flush against it. */
+.segmented.currencies {
+  margin-bottom: 10px;
+}
+
 .photo-picker {
   display: block;
   width: 100%;

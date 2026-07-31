@@ -25,6 +25,17 @@ def make_voucher(client: TestClient, **overrides) -> dict:
     return response.json()
 
 
+def stats_for(client: TestClient, currency: str = "EUR") -> dict:
+    """One currency's block of the statistics — the unit the screen renders.
+
+    Amounts are never summed across currencies, so there is no total to ask for.
+    """
+    body = client.get("/api/vouchers/stats").json()
+    blocks = {block["currency"]: block for block in body["currencies"]}
+    assert currency in blocks, f"{currency} missing from {sorted(blocks)}"
+    return blocks[currency]
+
+
 def test_blank_optional_env_values_are_unset() -> None:
     """`.env.example` ships FAMILY_CHAT_ID= empty; that must not crash startup."""
     from app.config import Settings
@@ -61,7 +72,7 @@ def test_merchant_filter_narrows_the_list(client: TestClient) -> None:
 
 
 def test_stats_reflect_spending(client: TestClient, other_client: TestClient) -> None:
-    before = client.get("/api/vouchers/stats").json()
+    before = stats_for(client)
 
     card = make_voucher(
         client, merchant="Stats-Shop", value_kind="amount", value_amount="100", valid_until=None
@@ -69,7 +80,7 @@ def test_stats_reflect_spending(client: TestClient, other_client: TestClient) ->
     client.post(f"/api/vouchers/{card['id']}/balance", json={"spent": "30"})
     other_client.post(f"/api/vouchers/{card['id']}/balance", json={"spent": "20"})
 
-    after = client.get("/api/vouchers/stats").json()
+    after = stats_for(client)
     assert Decimal(after["spent_total"]) == Decimal(before["spent_total"]) + Decimal("50")
     assert Decimal(after["on_cards"]) == Decimal(before["on_cards"]) + Decimal("50")
 
@@ -89,12 +100,12 @@ def test_stats_reflect_spending(client: TestClient, other_client: TestClient) ->
 
 
 def test_stats_flag_money_at_risk(client: TestClient) -> None:
-    before = client.get("/api/vouchers/stats").json()
+    before = stats_for(client)
     make_voucher(
         client, merchant="Expired-Shop", value_kind="amount", value_amount="12",
         valid_until="2020-05-05",
     )
-    after = client.get("/api/vouchers/stats").json()
+    after = stats_for(client)
     # An expired card still holding money is exactly what the screen must surface.
     assert Decimal(after["expired_balance"]) == Decimal(before["expired_balance"]) + Decimal("12")
 
@@ -110,9 +121,13 @@ def test_counts_feed_the_menu(client: TestClient) -> None:
 
     after = client.get("/api/vouchers/counts").json()
     assert after["archived"] == before["archived"] + 1
-    # Money left on archived cards is what makes the archive worth opening.
-    expected = Decimal(before["archived_balance"]) + Decimal("15")
-    assert Decimal(after["archived_balance"]) == expected
+    # Money left on archived cards is what makes the archive worth opening — per
+    # currency, since one line cannot honestly hold two of them.
+    def archived(body: dict, currency: str = "EUR") -> Decimal:
+        entry = next((m for m in body["archived_balance"] if m["currency"] == currency), None)
+        return Decimal(entry["amount"]) if entry else Decimal(0)
+
+    assert archived(after) == archived(before) + Decimal("15")
 
 
 def test_unknown_paths_are_404_not_the_spa(client: TestClient) -> None:
@@ -371,7 +386,7 @@ def test_delete_removes_voucher(client: TestClient) -> None:
 
 def test_uncertain_balance_is_kept_out_of_the_reliable_total(client: TestClient) -> None:
     """Money you are unsure about must not inflate "on the cards"."""
-    before = client.get("/api/vouchers/stats").json()
+    before = stats_for(client)
 
     card = make_voucher(
         client, merchant="Doubt-Shop", value_kind="amount", value_amount="40",
@@ -379,7 +394,7 @@ def test_uncertain_balance_is_kept_out_of_the_reliable_total(client: TestClient)
     )
     client.patch(f"/api/vouchers/{card['id']}", json={"balance_uncertain": True})
 
-    after = client.get("/api/vouchers/stats").json()
+    after = stats_for(client)
     assert Decimal(after["on_cards"]) == Decimal(before["on_cards"])
     assert Decimal(after["uncertain_balance"]) == Decimal(before["uncertain_balance"]) + 40
     assert after["cards_uncertain"] == before["cards_uncertain"] + 1

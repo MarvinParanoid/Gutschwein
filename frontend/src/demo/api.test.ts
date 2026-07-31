@@ -77,13 +77,17 @@ describe('the list', () => {
 })
 
 describe('statistics', () => {
+  /** The demo seed is one currency, so its figures live in the first block. */
+  const euro = async () => (await api.stats()).currencies[0]
+
   it('counts only what is really available', async () => {
-    const stats = await api.stats()
+    const stats = await euro()
     const active = await api.listVouchers('active')
     const certain = active
       .filter((v) => !v.balance_uncertain)
       .reduce((sum, v) => sum + Number(v.balance_amount), 0)
 
+    expect(stats.currency).toBe('EUR')
     expect(Number(stats.on_cards)).toBeCloseTo(certain, 2)
     expect(stats.cards_active).toBe(active.length)
     // An unconfirmed balance is money you cannot plan with: it gets its own line.
@@ -91,15 +95,39 @@ describe('statistics', () => {
   })
 
   it('adds up the spending from the event log', async () => {
-    const before = Number((await api.stats()).spent_total)
+    const before = Number((await euro()).spent_total)
     await api.updateBalance(4, { spent: '1.00' })
-    expect(Number((await api.stats()).spent_total)).toBeCloseTo(before + 1, 2)
+    expect(Number((await euro()).spent_total)).toBeCloseTo(before + 1, 2)
   })
 
   it('keeps a continuous month axis', async () => {
-    const { monthly } = await api.stats()
+    const { monthly } = await euro()
     expect(monthly).toHaveLength(6)
     expect(new Set(monthly.map((m) => m.month)).size).toBe(6)
+  })
+
+  it('never mixes two currencies into one figure', async () => {
+    const before = await euro()
+    const zloty = await api.createVoucher({
+      merchant: 'Biedronka',
+      value_kind: 'amount',
+      value_amount: '200.00',
+      currency: 'PLN',
+    } as never)
+    await api.updateBalance(zloty.id, { spent: '115.73' })
+
+    const blocks = (await api.stats()).currencies
+    const pln = blocks.find((block) => block.currency === 'PLN')!
+    const eur = blocks.find((block) => block.currency === 'EUR')!
+
+    expect(Number(pln.on_cards)).toBeCloseTo(84.27, 2)
+    expect(Number(pln.spent_total)).toBeCloseTo(115.73, 2)
+    // The euro side is untouched by any of it.
+    expect(eur.on_cards).toBe(before.on_cards)
+    expect(eur.spent_total).toBe(before.spent_total)
+    expect(pln.by_merchant.map((m) => m.merchant)).toEqual(['Biedronka'])
+    // The busier currency leads, so an ordinary family keeps the page it had.
+    expect(blocks[0].currency).toBe('EUR')
   })
 })
 
