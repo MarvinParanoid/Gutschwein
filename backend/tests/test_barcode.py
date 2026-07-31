@@ -9,21 +9,30 @@ import io
 import pytest
 import zxingcpp
 from fastapi.testclient import TestClient
-from PIL import Image
+from PIL import Image, ImageChops
 
 from app import barcode
 
-CARD_NUMBER = "2094599346555"
+# Invented: a real card number in a public repository is a real card number.
+CARD_NUMBER = "9998887776665"
 
 
-def render(text: str, fmt: str = "Code128", scale: int = 3) -> Image.Image:
-    """A barcode as an image, the way a card app would show it on screen."""
+def render(text: str, fmt: str = "Code128", scale: int = 3, quiet: bool = True) -> Image.Image:
+    """A barcode as an image, the way a card app would show it on screen.
+
+    `quiet=False` cuts off the ten-module margin the writer adds by itself. It has
+    to be cut for a fixture about quiet zones to mean anything: with it left in, an
+    image built to have no margin still has one, and the test passes whatever the
+    decoder does.
+    """
     raw = zxingcpp.write_barcode_to_image(
         zxingcpp.create_barcode(text, getattr(zxingcpp.BarcodeFormat, fmt))
     )
     height, width = raw.shape[0], raw.shape[1]
     image = Image.frombuffer("L", (width, height), bytes(raw), "raw", "L", 0, 1)
-    return image.resize((width * scale, height * scale), Image.NEAREST)
+    if not quiet:
+        image = image.crop(ImageChops.invert(image).getbbox())
+    return image.resize((image.width * scale, image.height * scale), Image.NEAREST)
 
 
 def as_png(image: Image.Image) -> bytes:
@@ -39,6 +48,29 @@ def screenshot_with(image: Image.Image, size=(1080, 800)) -> Image.Image:
                  (60, 200))
     canvas.paste(image.convert("RGB"), (80, 220))
     return canvas
+
+
+MODULE = 7  # px, as in the family's own screenshots
+
+
+def card_with_frame(text: str = CARD_NUMBER, quiet_modules: float = 4) -> Image.Image:
+    """The barcode on a coloured card, cropped to the card — the usual screenshot.
+
+    The card leaves a white gap of a few modules around the bars, and the crop puts
+    its colour right after it. In greyscale that colour is dark, so the decoder
+    finds a bar where the symbology requires ten modules of blank space, and refuses
+    a perfectly sharp barcode. Two of the family's cards are exactly this picture.
+    """
+    symbol = render(text, scale=MODULE, quiet=False)
+    gap = int(quiet_modules * MODULE)
+    inner = Image.new("RGB", (symbol.width + 2 * gap, symbol.height + 2 * gap), "white")
+    inner.paste(symbol.convert("RGB"), (gap, gap))
+    frame = 31
+    card = Image.new(
+        "RGB", (inner.width + 2 * frame, inner.height + 2 * frame), (189, 50, 41)
+    )
+    card.paste(inner, (frame, frame))
+    return card
 
 
 def test_reads_a_code_out_of_a_screenshot() -> None:
@@ -59,6 +91,32 @@ def test_thin_bars_are_recovered_by_the_upscale_pass() -> None:
     """One of four real cards only decoded after enlarging."""
     tiny = render(CARD_NUMBER, scale=1)
     found = barcode.decode(as_png(screenshot_with(tiny)))
+    assert found is not None and found.text == CARD_NUMBER
+
+
+def test_a_coloured_card_frame_no_longer_hides_the_code() -> None:
+    """Both Penny cards failed here, and neither was a question of resolution."""
+    found = barcode.decode(as_png(card_with_frame()))
+    assert found is not None
+    assert found.text == CARD_NUMBER
+    assert found.format == "Code 128"
+
+
+def test_a_frame_with_no_quiet_zone_at_all_is_still_read() -> None:
+    found = barcode.decode(as_png(card_with_frame(quiet_modules=0)))
+    assert found is not None and found.text == CARD_NUMBER
+
+
+def test_a_frame_that_is_not_one_flat_colour_is_shaved_off_instead() -> None:
+    """Nothing to trim: a gradient, a photo, a card on a patterned background."""
+    card = card_with_frame()
+    for x in range(0, card.width, 5):
+        for y in range(0, card.height, 5):
+            on_border = x < 31 or y < 31 or x > card.width - 31 or y > card.height - 31
+            if on_border:
+                card.putpixel((x, y), (x % 256, 60, y % 256))
+
+    found = barcode.decode(as_png(card))
     assert found is not None and found.text == CARD_NUMBER
 
 

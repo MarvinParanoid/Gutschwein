@@ -4,7 +4,9 @@ import { expect, test } from '@playwright/test'
 
 import { createCard, openCard, uniqueMerchant } from './helpers'
 
-const CARD_NUMBER = '2094599346555'
+// Invented, and the fixture is drawn from it: a real card number in a public
+// repository is a real card number.
+const CARD_NUMBER = '9998887776665'
 const FIXTURE = new URL('./fixtures/card-with-barcode.png', import.meta.url).pathname
 
 test('a screenshot with a barcode becomes a redrawn code at the till', async ({

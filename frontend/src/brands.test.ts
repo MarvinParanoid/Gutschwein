@@ -27,6 +27,20 @@ describe('the shop tiles', () => {
     expect(brandFor('H&M')?.label).toBe('HM')
     expect(brandFor('TK Maxx')?.label).toBe('TKM')
     expect(brandFor('google play')?.label).toBe('GP')
+    // The company name is on the receipt, the brand alone is on the sign.
+    expect(brandFor('PKN Orlen')?.label).toBe('ORL')
+  })
+
+  it('gives each shop its own letters, whatever it is called', () => {
+    // Aliases share a tile on purpose (rossman/rossmann, total/totalenergies). Two
+    // different shops sharing one would be indistinguishable: most of these tiles
+    // are some shade of red, so the letters are all that is left to tell them apart.
+    const tileOf = new Map<string, string>()
+    for (const brand of Object.values(BRANDS)) {
+      const tile = `${brand.background} on ${brand.color}`
+      expect(tileOf.get(brand.label) ?? tile).toBe(tile)
+      tileOf.set(brand.label, tile)
+    }
   })
 
   it('never matches on a substring', () => {
