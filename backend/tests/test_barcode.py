@@ -9,7 +9,7 @@ import io
 import pytest
 import zxingcpp
 from fastapi.testclient import TestClient
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageDraw
 
 from app import barcode
 
@@ -44,8 +44,7 @@ def as_png(image: Image.Image) -> bytes:
 def screenshot_with(image: Image.Image, size=(1080, 800)) -> Image.Image:
     """The barcode sitting on a phone screen, surrounded by other pixels."""
     canvas = Image.new("RGB", size, (24, 24, 24))
-    canvas.paste(Image.new("RGB", (image.width + 40, image.height + 40), "white"),
-                 (60, 200))
+    canvas.paste(Image.new("RGB", (image.width + 40, image.height + 40), "white"), (60, 200))
     canvas.paste(image.convert("RGB"), (80, 220))
     return canvas
 
@@ -66,11 +65,46 @@ def card_with_frame(text: str = CARD_NUMBER, quiet_modules: float = 4) -> Image.
     inner = Image.new("RGB", (symbol.width + 2 * gap, symbol.height + 2 * gap), "white")
     inner.paste(symbol.convert("RGB"), (gap, gap))
     frame = 31
-    card = Image.new(
-        "RGB", (inner.width + 2 * frame, inner.height + 2 * frame), (189, 50, 41)
-    )
+    card = Image.new("RGB", (inner.width + 2 * frame, inner.height + 2 * frame), (189, 50, 41))
     card.paste(inner, (frame, frame))
     return card
+
+
+def certificate_screenshot(
+    text: str = CARD_NUMBER,
+    quiet_modules: float = 4,
+    card_pad: int = 45,
+    screen: tuple[int, int, int] = (30, 40, 38),
+) -> Image.Image:
+    """A gift certificate as the shop's app shows it: three frames, not one.
+
+    The dark phone screen, then the card in the shop's colour with rounded corners,
+    then the white panel the bars sit on, and a second white panel below for the
+    number. Three real Penny certificates were this picture, and none of them read:
+    stripping one frame left the card's red against the bars, and the card's rounded
+    corners kept the screen's colour in the crop, so the next pass found a box that
+    covered everything and gave up.
+    """
+    bars = render(text, scale=MODULE, quiet=False)
+    gap = int(quiet_modules * MODULE)
+    panel = Image.new("RGB", (bars.width + 2 * gap, bars.height + 2 * gap), "white")
+    panel.paste(bars.convert("RGB"), (gap, gap))
+
+    card = Image.new(
+        "RGB", (panel.width + 2 * card_pad, panel.height + 2 * card_pad + 150), (189, 50, 41)
+    )
+    card.paste(panel, (card_pad, card_pad))
+    ImageDraw.Draw(card).rounded_rectangle(
+        (card_pad, card.height - 130, card.width - card_pad, card.height - 10),
+        radius=14,
+        fill="white",
+    )
+
+    corners = Image.new("L", card.size, 0)
+    ImageDraw.Draw(corners).rounded_rectangle((0, 0, card.width, card.height), radius=40, fill=255)
+    screenshot = Image.new("RGB", (card.width + 120, card.height + 20), screen)
+    screenshot.paste(card, (60, 0), corners)
+    return screenshot
 
 
 def test_reads_a_code_out_of_a_screenshot() -> None:
@@ -120,6 +154,37 @@ def test_a_frame_that_is_not_one_flat_colour_is_shaved_off_instead() -> None:
     assert found is not None and found.text == CARD_NUMBER
 
 
+@pytest.mark.parametrize("code", ["2094345550373", "2094931897059", "2094918454268"])
+def test_nested_frames_of_a_gift_certificate_are_taken_off_one_at_a_time(code: str) -> None:
+    """The three Penny certificates that could not be read, and could not be paid with.
+
+    Invented numbers of the same shape: thirteen digits, Code 128, the length the
+    quiet zone depends on.
+    """
+    found = barcode.decode(as_png(certificate_screenshot(code)))
+    assert found is not None
+    assert found.text == code
+    assert found.format == "Code 128"
+
+
+def test_black_bars_on_a_black_screen_are_not_mistaken_for_the_frame() -> None:
+    """A pure black screen behind the card is the colour of the bars themselves.
+
+    Carrying every stripped frame's colour forward made the bars count as background
+    once the black screen had been removed, so the box around "not the frame" came
+    back empty and the last layer was never reached.
+    """
+    shot = certificate_screenshot(quiet_modules=2, card_pad=30, screen=(0, 0, 0))
+    found = barcode.decode(as_png(shot))
+    assert found is not None and found.text == CARD_NUMBER
+
+
+def test_a_certificate_on_a_light_screen_reads_too() -> None:
+    shot = certificate_screenshot(quiet_modules=6, card_pad=60, screen=(245, 245, 247))
+    found = barcode.decode(as_png(shot))
+    assert found is not None and found.text == CARD_NUMBER
+
+
 def test_a_picture_without_a_barcode_is_not_an_error() -> None:
     plain = Image.new("RGB", (600, 400), "white")
     assert barcode.decode(as_png(plain)) is None
@@ -162,8 +227,12 @@ def test_upload_fills_the_code_and_serves_the_redrawn_barcode(client: TestClient
 
     voucher = client.post(
         "/api/vouchers",
-        json={"merchant": "Penny", "value_kind": "amount", "value_amount": "50",
-              "image_id": image_id},
+        json={
+            "merchant": "Penny",
+            "value_kind": "amount",
+            "value_amount": "50",
+            "image_id": image_id,
+        },
     ).json()
     assert voucher["code"] == CARD_NUMBER
     assert voucher["barcode_format"] == "Code 128"
