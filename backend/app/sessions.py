@@ -24,6 +24,11 @@ from app.models import LoginToken, Session, User, utcnow
 COOKIE_NAME = "gutschwein_session"
 LOGIN_TOKEN_TTL = timedelta(minutes=10)
 SESSION_TTL = timedelta(days=90)
+# How stale `last_used_at` may get before it is worth a write. The column exists so
+# the access screen can say "yesterday" about a device, and it was being rewritten on
+# every single request — a write transaction, and the lock that comes with it, on
+# paths that are otherwise pure reads.
+LAST_USED_RESOLUTION = timedelta(minutes=15)
 
 
 def digest(token: str) -> str:
@@ -57,9 +62,7 @@ async def issue_login_token(session: AsyncSession, user: User) -> str:
 async def redeem_login_token(session: AsyncSession, token: str) -> User | None:
     """Exchange a link token for a session. Returns None for anything suspect."""
     row = (
-        await session.execute(
-            select(LoginToken).where(LoginToken.token_hash == digest(token))
-        )
+        await session.execute(select(LoginToken).where(LoginToken.token_hash == digest(token)))
     ).scalar_one_or_none()
 
     now = utcnow()
@@ -90,10 +93,12 @@ async def resolve_session(session: AsyncSession, token: str) -> User | None:
     row = (
         await session.execute(select(Session).where(Session.token_hash == digest(token)))
     ).scalar_one_or_none()
-    if row is None or _as_utc(row.expires_at) < utcnow():
+    now = utcnow()
+    if row is None or _as_utc(row.expires_at) < now:
         return None
-    row.last_used_at = utcnow()
-    await session.commit()
+    if row.last_used_at is None or now - _as_utc(row.last_used_at) > LAST_USED_RESOLUTION:
+        row.last_used_at = now
+        await session.commit()
     return await session.get(User, row.user_id)
 
 

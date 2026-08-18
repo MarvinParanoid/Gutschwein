@@ -178,7 +178,14 @@ docker compose exec app python -m app.invite "Anna"   # prints a one-time login 
 docker compose exec app python -m app.invite --link 3 # another link for member 3
 docker compose exec app python -m app.invite --list
 docker compose exec app python -m app.invite --revoke 3
+docker compose exec app python -m app.invite --sessions-off 3
 ```
+
+`--revoke` deletes the member, and the database refuses it once they have any history —
+vouchers, comments or events. That is deliberate: deleting the row used to leave those
+pointing at nothing, and SQLite hands the freed id to the next member created, who then
+inherits the history. `--sessions-off` is the answer for someone who did things: it ends
+every session they have without erasing what they did.
 
 The console is only needed for the **first** member. After that the app itself does it:
 *Access* in the burger menu mints the same link for a new member or for another of your own
@@ -197,7 +204,10 @@ exactly while their id is in `ALLOWED_TELEGRAM_IDS`, a console member exactly wh
 row exists — which is why `--revoke` deletes their sessions before the row.
 
 A Telegram-less install has **no automatic backup**, because the nightly archive goes into
-the family chat. Back up `./data` yourself.
+the family chat. Back up `./data` yourself — the whole directory, not just the `.db`: SQLite
+runs in WAL mode, so recent transactions live in the `-wal` file next to it until they are
+checkpointed. The nightly archive is unaffected, it snapshots through sqlite's backup API
+and writes one complete file.
 
 ## Backups
 

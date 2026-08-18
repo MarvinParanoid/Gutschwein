@@ -6,8 +6,17 @@ Two audiences, two ways of choosing:
     jobs (reminders, digest) know it too.
 
 Group-chat messages have no single reader, so they use DEFAULT_LANGUAGE.
+
+Telegram is told to parse its messages as HTML, so everything the bot says goes
+through `html_t` / `group_t`, which escape what is substituted into a template
+while leaving the template's own markup alone. Shop names and comments are typed by
+people: "H&M" or "Rewe <Bahnhof>" in a plain `t()` result is a `can't parse entities`
+from Telegram, and on the notification path that error is swallowed — the family
+chat simply never hears about the card. `t()` itself does not escape, because its
+other audience is the JSON API, where `&amp;` in an error message is just wrong.
 """
 
+from html import escape
 from typing import Annotated, Any
 
 from fastapi import Header
@@ -564,6 +573,24 @@ def default_language() -> str:
     return settings.default_language
 
 
-def group_t(key: str, **params: Any) -> str:
+class Html(str):
+    """A fragment that is already Telegram-HTML and must not be escaped again.
+
+    Messages nest — an expiry warning is built from a "when" and a "caveat" that
+    are themselves rendered templates — and escaping a fragment twice turns its
+    tags into visible text.
+    """
+
+
+def _escaped(value: Any) -> str:
+    return value if isinstance(value, Html) else escape(str(value))
+
+
+def html_t(key: str, language: str = RU, **params: Any) -> Html:
+    """A message for Telegram: the template keeps its markup, the values do not."""
+    return Html(t(key, language, **{name: _escaped(v) for name, v in params.items()}))
+
+
+def group_t(key: str, **params: Any) -> Html:
     """A message for the family chat, where nobody's own language applies."""
-    return t(key, default_language(), **params)
+    return html_t(key, default_language(), **params)

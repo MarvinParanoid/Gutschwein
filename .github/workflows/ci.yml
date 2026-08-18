@@ -25,9 +25,12 @@ jobs:
           # version that actually needs covering.
           python-version: "3.13"
           cache: pip
-          cache-dependency-path: backend/pyproject.toml
+          cache-dependency-path: |
+            backend/pyproject.toml
+            backend/constraints.txt
 
-      - run: pip install -e ".[dev]"
+      # Same pins as the image, so CI tests what ships.
+      - run: pip install -c constraints.txt -e ".[dev]"
       - run: ruff check app tests
       - run: python -m pytest -q
 
@@ -159,7 +162,9 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-          cache-dependency-path: backend/pyproject.toml
+          cache-dependency-path: |
+            backend/pyproject.toml
+            backend/constraints.txt
 
       - uses: actions/setup-node@v7
         with:
@@ -169,7 +174,8 @@ jobs:
 
       # The suite drives the built bundle served by the real backend, so both
       # halves have to be installed.
-      - run: pip install -e ".[dev]"
+      # Same pins as the image, so CI tests what ships.
+      - run: pip install -c constraints.txt -e ".[dev]"
         working-directory: backend
       - run: npm ci
         working-directory: frontend

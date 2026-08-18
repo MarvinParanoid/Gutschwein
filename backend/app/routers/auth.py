@@ -17,7 +17,7 @@ from app.config import settings
 from app.db import get_session
 from app.i18n import Message, group_t
 from app.models import Session as SessionRow
-from app.models import User
+from app.models import User, utcnow
 from app.notify import notify
 from app.schemas import InviteOut, InviteRequest, SessionOut, UserOut
 from app.sessions import (
@@ -87,10 +87,15 @@ async def list_sessions(
     One shared family, one shared list: the point is to notice a device that
     should not be there, and you cannot notice it in a list you cannot see.
     Telegram itself needs no session, so the Mini App never appears here.
+
+    Expired rows are left out. `resolve_session` already refuses them, so listing
+    them showed browsers that cannot get in as though they could — noise in the one
+    place whose whole job is to make an unwanted device stand out.
     """
     rows = await session.execute(
         select(SessionRow, User)
         .join(User, User.id == SessionRow.user_id)
+        .where(SessionRow.expires_at > utcnow())
         .order_by(SessionRow.last_used_at.desc().nullslast(), SessionRow.id.desc())
     )
     mine = digest(gutschwein_session) if gutschwein_session else None

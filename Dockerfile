@@ -14,9 +14,11 @@ ENV PYTHONUNBUFFERED=1 \
     DATABASE_URL=sqlite+aiosqlite:////data/gutschwein.db
 
 WORKDIR /app
-COPY backend/pyproject.toml ./
+# constraints.txt pins every runtime dependency; without it this line resolves
+# afresh on every build and the same commit stops producing the same image.
+COPY backend/pyproject.toml backend/constraints.txt ./
 COPY backend/app ./app
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir -c constraints.txt .
 
 COPY backend/alembic.ini ./
 COPY backend/alembic ./alembic

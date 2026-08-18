@@ -37,6 +37,12 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
 
 ## Things that will bite
 
+- **Backend dependency versions live in `backend/constraints.txt`**, regenerated with
+  `make lock`. It is a *constraints* file, not a requirements file, on purpose: the lock is
+  produced on the developer's Python (3.14) and installed on the image's (3.13), and
+  constraints let pip still resolve a dependency that only exists on one of them while
+  fixing the version of everything named. Changing `pyproject.toml` without rerunning
+  `make lock` leaves the image on the old pins.
 - **Regenerate `frontend/package-lock.json` with a full `npx npm@10 install`** — the npm
   version CI and the Docker image use, and a full install, not `--package-lock-only`.
   A newer npm prunes the platform variants of optional deps (`npm ci` on npm 10 then fails

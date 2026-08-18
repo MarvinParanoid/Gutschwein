@@ -38,6 +38,23 @@ lint:
 	cd backend && .venv/bin/ruff check app tests
 	cd frontend && npm run typecheck
 
+# Pins for the image build. A throwaway venv, because a freeze of the development
+# one would pin pytest and ruff into production.
+lock:
+	rm -rf /tmp/gutschwein-lock
+	python -m venv /tmp/gutschwein-lock
+	/tmp/gutschwein-lock/bin/pip install -q --upgrade pip
+	/tmp/gutschwein-lock/bin/pip install -q ./backend
+	# The blank line after the comment block is the boundary: everything above it
+	# is prose to keep, everything below is regenerated.
+	@sed -n '1,/^$$/p' backend/constraints.txt > /tmp/gutschwein-lock/next
+	@/tmp/gutschwein-lock/bin/pip freeze --exclude-editable \
+		| grep -v '^gutschwein-backend' | sort >> /tmp/gutschwein-lock/next
+	@mv /tmp/gutschwein-lock/next backend/constraints.txt
+	# setuptools builds in-tree, and its leftovers are not part of the checkout.
+	@rm -rf /tmp/gutschwein-lock backend/build backend/*.egg-info
+	@echo "backend/constraints.txt regenerated — read the diff before committing"
+
 # make migration m="add reminder flag"
 migration:
 	cd backend && .venv/bin/alembic revision --autogenerate -m "$(m)"

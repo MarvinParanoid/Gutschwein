@@ -1,0 +1,58 @@
+# Pinned versions for the runtime dependencies of pyproject.toml.
+#
+# Deploying means building the image, and `pip install .` on `>=` constraints
+# resolves afresh every time — so the same commit could produce a different image
+# tomorrow than it did today. The frontend has had package-lock.json all along;
+# this is the backend's half, and the reason is on record: docs/deploy.md notes a
+# dependency problem that once put production into a crash loop.
+#
+# A constraints file rather than a requirements file, deliberately. pip still
+# resolves for the interpreter it is running on, so a dependency that only exists
+# on some Python versions is still picked up; these lines only decide *which*
+# version anything named here may be. That matters because this file is generated
+# on the developer's Python and installed on the image's.
+#
+# Regenerate with `make lock` after changing pyproject.toml, and read the diff.
+
+Mako==1.4.1
+MarkupSafe==3.0.3
+PyYAML==6.0.3
+SQLAlchemy==2.0.52
+aiofiles==25.1.0
+aiogram==3.30.0
+aiohappyeyeballs==2.7.1
+aiohttp==3.14.3
+aiosignal==1.4.0
+aiosqlite==0.22.1
+alembic==1.19.1
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.14.2
+attrs==26.1.0
+certifi==2026.7.22
+click==8.4.2
+fastapi==0.141.1
+frozenlist==1.8.0
+greenlet==3.5.5
+h11==0.16.0
+httptools==0.8.0
+idna==3.19
+magic-filter==1.0.12
+multidict==6.7.1
+pillow==12.3.0
+pillow_heif==1.5.0
+propcache==0.5.2
+pydantic-settings==2.15.0
+pydantic==2.13.4
+pydantic_core==2.46.4
+python-dotenv==1.2.3
+python-multipart==0.0.32
+starlette==1.6.0
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+uvicorn==0.52.3
+uvloop==0.22.1
+watchfiles==1.2.0
+websockets==17.0.1
+yarl==1.24.5
+zxing-cpp==3.1.1
