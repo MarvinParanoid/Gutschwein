@@ -74,16 +74,17 @@ def certificate_screenshot(
     text: str = CARD_NUMBER,
     quiet_modules: float = 4,
     card_pad: int = 45,
-    screen: tuple[int, int, int] = (30, 40, 38),
+    screen: tuple[int, int, int] = (19, 22, 21),
 ) -> Image.Image:
-    """A gift certificate as the shop's app shows it: three frames, not one.
+    """A gift certificate as the shop's app shows it, framed the way it really is.
 
-    The dark phone screen, then the card in the shop's colour with rounded corners,
-    then the white panel the bars sit on, and a second white panel below for the
-    number. Three real Penny certificates were this picture, and none of them read:
-    stripping one frame left the card's red against the bars, and the card's rounded
-    corners kept the screen's colour in the crop, so the next pass found a box that
-    covered everything and gave up.
+    The card is taller than the crop, so it runs off the top and the bottom and the
+    picture's own border is mostly the card's red, with the dark screen showing only
+    down the sides. That is why reading a frame off the border failed here: the
+    commonest colour around the edge is the card, and a box drawn around everything
+    that is not the card grows straight back out to the dark strips.
+
+    Inside are two light panels — the bars, and the number printed below them.
     """
     bars = render(text, scale=MODULE, quiet=False)
     gap = int(quiet_modules * MODULE)
@@ -91,7 +92,9 @@ def certificate_screenshot(
     panel.paste(bars.convert("RGB"), (gap, gap))
 
     card = Image.new(
-        "RGB", (panel.width + 2 * card_pad, panel.height + 2 * card_pad + 150), (189, 50, 41)
+        "RGB",
+        (panel.width + 2 * card_pad, panel.height + 2 * card_pad + 150),
+        (189, 47, 38),
     )
     card.paste(panel, (card_pad, card_pad))
     ImageDraw.Draw(card).rounded_rectangle(
@@ -100,10 +103,8 @@ def certificate_screenshot(
         fill="white",
     )
 
-    corners = Image.new("L", card.size, 0)
-    ImageDraw.Draw(corners).rounded_rectangle((0, 0, card.width, card.height), radius=40, fill=255)
-    screenshot = Image.new("RGB", (card.width + 120, card.height + 20), screen)
-    screenshot.paste(card, (60, 0), corners)
+    screenshot = Image.new("RGB", (card.width + 120, card.height - 40), screen)
+    screenshot.paste(card, (60, -20))
     return screenshot
 
 
@@ -155,11 +156,12 @@ def test_a_frame_that_is_not_one_flat_colour_is_shaved_off_instead() -> None:
 
 
 @pytest.mark.parametrize("code", ["2094345550373", "2094931897059", "2094918454268"])
-def test_nested_frames_of_a_gift_certificate_are_taken_off_one_at_a_time(code: str) -> None:
-    """The three Penny certificates that could not be read, and could not be paid with.
+def test_the_printed_panel_is_found_inside_a_framed_certificate(code: str) -> None:
+    """Six real certificates could not be read, and could not be paid with either.
 
-    Invented numbers of the same shape: thirteen digits, Code 128, the length the
-    quiet zone depends on.
+    Numbers of the same shape as the real ones — thirteen digits, Code 128 — because
+    the quiet zone the picture is missing is measured in modules, and the length of
+    the number is what decides how many of them there are.
     """
     found = barcode.decode(as_png(certificate_screenshot(code)))
     assert found is not None
@@ -167,19 +169,15 @@ def test_nested_frames_of_a_gift_certificate_are_taken_off_one_at_a_time(code: s
     assert found.format == "Code 128"
 
 
-def test_black_bars_on_a_black_screen_are_not_mistaken_for_the_frame() -> None:
-    """A pure black screen behind the card is the colour of the bars themselves.
-
-    Carrying every stripped frame's colour forward made the bars count as background
-    once the black screen had been removed, so the box around "not the frame" came
-    back empty and the last layer was never reached.
-    """
+def test_the_bars_are_not_confused_with_a_black_screen_behind_the_card() -> None:
+    """The screen, the card and the ink are all dark; only the panel is not."""
     shot = certificate_screenshot(quiet_modules=2, card_pad=30, screen=(0, 0, 0))
     found = barcode.decode(as_png(shot))
     assert found is not None and found.text == CARD_NUMBER
 
 
 def test_a_certificate_on_a_light_screen_reads_too() -> None:
+    """Light mode: the screen around the card is brighter than the panel's own white."""
     shot = certificate_screenshot(quiet_modules=6, card_pad=60, screen=(245, 245, 247))
     found = barcode.decode(as_png(shot))
     assert found is not None and found.text == CARD_NUMBER

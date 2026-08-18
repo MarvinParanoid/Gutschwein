@@ -151,6 +151,22 @@ Pushing to `main` deploys through GitHub Actions instead, which is the safer rou
 would have caught the missing dependency that once put production into a crash loop, and
 `make deploy-vps` skips it.
 
+## Re-reading the barcodes
+
+A voucher's barcode is decoded once, when its picture is uploaded, so a card the decoder
+could not read then stays unreadable after the decoder improves. `app.rescan` reads the
+stored pictures again:
+
+```bash
+docker compose exec app python -m app.rescan           # what would change, writes nothing
+docker compose exec app python -m app.rescan --apply   # write it
+docker compose exec app python -m app.rescan --all --apply
+```
+
+Without `--all` it only looks at vouchers that have no barcode yet. It never overwrites a
+code someone typed, and a picture that still refuses keeps whatever it had — a rescan may
+only add. Run it after an update that touches `app/barcode.py`.
+
 ## Members without Telegram
 
 Telegram is where the conveniences live — the photo-with-a-caption shortcut, the chat

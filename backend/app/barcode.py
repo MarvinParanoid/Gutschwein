@@ -15,10 +15,16 @@ the family's own cards failed exactly this way, and the answer was not more
 resolution but less picture: take the frame off, then hand the decoder its blank
 margin.
 
-A screenshot has more than one frame, though. Penny's certificate is the dark phone
-screen, then the red card, then the white panel the bars sit on, and stripping only
-the outermost leaves the next one against the bars — the same forbidden neighbour.
-So the frames come off one at a time, and every layer is offered to the decoder.
+Trimming that frame away is harder than it sounds, because a screenshot has several
+and they are not concentric: Penny's certificate is the dark phone screen, then the
+red card — cut off at the top and bottom, so the picture's own border is mostly red
+with dark strips down the sides — then the white panel the bars sit on. Peeling by
+border colour got the first layer and stopped.
+
+So the panel is found instead of the frame. Bars are printed dark on light, and the
+panel is the one wide band of rows that is largely light; the frames around it, at
+any nesting and in any colour, are not. Six of the family's certificates were
+unreadable and all six read this way.
 """
 
 import io
@@ -27,7 +33,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 import zxingcpp
-from PIL import Image, ImageChops, ImageOps
+from PIL import Image, ImageOps
 
 log = logging.getLogger(__name__)
 
@@ -45,18 +51,16 @@ QUIET_ZONE = 0.10
 # stops well before the bars: past ~10% the code itself is being cut, and half a
 # code that still decodes would be a wrong number shown at the till.
 INSETS = (0.03, 0.06, 0.09)
-# How far a pixel may differ from a frame colour and still count as part of it.
-# Screenshots are lossy, so a flat colour is never quite flat.
-FRAME_TOLERANCE = 24
-# How many nested frames to take off. Three is what a card screenshot actually has
-# (screen, card, panel); the fourth is slack, and each one costs a decode.
-FRAME_PEELS = 4
-# Colours are rounded to this step before the border is polled for its most common
-# one, so WebP noise does not split one flat frame into a thousand near-misses.
-COLOUR_STEP = 16
-# The share of each side that counts as the border ring.
-BORDER_RING = 0.04
-# Below this a crop cannot hold a barcode, and going further would be cutting bars.
+# A pixel this bright is paper rather than ink, colour or shadow.
+LIGHT_THRESHOLD = 191
+# The share of a row that must be light for it to belong to the printed panel. The
+# bars themselves take most of it — the Penny panel is 38% light — so this sits well
+# below a half, and still far above a red card row, which has no light pixels at all.
+PANEL_SHARE = 0.20
+# Panels tried, widest band first. Two, because the certificate has a second one
+# below with the number printed in it, and a picture may be cropped to either.
+PANELS = 2
+# Below this a crop cannot hold a barcode.
 MIN_SIDE = 40
 
 
@@ -80,72 +84,45 @@ def _with_quiet_zone(image: Image.Image) -> Image.Image:
     return ImageOps.expand(grey, border=margin, fill=255)
 
 
-def _border_colour(image: Image.Image) -> tuple[int, int, int]:
-    """The most common colour around the edge — the frame, whatever shape it is.
+def _runs(values: list[int], threshold: float) -> list[tuple[int, int]]:
+    """The stretches of `values` that stay above `threshold`, as half-open ranges."""
+    runs: list[tuple[int, int]] = []
+    start: int | None = None
+    for index, value in enumerate(values):
+        if value > threshold and start is None:
+            start = index
+        elif value <= threshold and start is not None:
+            runs.append((start, index))
+            start = None
+    if start is not None:
+        runs.append((start, len(values)))
+    return runs
 
-    The corner pixel used to stand in for this, which a rounded card defeats: crop
-    to the card and its corner is still the screen behind it, so the next pass finds
-    nothing to strip and the ladder stops one frame short of the bars.
+
+def _row_means(mask: Image.Image) -> list[int]:
+    """The average of every row, 0-255. BOX resize to one column does it in C."""
+    return list(mask.resize((1, mask.height), Image.BOX).tobytes())
+
+
+def _light_panels(image: Image.Image) -> Iterator[Image.Image]:
+    """The light panels the code may be printed on, widest band first.
+
+    Rows first, because a barcode's rows all look alike and a frame's do not: the
+    panel is a run of rows that are largely light, and everything around it — dark
+    screen, coloured card, shadow — is not. The sides then come from the light
+    pixels inside that run. Taking the widest *light* column instead finds a gap
+    between two bars, which is how this first went wrong.
     """
-    ring = Image.new("RGB", (image.width, max(1, int(image.height * BORDER_RING) * 2)))
-    strip = max(1, int(image.height * BORDER_RING))
-    ring.paste(image.crop((0, 0, image.width, strip)), (0, 0))
-    ring.paste(image.crop((0, image.height - strip, image.width, image.height)), (0, strip))
-    side = max(1, int(image.width * BORDER_RING))
-    columns = Image.new("RGB", (side * 2, image.height))
-    columns.paste(image.crop((0, 0, side, image.height)), (0, 0))
-    columns.paste(image.crop((image.width - side, 0, image.width, image.height)), (side, 0))
-
-    def round_to_step(value: int) -> int:
-        return min(255, (value // COLOUR_STEP) * COLOUR_STEP + COLOUR_STEP // 2)
-
-    counts: dict[tuple[int, int, int], int] = {}
-    for part in (ring, columns):
-        rounded = part.point(round_to_step)
-        for count, colour in rounded.getcolors(rounded.width * rounded.height) or []:
-            counts[colour] = counts.get(colour, 0) + count
-    return max(counts.items(), key=lambda item: item[1])[0] if counts else (255, 255, 255)
-
-
-def _content_box(
-    image: Image.Image, background: tuple[tuple[int, int, int], ...]
-) -> tuple[int, int, int, int] | None:
-    """The box around everything that is neither the frame nor the one before it.
-
-    The previous frame is included because a rounded card leaves its corners behind
-    when it is cropped away, and a box drawn around "not the card" would grow
-    straight back to them. Only the previous one, though: keep the whole history and
-    a screenshot on a black screen ends up counting the bars themselves as frame,
-    which is how the certificate on a black background stayed unreadable.
-    """
-    distance: Image.Image | None = None
-    for colour in background:
-        flat = Image.new("RGB", image.size, colour)
-        difference = ImageChops.difference(image, flat).convert("L")
-        distance = difference if distance is None else ImageChops.darker(distance, difference)
-    if distance is None:
-        return None
-    return distance.point(lambda value: 255 if value > FRAME_TOLERANCE else 0).getbbox()
-
-
-def _peeled(image: Image.Image) -> Iterator[Image.Image]:
-    """The picture with one more frame taken off each time, outermost first.
-
-    A photograph has no flat border, so the first box already covers everything and
-    this costs one comparison.
-    """
-    rgb = image.convert("RGB")
-    previous: tuple[int, int, int] | None = None
-    for _ in range(FRAME_PEELS):
-        colour = _border_colour(rgb)
-        box = _content_box(rgb, (colour,) if previous is None else (colour, previous))
-        previous = colour
-        if box is None or box == (0, 0, rgb.width, rgb.height):
-            return
-        if box[2] - box[0] < MIN_SIDE or box[3] - box[1] < MIN_SIDE:
-            return
-        rgb = rgb.crop(box)
-        yield rgb
+    mask = image.convert("L").point(lambda value: 255 if value > LIGHT_THRESHOLD else 0)
+    bands = _runs(_row_means(mask), PANEL_SHARE * 255)
+    for top, bottom in sorted(bands, key=lambda band: band[1] - band[0], reverse=True)[:PANELS]:
+        box = mask.crop((0, top, mask.width, bottom)).getbbox()
+        if box is None:
+            continue
+        left, right = box[0], box[2]
+        if right - left < MIN_SIDE or bottom - top < MIN_SIDE:
+            continue
+        yield image.crop((left, top, right, bottom))
 
 
 def _inset(image: Image.Image, fraction: float) -> Image.Image | None:
@@ -163,8 +140,8 @@ def _attempts(image: Image.Image) -> Iterator[Image.Image]:
     """
     yield image
 
-    for stripped in _peeled(image):
-        yield _with_quiet_zone(stripped)
+    for panel in _light_panels(image):
+        yield _with_quiet_zone(panel)
 
     grey = image.convert("L")
     yield grey.resize((grey.width * UPSCALE, grey.height * UPSCALE), Image.LANCZOS)
