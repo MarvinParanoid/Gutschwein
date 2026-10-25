@@ -126,6 +126,26 @@ MESSAGES: dict[str, dict[str, str]] = {
         EN: "No access. Give your Telegram ID to the admin: {telegram_id}",
         DE: "Kein Zugang. Gib dem Admin deine Telegram-ID: {telegram_id}",
     },
+    "error.membership_revoked": {
+        RU: "Доступ отозван. Если это ошибка, обратитесь к администратору",
+        EN: "Your access was revoked. If this is a mistake, ask the admin",
+        DE: "Dein Zugang wurde entzogen. Falls das ein Irrtum ist, frag den Admin",
+    },
+    "error.membership_unconfirmed": {
+        RU: "Доступ ждёт подтверждения администратора",
+        EN: "Your access is waiting for the admin to confirm it",
+        DE: "Dein Zugang wartet auf die Bestätigung durch den Admin",
+    },
+    "error.membership_inviter": {
+        RU: "Нет доступа: у того, кто вас пригласил, его больше нет",
+        EN: "No access: whoever invited you no longer has access",
+        DE: "Kein Zugang: wer dich eingeladen hat, hat selbst keinen mehr",
+    },
+    "error.membership_invalid": {
+        RU: "Нет доступа: запись о приглашении повреждена. Обратитесь к администратору",
+        EN: "No access: the invitation record is damaged. Ask the admin",
+        DE: "Kein Zugang: der Einladungseintrag ist beschädigt. Frag den Admin",
+    },
     "error.session_not_found": {
         RU: "Сессия не найдена",
         EN: "Session not found",

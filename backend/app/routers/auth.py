@@ -48,7 +48,7 @@ async def login(payload: LoginRequest, response: Response, session: Session) -> 
             status.HTTP_401_UNAUTHORIZED,
             Message("error.login_link_dead"),
         )
-    check_allowed(user)
+    await check_allowed(session, user)
 
     token = await open_session(session, user)
     response.set_cookie(
@@ -158,7 +158,8 @@ async def invite(payload: InviteRequest, user: CurrentUser, session: Session) ->
 
     name = payload.name.strip()
     if name:
-        member = User(first_name=name, language=user.language)
+        # Their access rests on the inviter's: removing the inviter removes them.
+        member = User(first_name=name, language=user.language, invited_by_id=user.id)
         session.add(member)
         await session.flush()
     else:

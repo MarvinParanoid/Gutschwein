@@ -24,7 +24,9 @@ def empty_whitelist(monkeypatch):
 
 async def _console_member(name: str = "Аня") -> tuple[User, str]:
     async with SessionLocal() as session:
-        user = User(first_name=name)
+        # A console root, as `app.invite "name"` creates: the anchor a member
+        # without Telegram needs to be let in at all.
+        user = User(first_name=name, console_root=True)
         session.add(user)
         await session.flush()
         token = await issue_login_token(session, user)

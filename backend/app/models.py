@@ -12,6 +12,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    false,
     func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -71,6 +72,17 @@ class User(Base):
     last_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow
     )
+    # Where a member without Telegram gets their right to be here (app.membership).
+    # Who created them in the app: their access lasts only as long as that
+    # member's does. No ON DELETE: an inviter with invitees cannot be deleted.
+    invited_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+    # Created from the server console: whoever has a shell vouched for them.
+    # False by default, so a row nobody vouched for is refused, not let in.
+    console_root: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # Membership withdrawn; the row stays because history points at it.
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     @property
     def display_name(self) -> str:

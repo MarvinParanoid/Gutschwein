@@ -64,10 +64,14 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
   A schema change means a new revision — there is no `create_all` fallback.
 - `alembic/env.py` strips the async driver from `DATABASE_URL`; keep that in mind when
   switching to Postgres (`+asyncpg` → `+psycopg`).
-- Two kinds of member, checked on every request in `check_allowed()`: a Telegram member is
-  allowed while their id is in `ALLOWED_TELEGRAM_IDS`, a console member (`telegram_id IS
-  NULL`, created by `python -m app.invite`) while their row exists. Neither path may become
-  a way around the other; `tests/test_invite.py` guards that.
+- Membership is checked on every request in `check_allowed()` → `app.membership`. A
+  Telegram member is allowed while their id is in `ALLOWED_TELEGRAM_IDS`. A member without
+  Telegram is allowed while their chain of `invited_by_id` ends at a `console_root`
+  (created by `python -m app.invite`) or at a Telegram member still on the list, with no
+  `revoked_at` anywhere on it. A row with neither root nor inviter is *refused*: the
+  default is `console_root=False`, so any new code creating a `User` without Telegram must
+  set one or the other. Neither path may become a way around the other;
+  `tests/test_membership.py` and `tests/test_invite.py` guard that.
 - Auth carries no session: every request re-validates `initData`, which expires after
   `INIT_DATA_MAX_AGE` (24h). Reopening the Mini App issues a fresh one.
 - Uploads are two-step: `POST /api/uploads` returns an `image_id`, then the voucher is

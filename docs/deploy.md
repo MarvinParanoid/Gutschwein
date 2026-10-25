@@ -174,18 +174,25 @@ notifications, the digest, the nightly backup — but it is not required. Leave 
 and `FAMILY_CHAT_ID` empty and hand out sessions from the console:
 
 ```bash
-docker compose exec app python -m app.invite "Anna"   # prints a one-time login link
-docker compose exec app python -m app.invite --link 3 # another link for member 3
-docker compose exec app python -m app.invite --list
-docker compose exec app python -m app.invite --revoke 3
-docker compose exec app python -m app.invite --sessions-off 3
+docker compose exec app python -m app.invite "Anna"       # a console root, prints a one-time link
+docker compose exec app python -m app.invite --link 3     # another link for member 3
+docker compose exec app python -m app.invite --list       # everyone, and whether they get in
+docker compose exec app python -m app.invite --revoke 3   # end a membership (and their invitees')
+docker compose exec app python -m app.invite --restore 3  # undo that
+docker compose exec app python -m app.invite --sessions-off 3  # sign out devices, keep membership
+docker compose exec app python -m app.invite --prune      # sign out everyone refused now
 ```
 
-`--revoke` deletes the member, and the database refuses it once they have any history —
-vouchers, comments or events. That is deliberate: deleting the row used to leave those
-pointing at nothing, and SQLite hands the freed id to the next member created, who then
-inherits the history. `--sessions-off` is the answer for someone who did things: it ends
-every session they have without erasing what they did.
+`--revoke` ends a membership: it marks the member revoked, and ends the sessions and unused
+links of everyone invited through them in the same transaction. The row itself is deleted
+only for a member who left no history (vouchers, comments, events) and invited nobody;
+otherwise it stays, revoked, because history points at it — deleting it used to let SQLite
+hand the freed id to the next member, who then inherited the history. `--restore` lifts the
+revocation and with it the refusal of their invitees, but the sessions it ended stay ended:
+everyone needs a new link (`--link`).
+
+`--sessions-off` is a different thing: it signs a member out of every device and drops
+their unused links, and leaves their membership — and their invitees — as they were.
 
 The console is only needed for the **first** member. After that the app itself does it:
 *Access* in the burger menu mints the same link for a new member or for another of your own
@@ -200,8 +207,47 @@ reaches a server log. Opening it sets the same session cookie. Only the trust an
 
 Both doors work at once, so one member can refuse Telegram while the rest keep using the
 Mini App. Membership is checked on every request either way: a Telegram member is in
-exactly while their id is in `ALLOWED_TELEGRAM_IDS`, a console member exactly while their
-row exists — which is why `--revoke` deletes their sessions before the row.
+exactly while their id is in `ALLOWED_TELEGRAM_IDS`; a member invited in the app is in
+exactly while whoever invited them is — so taking someone off the list locks out the people
+they invited too, on the next request. Putting them back lets those people in again with
+the sessions they still have. `--prune` after the change signs those devices out, so they
+come back only through a new link — but it ends no membership: to lock someone out for
+good, `--revoke` them.
+
+### Upgrading to provenance (revision 0010)
+
+Before 0010 an invitation from the app left no record of who sent it, and that is how a
+member taken off the list kept access through their invitees. The migration therefore
+decides only what the data proves:
+
+- **No Telegram member has ever existed** in the database (and no history points at a
+  deleted member): every member without Telegram was created from the console, and all
+  of them become console roots. A Telegram-free install keeps working with no action.
+- **Otherwise** members without Telegram are left **unconfirmed** and are refused until you
+  decide. The migration log and every start of the app list them by id and name.
+
+Afterwards, for each `unconfirmed` member in `--list`:
+
+```bash
+docker compose exec app python -m app.invite --list
+docker compose exec app python -m app.invite --confirm 4        # you vouch for them
+docker compose exec app python -m app.invite --set-inviter 4 1  # invited by member 1
+docker compose exec app python -m app.invite --revoke 4         # nobody knows them
+```
+
+`--set-inviter` is the more accurate answer when you know who invited them: their access
+then follows that member's. The family chat's "… invited …" messages are the only record
+of who that was. Their existing sessions start working again as soon as they are
+confirmed — unless `--prune` was run in between, which deletes them. A link they tried
+while refused is used up; give them a new one with `--link`.
+
+Recovery: an allowlist typo is fixed by correcting `.env` and restarting — nothing was
+written. A revocation by mistake is `--restore` plus a new `--link`. With no root left at
+all, `python -m app.invite "Name"` always creates a new one. Going back to an image older
+than 0010 needs the schema taken back first, by the newer image — the app migrates forward
+on every start, so run it as a one-off and then switch images:
+`docker compose run --rm app alembic downgrade 0009`. It removes the three columns and
+nothing else.
 
 A Telegram-less install has **no automatic backup**, because the nightly archive goes into
 the family chat. Back up `./data` yourself — the whole directory, not just the `.db`: SQLite

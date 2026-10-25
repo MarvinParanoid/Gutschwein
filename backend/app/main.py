@@ -13,8 +13,10 @@ from fastapi.staticfiles import StaticFiles
 
 from app import notify
 from app.config import settings
+from app.db import SessionLocal
 from app.i18n import MESSAGES, Message, language_for, t
 from app.maintenance import maintenance_loop
+from app.membership import warn_about_unconfirmed
 from app.migrations import upgrade_database
 from app.routers import auth, barcodes, images, uploads, users, vouchers
 
@@ -40,6 +42,8 @@ def _report_bot_exit(task: asyncio.Task) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await asyncio.to_thread(upgrade_database)
+    async with SessionLocal() as session:
+        await warn_about_unconfirmed(session)
 
     bot_task: asyncio.Task | None = None
     bot = None

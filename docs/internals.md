@@ -62,15 +62,44 @@ letters instead of white (white on it is 3.05:1).
 One shared household: everyone sees and edits every card. There are no groups or roles — a
 deliberate omission.
 
-Two kinds of member, and `check_allowed()` re-checks on every request rather than only at
-login:
+`check_allowed()` re-checks membership on every request rather than only at login:
 
 - a **Telegram member** is in exactly while their id is in `ALLOWED_TELEGRAM_IDS`, so
   removing it locks them out on the next request, including an already-open browser;
-- a **console member** has no Telegram id at all (`python -m app.invite`), and for them the
-  row is the membership — revoking deletes their sessions first, then the row.
+- a **console root** has no Telegram id and was created from the server console
+  (`python -m app.invite`): whoever has a shell vouched for them;
+- an **invited member** was created in the app by another member (`invited_by_id`) and is
+  in only while that member is. The chain is followed up to a Telegram member on the list
+  or a console root, so removing someone takes everyone they invited with them — sessions
+  already open and links not yet used alike. Without that, a member taken off the list kept
+  a way back in through the people they had invited, who could invite further (F4 in
+  `docs/audits/hardening-audit.md`);
+- a member whose origin was never recorded — created before 0010 in a database that has
+  had Telegram members — is **refused** until the operator says where they come from
+  (`--confirm`, `--set-inviter`). Guessing in their favour is what the fix is about.
 
-Neither path may become a way around the other; `tests/test_invite.py` asserts that.
+`revoked_at` withdraws a membership without deleting the row the history points at; it is
+checked first on every link of the chain. A cycle, a missing ancestor, a chain longer than
+`MAX_CHAIN` or a row that is both Telegram and app-invited is refused and logged.
+
+The check writes nothing. A refused member's sessions and links simply stop working — and
+work again if the reason goes away, e.g. their Telegram ancestor is put back on the list.
+Deleting them is the operator's call. `--prune` signs out the devices and drops the unused
+links of everyone refused right now, and leaves memberships alone: once the reason goes away,
+those members are allowed again and sign in with a new link. `--revoke` is the only thing
+that ends a membership; it also deletes the sessions of the whole subtree, so a later
+`--restore` does not bring old devices back.
+
+DEV_MODE is the one intended exception to all of this: `X-Dev-User` and
+`/api/auth/dev-token` let any id in without the allowlist or the chain check. They exist
+for local development and the end-to-end suite, and CI checks that the image refuses both
+with DEV_MODE off.
+
+A link redeemed by a member who is refused is **used up**: `redeem_login_token` marks it
+used before `check_allowed` refuses the login, and no session is opened. Such a member
+needs a fresh link once they are allowed again (`--link`, or the bot's `/login`).
+
+Neither path may become a way around the other; `tests/test_membership.py` asserts that.
 
 Sessions are visible and revocable from *Access* in the app: the household sees every
 signed-in browser, not only its own, because the point is to notice a device that should

@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db import get_session
 from app.i18n import language_for, t
+from app.membership import membership
 from app.models import User, utcnow
 from app.sessions import resolve_session
 
@@ -72,23 +73,24 @@ async def upsert_user(session: AsyncSession, tg: TelegramUser) -> User:
     return user
 
 
-def check_allowed(user: User) -> User:
+async def check_allowed(session: AsyncSession, user: User) -> User:
     """Membership is checked on every request, not only at login.
 
-    Two kinds of member, one rule each. A Telegram member is allowed exactly
-    while their id is in ALLOWED_TELEGRAM_IDS — removing it locks them out on the
-    next request, including a browser session opened while they still had access.
-    A member invited from the console has no Telegram id; for them the row itself
-    is the membership, and revoking means deleting it (`app.invite --revoke`).
+    A Telegram member is allowed exactly while their id is in ALLOWED_TELEGRAM_IDS
+    — removing it locks them out on the next request, including a browser session
+    opened while they still had access. A member without Telegram is allowed while
+    their invitation chain ends at a console root or at a Telegram member who is
+    still on the list (`app.membership`), so removing someone takes the people
+    they invited with them.
     """
-    if user.telegram_id is None:
+    verdict = await membership(session, user)
+    if verdict.allowed:
         return user
-    if user.telegram_id not in settings.allowed_ids:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            t("error.no_access", user.language, telegram_id=user.telegram_id),
-        )
-    return user
+    if verdict.reason == "telegram":
+        message = t("error.no_access", user.language, telegram_id=user.telegram_id)
+    else:
+        message = t(f"error.membership_{verdict.reason}", user.language)
+    raise HTTPException(status.HTTP_403_FORBIDDEN, message)
 
 
 async def get_current_user(
@@ -109,7 +111,7 @@ async def get_current_user(
     if gutschwein_session:
         user = await resolve_session(session, gutschwein_session)
         if user is not None:
-            return check_allowed(user)
+            return await check_allowed(session, user)
 
     if not authorization or not authorization.lower().startswith("tma "):
         raise HTTPException(
