@@ -40,9 +40,14 @@ REMINDER_DAYS = 3
 REMINDER_INTERVAL = 6 * 3600
 
 
-def open_app_keyboard(text: str | None = None) -> InlineKeyboardMarkup | None:
-    text = text or group_t("bot.open_app")
-    if not settings.webapp_url.startswith("https://"):
+def open_app_keyboard(text: str, chat_type: str) -> InlineKeyboardMarkup | None:
+    """The button that opens the Mini App, where Telegram allows one.
+
+    A `web_app` button is private-chat only: in a group Telegram rejects the whole
+    message with BUTTON_TYPE_INVALID, not just the button. So a group gets the text
+    alone — which is why the family-chat senders (digest, reminders) pass no keyboard.
+    """
+    if chat_type != "private" or not settings.webapp_url.startswith("https://"):
         return None
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -128,7 +133,10 @@ def build_dispatcher() -> Dispatcher:
             await message.answer(html_t("bot.digest_nothing", lang(message)))
             return
         await message.answer(
-            text, reply_markup=open_app_keyboard(html_t("bot.open_cards", lang(message)))
+            text,
+            reply_markup=open_app_keyboard(
+                html_t("bot.open_cards", lang(message)), message.chat.type
+            ),
         )
 
     @dp.message(Command("start"))
@@ -137,9 +145,9 @@ def build_dispatcher() -> Dispatcher:
         if not allowed(message):
             await message.answer(html_t("bot.no_access", language, user_id=message.from_user.id))
             return
-        keyboard = open_app_keyboard(html_t("bot.open_app", language))
+        keyboard = open_app_keyboard(html_t("bot.open_app", language), message.chat.type)
         hint = html_t("bot.start", language)
-        if keyboard is None:
+        if not settings.webapp_url.startswith("https://"):
             await message.answer(hint + html_t("bot.no_webapp_url", language))
         else:
             await message.answer(hint, reply_markup=keyboard)
@@ -175,7 +183,9 @@ def build_dispatcher() -> Dispatcher:
             label = voucher_label(voucher)
             actor = user.display_name
 
-        await message.answer(reply, reply_markup=_card_keyboard(complete, language))
+        await message.answer(
+            reply, reply_markup=_card_keyboard(complete, language, message.chat.type)
+        )
         if complete:
             await _notify_family(message, group_t("notify.card_added", actor=actor, label=label))
 
@@ -189,7 +199,7 @@ def build_dispatcher() -> Dispatcher:
         if parsed.is_empty:
             await message.answer(
                 html_t("bot.not_understood", language),
-                reply_markup=open_app_keyboard(html_t("bot.open_app", language)),
+                reply_markup=open_app_keyboard(html_t("bot.open_app", language), message.chat.type),
             )
             return
 
@@ -212,7 +222,9 @@ def build_dispatcher() -> Dispatcher:
             label = voucher_label(voucher)
             actor = user.display_name
 
-        await message.answer(reply, reply_markup=_card_keyboard(complete, language))
+        await message.answer(
+            reply, reply_markup=_card_keyboard(complete, language, message.chat.type)
+        )
         if complete:
             await _notify_family(message, group_t("notify.card_added", actor=actor, label=label))
 
@@ -233,8 +245,9 @@ def _telegram_user(message: Message) -> TelegramUser:
     )
 
 
-def _card_keyboard(complete: bool, language: str) -> InlineKeyboardMarkup | None:
-    return open_app_keyboard(html_t("bot.open_card" if complete else "bot.fill_in_app", language))
+def _card_keyboard(complete: bool, language: str, chat_type: str) -> InlineKeyboardMarkup | None:
+    key = "bot.open_card" if complete else "bot.fill_in_app"
+    return open_app_keyboard(html_t(key, language), chat_type)
 
 
 def _describe(voucher: Voucher, complete: bool, parsed: QuickAdd, language: str) -> str:
@@ -291,11 +304,8 @@ async def _remind_once(bot: Bot, session: AsyncSession, voucher: Voucher, today:
     the batch was never warned about at all — in an app whose whole purpose is to
     warn about them.
     """
-    await bot.send_message(
-        settings.family_chat_id,
-        _expiry_message(voucher, today),
-        reply_markup=open_app_keyboard(group_t("bot.look")),
-    )
+    # No app button: the family chat is a group, and a group rejects one.
+    await bot.send_message(settings.family_chat_id, _expiry_message(voucher, today))
     voucher.reminded_on = today
     await session.commit()
 

@@ -8,7 +8,8 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.digest import build_digest
+from app.config import settings
+from app.digest import build_digest, send_digest
 from app.models import (
     Base,
     Event,
@@ -193,3 +194,20 @@ async def test_digest_in_english(session: AsyncSession, monkeypatch):
     assert "The week in cards" in text
     assert "across 2 of them" in text
     assert "Nothing was spent this week" in text
+
+
+async def test_the_digest_goes_to_the_group_without_an_app_button(
+    session: AsyncSession, monkeypatch
+) -> None:
+    """A Mini App button in a group gets the whole message rejected (BUTTON_TYPE_INVALID)."""
+    user = await make_user(session)
+    await add_card(session, user, "Rewe", "50")
+    monkeypatch.setattr(settings, "family_chat_id", -100)
+    sent: list[dict] = []
+
+    class FakeBot:
+        async def send_message(self, chat_id: int, text: str, **kwargs: object) -> None:
+            sent.append({"chat_id": chat_id, **kwargs})
+
+    assert await send_digest(FakeBot(), session)  # type: ignore[arg-type]
+    assert sent == [{"chat_id": -100}]

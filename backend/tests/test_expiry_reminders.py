@@ -21,6 +21,10 @@ class FakeBot:
         self.fail_on = fail_on or set()
 
     async def send_message(self, chat_id: int, text: str, **kwargs: object) -> None:
+        # What Telegram does with a Mini App button in a group: the family chat is
+        # one, and the whole message is rejected, not just the button.
+        if kwargs.get("reply_markup") is not None:
+            raise RuntimeError("Bad Request: BUTTON_TYPE_INVALID")
         for bad in self.fail_on:
             if bad in text:
                 raise RuntimeError(f"Bad Request: can't parse entities ({bad})")
@@ -57,6 +61,7 @@ async def _reminded(voucher_id: int) -> bool:
 
 async def _run_one_pass(bot: FakeBot, monkeypatch) -> None:
     """One iteration of the loop, without the six-hour sleep at the end."""
+
     async def stop(_seconds: float) -> None:
         raise StopAsyncIteration
 
@@ -67,9 +72,7 @@ async def _run_one_pass(bot: FakeBot, monkeypatch) -> None:
         pass
 
 
-async def test_every_expiring_card_is_warned_about(
-    client: TestClient, monkeypatch
-) -> None:
+async def test_every_expiring_card_is_warned_about(client: TestClient, monkeypatch) -> None:
     ids = await _expiring("Первый", "Второй", "Третий")
     monkeypatch.setattr(bot_module.settings, "family_chat_id", 42)
 

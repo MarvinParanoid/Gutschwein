@@ -184,11 +184,8 @@ async def send_digest(bot: Bot, session: AsyncSession) -> str | None:
     text = await build_digest(session)
     if text is None:
         return None
-    from app.bot import open_app_keyboard
-
-    await bot.send_message(
-        settings.family_chat_id, text, reply_markup=open_app_keyboard(group_t("bot.open_cards"))
-    )
+    # No app button: the family chat is a group, and a group rejects one.
+    await bot.send_message(settings.family_chat_id, text)
     return text
 
 

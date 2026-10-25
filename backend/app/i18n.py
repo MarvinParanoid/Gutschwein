@@ -230,7 +230,6 @@ MESSAGES: dict[str, dict[str, str]] = {
         DE: "In der App ausfüllen",
     },
     "bot.open_cards": {RU: "Открыть карты", EN: "Open the cards", DE: "Karten öffnen"},
-    "bot.look": {RU: "Посмотреть", EN: "Take a look", DE: "Ansehen"},
     "bot.no_webapp_url": {
         RU: "\n\n⚠️ WEBAPP_URL не настроен, кнопка приложения недоступна.",
         EN: "\n\n⚠️ WEBAPP_URL is not set, so the app button is unavailable.",

@@ -153,9 +153,7 @@ async def test_text_alone_creates_a_card_without_a_photo(bot, session) -> None:
     await _feed(bot, _message(f"{SHOP_TEXT} 30"))
 
     async with SessionLocal() as db:
-        card = (
-            await db.execute(select(Voucher).where(Voucher.merchant == SHOP_TEXT))
-        ).scalar_one()
+        card = (await db.execute(select(Voucher).where(Voucher.merchant == SHOP_TEXT))).scalar_one()
     assert str(card.balance_amount) == "30.00"
     assert card.image_path is None
     assert "30 EUR" in session.replies[0]
@@ -182,3 +180,26 @@ async def test_login_sends_a_link_only_in_private(bot, session) -> None:
 
     await _feed(bot, _message("/login", chat_type="supergroup"))
     assert "https://example.com/login#" not in session.replies[1]
+
+
+def _has_app_button(method: TelegramMethod[Any]) -> bool:
+    markup = getattr(method, "reply_markup", None)
+    rows = getattr(markup, "inline_keyboard", None) or []
+    return any(button.web_app for row in rows for button in row)
+
+
+async def test_private_replies_carry_the_app_button(bot, session) -> None:
+    await _feed(bot, _message("/start"))
+    await _feed(bot, _message("Privatladen 20"))
+
+    assert all(_has_app_button(m) for m in session.calls)
+
+
+@pytest.mark.parametrize("text", ["/start", "/digest", "здравствуйте", "Gruppenladen 20"])
+async def test_a_group_reply_carries_no_app_button(bot, session, text) -> None:
+    """Telegram rejects a web_app button outside a private chat with BUTTON_TYPE_INVALID,
+    and the reply is lost with it — the family chat simply never heard back."""
+    await _feed(bot, _message(text, chat_type="supergroup"))
+
+    assert session.replies
+    assert not any(_has_app_button(m) for m in session.calls)
