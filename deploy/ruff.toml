@@ -1,0 +1,2 @@
+# Same as backend/pyproject.toml, for the deployment script tests.
+line-length = 100

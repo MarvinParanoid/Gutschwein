@@ -162,8 +162,8 @@ app says you have no access, the message carries your Telegram id — add it to
   (`ProtectSystem`). A bare `log` goes to the journal, which is what you want anyway.
 - **Watch the disk.** Rebuilds leave dangling images behind; both deploy paths end with
   `docker image prune -f && docker builder prune -f`, and compose caps the json log files.
-  Pulled images are *tagged*, so prune ignores them — the deploy script keeps the three
-  most recent sha tags and deletes the rest.
+  Pulled images are *tagged*, so prune ignores them — the deploy script keeps the running
+  one, `:previous`, and the two newest other release tags, and deletes the rest.
 - **Snap Docker also strips the environment.** `GUTSCHWEIN_TAG=… docker compose config`
   comes out with `:latest` regardless: the variable never crosses the confinement, so
   compose interpolation cannot be driven from the shell. The deploy script therefore pulls
@@ -172,20 +172,111 @@ app says you have no access, the message carries your Telegram id — add it to
 
 ## Updating
 
+Production is updated by the **Deploy** workflow (see *Releasing and rolling back*),
+which runs `/root/deploy.sh` on the server. Its source is
+[`deploy/deploy.sh`](../deploy/deploy.sh); after changing it, install it by hand — the
+deploy key can only run it, not replace it:
+
 ```bash
-make deploy-vps    # rsync + rebuild + wait for /healthz
+scp deploy/deploy.sh root@your-server:/root/deploy.sh
+# Check it with dry-run: without a command the script means "deploy :latest".
+ssh root@your-server 'chmod 700 /root/deploy.sh && SSH_ORIGINAL_COMMAND=dry-run /root/deploy.sh'
 ```
 
-This one deliberately still builds on the server: its whole purpose is deploying work that
-has not been pushed, and an unpushed commit is by definition not in the registry.
+What one deployment does, in order:
 
-The sync path is pinned to the Makefile's own directory, so it can be run from anywhere.
-`data/` is excluded, and rsync never deletes excluded paths. Machine-specific values live
-in `.make.local` (gitignored) — copy the three defaults out of the Makefile.
+1. **Takes a host-wide lock** (`/run/lock/gutschwein-deploy.lock`). A second deployment —
+   from the workflow or by hand — stops at once without touching anything.
+2. **Preflight, with the app still running:** `.env` present, enough free disk for a
+   snapshot (data size + 1 GB) and for the image, the image pulled, and an **import check**:
+   `python -c "import app.main"` in the new image, without network. That proves the image
+   is intact and its code and dependencies import — not that the app starts: configuration,
+   the database, the migrations and the bot are first exercised by the real start in step 5.
+   Any failure here leaves the running version as it was.
+3. **Keeps the running image as `:previous`** — by the ID of the container that is running,
+   and only if that container is *healthy*. After a failed deployment the running container
+   is the failed one, so `:previous` keeps pointing at the last version that was healthy.
+   Image cleanup skips `:previous` by name, so a rollback candidate is always on the
+   machine, without the registry.
+4. **Stops the app and snapshots it** into `/root/gutschwein-snapshots/<UTC time>-<tag>/` —
+   outside the git checkout, so no git command there can touch it: the database through
+   SQLite's backup API (consistent, committed WAL included, checked with
+   `PRAGMA integrity_check`, stored as one self-contained file), a full independent copy of
+   `uploads/` compared file by file, and `snapshot.txt` (images, whether the old container
+   was healthy, schema revision, row counts, checksum). A snapshot is complete only once
+   its directory loses the `.partial` suffix. The newest five are kept.
+5. **Starts the new version**, whose startup runs the migrations, and waits for
+   `/healthz`.
 
-The **Deploy** workflow is the safer route: it only deploys what CI built and passed —
-CI would have caught the missing dependency that once put production into a crash loop,
-and `make deploy-vps` skips it.
+Nothing is rolled back, restored or downgraded automatically. If the new version does not
+come up, the script says which snapshot and which image to go back to, and leaves the
+decision to you.
+
+**Never run `git clean -x` in `/root/sparschwein`.** `.env` and `data/` live in that
+checkout untracked, and `-x` deletes them. `deploy.sh` only fetches and resets, which leaves
+untracked files alone.
+
+### Interrupted deployments
+
+Interrupted by Ctrl-C, `SIGTERM`, or the ssh session dropping (a cancelled workflow run)
+**before step 5**, the script cleans up after itself: an incomplete snapshot is deleted and
+the old container is started again. That container's database was only read, so this
+resumes it rather than rolling anything back. Interrupted during or after step 5, nothing is
+undone: the new version may already have migrated the database.
+
+Killed outright (`kill -9`, out of memory) or cut off by a reboot, the script cannot clean
+up. It leaves `/root/gutschwein-snapshots/in-progress`, which names the stage it reached,
+and `dry-run` shows it:
+
+```bash
+ssh root@your-server 'SSH_ORIGINAL_COMMAND=dry-run /root/deploy.sh'
+```
+
+| `stage=` | State it left | What to do |
+|---|---|---|
+| `preflight` | old app untouched (maybe a new image pulled, `:previous` re-tagged) | nothing; deploy again |
+| `stopping-old`, `snapshot` | old app **stopped** (a reboot does not restart it: compose stopped it on purpose); maybe a `*.partial` snapshot | `cd /root/sparschwein && docker compose start app`; the next deployment removes the `.partial` |
+| `switching` | old container being replaced; the app may be down; **the database may be partly migrated** | see below — deployments are blocked until you clear the note |
+| `health` | the new version is running, maybe still migrating | see below — deployments are blocked until you clear the note |
+
+The note is also left, on purpose, when a deployment *fails* at `switching` or `health`:
+the new version may have started and migrated. It is removed after every other outcome.
+
+**A note from `switching` or `health` — or one whose stage cannot be read — blocks every
+further deployment**, and nothing removes it, because it is the only record that the
+database may be half-migrated. Find out what state it is in: `docker compose logs app`,
+the revision in `alembic_version` against the one the new image expects. Then either fix
+forward or go back to the snapshot (below), and only then move the note aside — never
+delete it:
+
+```bash
+mv /root/gutschwein-snapshots/in-progress /root/gutschwein-snapshots/in-progress.reviewed-$(date -u +%Y%m%dT%H%M%SZ)
+```
+
+A note from an earlier stage (`preflight`, `stopping-old`, `snapshot`) does not block: the
+database was at most read. The next deployment prints it and carries on. The database is
+never changed by the script itself — only by the new version's startup, from `switching`
+on.
+
+`dry-run` is read-only: it pulls, tags, starts, stops, creates and deletes nothing, takes no
+lock, and works while a deployment is running.
+
+Going back to the snapshot by hand — this **discards everything written since it was
+taken**, so it is for a deployment that failed, not for one that has been in use:
+
+```bash
+cd /root/sparschwein
+docker compose stop app
+mv data data.before-restore-$(date -u +%Y%m%dT%H%M%SZ)          # never delete it
+mkdir -p data
+cp -a /root/gutschwein-snapshots/<name>/gutschwein.db /root/gutschwein-snapshots/<name>/uploads data/
+chown -R 10001:10001 data
+docker tag ghcr.io/marvinparanoid/gutschwein:previous ghcr.io/marvinparanoid/gutschwein:latest
+GUTSCHWEIN_TAG=latest docker compose up -d
+```
+
+The snapshot directory holds every card's code, so it is `700` and belongs on the server
+only.
 
 ## Re-reading the barcodes
 

@@ -63,6 +63,24 @@ jobs:
       # `npm run build` is tsc --noEmit followed by vite build.
       - run: npm run build
 
+  deploy-script:
+    name: deploy script (dash + shellcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - run: shellcheck -s sh deploy/deploy.sh
+      - run: pip install pytest
+      # The server runs deploy.sh with dash, Ubuntu's /bin/sh — and so do these tests,
+      # with git, flock, SQLite and the file copies real and Docker stubbed out.
+      - run: python -m pytest -q deploy/
+        env:
+          DEPLOY_TEST_SHELL: dash
+
   docker:
     name: docker image + smoke test
     runs-on: ubuntu-latest

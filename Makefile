@@ -1,20 +1,9 @@
-.PHONY: install dev-api dev-web build test lint migration deploy deploy-vps demo-gif stats
+.PHONY: install dev-api dev-web build test lint migration deploy demo-gif stats
 
-# Machine-specific settings live outside the repository. Copy the three lines
-# below into .make.local (gitignored) with your own values.
+# Machine-specific settings live outside the repository. Copy the line below into
+# .make.local (gitignored) with your own value.
 -include .make.local
 VPS ?= root@gutschwein.example.com
-REMOTE ?= /root/gutschwein
-URL ?= https://gutschwein.example.com
-# data/ holds the database and uploads. It is excluded, and rsync never deletes
-# excluded paths, so --delete cannot eat it.
-# --no-owner/--no-group: rsync run as root would otherwise stamp the remote files
-# with the local uid (1000), which git then rejects as "dubious ownership".
-RSYNC_FLAGS := -a --no-owner --no-group
-RSYNC_EXCLUDES := --exclude '.git' --exclude 'frontend/node_modules' \
-	--exclude 'backend/.venv' --exclude 'backend/static' --exclude 'data' \
-	--exclude '__pycache__' --exclude '.ruff_cache' --exclude '.pytest_cache' \
-	--exclude '*.egg-info' --exclude '.claude'
 
 install:
 	cd backend && python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
@@ -59,23 +48,10 @@ lock:
 migration:
 	cd backend && .venv/bin/alembic revision --autogenerate -m "$(m)"
 
+# A local build, for development. Production is deployed by the Deploy workflow
+# through deploy/deploy.sh on the server — never from here.
 deploy:
 	docker compose up -d --build
-
-# $(CURDIR)/ pins the sync root to this directory: running rsync with a relative
-# './' from a subdirectory once mirrored frontend/ over the whole project.
-deploy-vps:
-	rsync $(RSYNC_FLAGS) --delete $(RSYNC_EXCLUDES) $(CURDIR)/ $(VPS):$(REMOTE)/
-	# Every build leaves the previous image dangling, and the VPS disk is shared
-	# with other services — so prune right after a successful build.
-	ssh $(VPS) 'cd $(REMOTE) && docker compose up -d --build && docker image prune -f >/dev/null && docker builder prune -f >/dev/null'
-	@echo "ждём готовности $(URL) ..."
-	@for i in $$(seq 1 30); do \
-		curl -fsS $(URL)/healthz && echo " ✓ поднялся" && exit 0; \
-		sleep 2; \
-	done; \
-	echo "НЕ поднялся за минуту — смотрите: ssh $(VPS) 'cd $(REMOTE) && docker compose logs app'"; \
-	exit 1
 
 # Visitor counts from the reverse proxy log on the VPS. Needs deploy/demo-stats
 # installed there once; see docs/deploy.md.
