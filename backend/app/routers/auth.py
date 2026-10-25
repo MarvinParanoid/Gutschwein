@@ -42,13 +42,21 @@ class LoginRequest(BaseModel):
 
 @router.post("/login", response_model=UserOut)
 async def login(payload: LoginRequest, response: Response, session: Session) -> UserOut:
+    # From here to the commit in open_session the link is held under the writer
+    # lock: consumed and turned into a session together, or not at all.
     user = await redeem_login_token(session, payload.token)
     if user is None:
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
             Message("error.login_link_dead"),
         )
-    await check_allowed(session, user)
+    try:
+        await check_allowed(session, user)
+    except HTTPException:
+        # A refused member still spends the link, so it cannot be replayed once
+        # they are let in again; they get no session.
+        await session.commit()
+        raise
 
     token = await open_session(session, user)
     response.set_cookie(
