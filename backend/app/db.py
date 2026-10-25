@@ -17,7 +17,7 @@ does, and they are per connection — so they are applied every time one is open
 
 from collections.abc import AsyncIterator
 
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
@@ -39,6 +39,18 @@ if engine.dialect.name == "sqlite":
             cursor.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
         finally:
             cursor.close()
+
+
+async def take_writer_lock(session: AsyncSession) -> None:
+    """Start a write transaction now, holding SQLite's single writer lock to commit.
+
+    For work that has to be serialised with writers but has no row of its own to
+    lock (`services.lock_voucher_or_404` is the version for one voucher). An UPDATE
+    that matches nothing still opens the write transaction — pysqlite emits BEGIN
+    before any DML, and SQLite takes the lock when the statement starts, not when
+    a row changes. Keep what follows short: every other writer waits on it.
+    """
+    await session.execute(text("UPDATE vouchers SET id = id WHERE 0"))
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:

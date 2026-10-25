@@ -71,11 +71,37 @@ async def _serialize_one(session: AsyncSession, voucher: Voucher) -> VoucherOut:
 
 
 def _resolve_image(image_id: str | None) -> str | None:
+    """The early check: a name this app generates, for a file that exists now.
+
+    Early means before the lock, so a bad id is refused without queueing behind
+    other writers. It is repeated under the lock by `_claim_image`, because the
+    maintenance sweep may delete an unreferenced file in between.
+    """
     if image_id is None:
         return None
-    if not storage.absolute_path(image_id).is_file():
+    if not storage.IMAGE_ID_RE.match(image_id) or not storage.absolute_path(image_id).is_file():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, Message("error.image_not_found"))
     return image_id
+
+
+async def _claim_image(session: AsyncSession, image_id: str, voucher_id: int) -> None:
+    """Attach a picture to one voucher only. Call it holding the writer lock.
+
+    A picture belongs to at most one card. Two cards on one file used to lose it
+    together — deleting either deleted the other's picture — and the barcode route
+    drew whichever card's code the database returned first. Under the lock this
+    is serialised with every other attachment and with the maintenance sweep,
+    which deletes only under the same lock (`maintenance.cleanup_orphan_images`):
+    either the sweep went first and the file is gone, or the claim did and the
+    sweep sees the reference.
+    """
+    if not storage.absolute_path(image_id).is_file():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, Message("error.image_not_found"))
+    owner = await session.execute(
+        select(Voucher.id).where(Voucher.image_path == image_id, Voucher.id != voucher_id).limit(1)
+    )
+    if owner.first() is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, Message("error.image_in_use"))
 
 
 @router.get("", response_model=list[VoucherOut])
@@ -224,7 +250,11 @@ async def create_voucher(
     apply_expiry_rule(voucher)
     await attach_barcode(voucher)
     session.add(voucher)
+    # The INSERT takes the writer lock, so the claim below cannot interleave with
+    # another one; a refusal rolls the INSERT back with it.
     await session.flush()
+    if voucher.image_path is not None:
+        await _claim_image(session, voucher.image_path, voucher.id)
     record_event(session, voucher, user, EventKind.created)
     await session.commit()
     await session.refresh(voucher)
@@ -266,7 +296,9 @@ async def update_voucher(
     # field back, and one it did not change must not undo an edit made meanwhile.
     wanted = {field: value for field, value in changes.items() if getattr(seen, field) != value}
     new_image = image_id is not ... and image_id != seen.image_path
-    if image_id is not ...:
+    # Only a picture being attached is checked: the form sends the card's own back
+    # on every save, and a card must stay editable even if its file was lost.
+    if new_image:
         image_id = _resolve_image(image_id)
     found = await read_barcode(image_id) if new_image else None
 
@@ -289,11 +321,14 @@ async def update_voucher(
         voucher.balance_amount = voucher.value_amount
 
     if new_image and voucher.image_path != image_id:
-        old = voucher.image_path
+        if image_id is not None:
+            await _claim_image(session, image_id, voucher.id)
+        # The old file is left where it is: deleted here, before the commit, it
+        # was lost for good when the commit then failed. Once nothing points at it,
+        # the maintenance sweep removes it.
         voucher.image_path = image_id
         apply_barcode(voucher, found)
         record_event(session, voucher, user, EventKind.image_replaced)
-        storage.delete(old)
 
     if changed_fields:
         record_event(
@@ -493,12 +528,14 @@ async def restore(user: CurrentUser, session: Session, voucher_id: int) -> Vouch
 
 @router.delete("/{voucher_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_voucher(user: CurrentUser, session: Session, voucher_id: int) -> None:
-    """Hard delete. Archiving is the soft option; this one really removes it."""
+    """Hard delete. Archiving is the soft option; this one really removes it.
+
+    The picture stays on disk until the maintenance sweep finds nothing pointing
+    at it, so a delete can never take another card's picture with it.
+    """
     voucher = await get_voucher_or_404(session, voucher_id)
-    image_path = voucher.image_path
     await session.delete(voucher)
     await session.commit()
-    storage.delete(image_path)
 
 
 @router.get("/{voucher_id}/comments", response_model=list[CommentOut])

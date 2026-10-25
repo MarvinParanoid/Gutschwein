@@ -25,8 +25,9 @@ from app.models import utcnow
 
 pillow_heif.register_heif_opener()
 
-# The exact shape of a name we generate. Serving and cleanup both go through it,
-# so nothing else in the volume can be served — or deleted. The non-webp suffixes
+# The exact shape of a name we generate. Serving, attaching and cleanup all go
+# through it, so nothing else in the volume can be served, attached to a card, or
+# deleted. Nothing deletes an image but the maintenance sweep. The non-webp suffixes
 # are still listed: files uploaded before the conversion existed are valid.
 IMAGE_ID_RE = re.compile(r"^\d{4}-\d{2}/[0-9a-f]{32}\.(webp|jpg|png|heic|heif)$")
 
@@ -108,9 +109,3 @@ def absolute_path(relative: str) -> Path:
     if not target.is_relative_to(root):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, Message("error.bad_path"))
     return target
-
-
-def delete(relative: str | None) -> None:
-    if not relative:
-        return
-    absolute_path(relative).unlink(missing_ok=True)

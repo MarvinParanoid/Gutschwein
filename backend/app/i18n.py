@@ -43,6 +43,11 @@ MESSAGES: dict[str, dict[str, str]] = {
         EN: "You can only delete your own comments",
         DE: "Du kannst nur eigene Kommentare löschen",
     },
+    "error.image_in_use": {
+        RU: "Эта картинка уже прикреплена к другой карте",
+        EN: "This picture is already attached to another card",
+        DE: "Dieses Bild gehört schon zu einer anderen Karte",
+    },
     "error.image_not_found": {
         RU: "Изображение не найдено",
         EN: "Image not found",

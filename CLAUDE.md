@@ -75,7 +75,12 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
 - Auth carries no session: every request re-validates `initData`, which expires after
   `INIT_DATA_MAX_AGE` (24h). Reopening the Mini App issues a fresh one.
 - Uploads are two-step: `POST /api/uploads` returns an `image_id`, then the voucher is
-  created/patched with it. An abandoned form leaves an orphan file (no GC yet).
+  created/patched with it. A picture belongs to one voucher: `_claim_image()` refuses a
+  second owner with 409, under the writer lock. **No request handler deletes a file** —
+  not on replace, not on delete. The maintenance sweep is the only deleter, and it makes
+  its last reference check and the unlink under `take_writer_lock()`, the same lock the
+  claim holds, so it cannot race an attachment. Deleting in the request either lost a
+  still-referenced picture when the commit failed or took another card's with it.
 - Status changes go through `_transition()` in `routers/vouchers.py`, which also writes the
   event. Don't set `voucher.status` directly.
 - API errors carry a key, not a sentence: `raise HTTPException(404, Message("error.x"))`.

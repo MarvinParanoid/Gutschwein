@@ -128,5 +128,9 @@ chat. If that ever stops being acceptable, serve them through `fetch` and a blob
   `balance_updated` event carrying `{spent, remaining, note}`. There is no ledger table, so
   corrections are ordinary updates and past events are never rewritten.
 - Uploads are two-step: `POST /api/uploads` returns an `image_id`, then the card is created
-  or patched with it. An abandoned form leaves an orphan file until the maintenance loop
-  collects it.
+  or patched with it. A picture belongs to one card (a second claim is a 409), and nothing
+  but the maintenance sweep deletes one: an abandoned form, a replaced picture and a
+  deleted card all leave a file that the sweep removes once nothing points at it — within
+  a day or two, so a deleted card's picture outlives it on disk (and in backups) that long.
+  The sweep's last check and the unlink happen under the writer lock that attaching a
+  picture also holds, so a file is never deleted while a card is claiming it.
