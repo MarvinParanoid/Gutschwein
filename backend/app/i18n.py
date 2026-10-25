@@ -349,6 +349,11 @@ MESSAGES: dict[str, dict[str, str]] = {
         EN: "Give either the amount spent or the remaining balance",
         DE: "Gib entweder den bezahlten Betrag oder das Restguthaben an",
     },
+    "error.balance_not_patchable": {
+        RU: "Остаток меняется только через списание или исправление остатка",
+        EN: "The balance changes only by recording a payment or correcting it",
+        DE: "Das Guthaben ändert sich nur über eine Zahlung oder eine Korrektur",
+    },
     "error.empty_comment": {
         RU: "Пустой комментарий",
         EN: "Empty comment",

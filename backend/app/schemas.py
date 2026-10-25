@@ -107,10 +107,23 @@ class VoucherUpdate(BaseModel):
     conditions: str | None = None
     notes: str | None = None
     image_id: str | None = None
-    balance_amount: Decimal | None = None
     balance_uncertain: bool | None = None
 
     normalize_currency = field_validator("currency", mode="before")(normalize_currency)
+
+    @model_validator(mode="before")
+    @classmethod
+    def balance_has_its_own_endpoint(cls, data: object) -> object:
+        """The balance changes only through POST /balance, which writes its event.
+
+        It used to be a PATCH field too: set with no `balance_updated` behind it, so
+        the card and its history disagreed, and outside the lock that keeps payments
+        from overwriting each other. Refused rather than left out, because an unknown
+        field is otherwise dropped in silence — a client would think it had worked.
+        """
+        if isinstance(data, dict) and "balance_amount" in data:
+            raise ValueError("error.balance_not_patchable")
+        return data
 
 
 class VoucherOut(VoucherFields):

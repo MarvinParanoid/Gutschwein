@@ -283,7 +283,6 @@ async def update_voucher(
     # with it; a partly spent one keeps whatever is left.
     if (
         "value_amount" in changed_fields
-        and "balance_amount" not in changes
         and voucher.value_kind == ValueKind.amount
         and voucher.balance_amount == previous_value
     ):
