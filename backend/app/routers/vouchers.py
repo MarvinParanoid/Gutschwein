@@ -34,11 +34,14 @@ from app.schemas import (
     VoucherUpdate,
 )
 from app.services import (
+    apply_barcode,
     apply_expiry_rule,
     attach_barcode,
     comment_counts,
     format_amount,
     get_voucher_or_404,
+    lock_voucher_or_404,
+    read_barcode,
     record_event,
     voucher_label,
 )
@@ -247,13 +250,31 @@ async def get_voucher(user: CurrentUser, session: Session, voucher_id: int) -> V
 async def update_voucher(
     user: CurrentUser, session: Session, voucher_id: int, payload: VoucherUpdate
 ) -> VoucherOut:
-    voucher = await get_voucher_or_404(session, voucher_id)
-    changes = payload.model_dump(exclude_unset=True)
+    """Apply the fields sent, against the card as it is under the lock.
 
+    The face-value rule below reads the balance, so this is a read-modify-write
+    like a payment: checked against a copy read before a concurrent payment
+    committed, it took an untouched 50 card that had just been charged 10 and
+    raised it to the new face value, erasing the payment. Decoding a new picture is
+    the slow part and needs no lock, so it happens first; the lock covers only the
+    quick work from the reload to the commit.
+    """
+    seen = await get_voucher_or_404(session, voucher_id)
+    changes = payload.model_dump(exclude_unset=True)
     image_id = changes.pop("image_id", ...)
+    # Judged against the card as this request first read it: a form sends every
+    # field back, and one it did not change must not undo an edit made meanwhile.
+    wanted = {field: value for field, value in changes.items() if getattr(seen, field) != value}
+    new_image = image_id is not ... and image_id != seen.image_path
+    if image_id is not ...:
+        image_id = _resolve_image(image_id)
+    found = await read_barcode(image_id) if new_image else None
+
+    # The reload replaces `seen`'s attributes in place: nothing has been set on it.
+    voucher = await lock_voucher_or_404(session, voucher_id)
     changed_fields = []
     previous_value = voucher.value_amount
-    for field, value in changes.items():
+    for field, value in wanted.items():
         if getattr(voucher, field) != value:
             setattr(voucher, field, value)
             changed_fields.append(field)
@@ -268,13 +289,12 @@ async def update_voucher(
     ):
         voucher.balance_amount = voucher.value_amount
 
-    if image_id is not ...:
+    if new_image and voucher.image_path != image_id:
         old = voucher.image_path
-        voucher.image_path = _resolve_image(image_id)
-        if old != voucher.image_path:
-            await attach_barcode(voucher)
-            record_event(session, voucher, user, EventKind.image_replaced)
-            storage.delete(old)
+        voucher.image_path = image_id
+        apply_barcode(voucher, found)
+        record_event(session, voucher, user, EventKind.image_replaced)
+        storage.delete(old)
 
     if changed_fields:
         record_event(
@@ -309,7 +329,8 @@ async def _transition(
 async def mark_used(
     user: CurrentUser, session: Session, voucher_id: int
 ) -> VoucherOut:
-    voucher = await get_voucher_or_404(session, voucher_id)
+    # Locked: it zeroes the balance, and a second tap must see the first one's result.
+    voucher = await lock_voucher_or_404(session, voucher_id)
     if voucher.status == VoucherStatus.used:
         raise HTTPException(status.HTTP_409_CONFLICT, Message("error.already_used"))
     # "Used up" on a gift card means nothing is left on it.
@@ -341,8 +362,11 @@ async def update_balance(
     The caller sends either what was spent or the remaining balance printed on
     the receipt. Corrections need no special path: sending `remaining` again
     overwrites the number, and the event log keeps both attempts.
+
+    Computed from the balance as it is under the lock, so concurrent payments apply
+    one after the other rather than over each other (see `lock_voucher_or_404`).
     """
-    voucher = await get_voucher_or_404(session, voucher_id)
+    voucher = await lock_voucher_or_404(session, voucher_id)
     if voucher.value_kind != ValueKind.amount:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, Message("error.balance_amount_only")

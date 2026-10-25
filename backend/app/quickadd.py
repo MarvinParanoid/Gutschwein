@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import EventKind, User, ValueKind, Voucher, VoucherStatus
-from app.services import apply_expiry_rule, record_event
+from app.services import apply_expiry_rule, lock_voucher_or_404, record_event
 
 # A bare number, optionally with two decimals: "50", "12.50", "12,50".
 AMOUNT_RE = re.compile(r"(?<![\d.,])(\d{1,6}(?:[.,]\d{1,2})?)(?![\d.,])")
@@ -88,15 +88,24 @@ async def apply_quick_add(
 
     A card is complete once it has a shop and an amount; until then it stays a
     draft so nothing half-entered shows up as spendable money.
+
+    A draft with an amount can already be paid from, so the caption is applied to
+    it as it is under the lock (see `lock_voucher_or_404`), not as `voucher` was
+    when the bot found it; the reload refreshes that same object in place. Its
+    amount is the face value, and the balance follows it only while nothing has
+    been spent — the rule the form uses — so a later caption never wipes a payment.
     """
+    voucher = await lock_voucher_or_404(session, voucher.id)
     changed = []
     if parsed.merchant:
         voucher.merchant = parsed.merchant
         changed.append("merchant")
     if parsed.amount is not None:
+        untouched = voucher.balance_amount is None or voucher.balance_amount == voucher.value_amount
         voucher.value_kind = ValueKind.amount
         voucher.value_amount = parsed.amount
-        voucher.balance_amount = parsed.amount
+        if untouched:
+            voucher.balance_amount = parsed.amount
         changed.append("value_amount")
 
     # The shop is only known now, so the expiry rule can finally be applied.

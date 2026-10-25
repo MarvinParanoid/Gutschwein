@@ -4,7 +4,7 @@ import asyncio
 from decimal import Decimal
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import barcode, storage
@@ -19,6 +19,39 @@ async def get_voucher_or_404(session: AsyncSession, voucher_id: int) -> Voucher:
     voucher = await session.get(Voucher, voucher_id)
     if voucher is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, Message("error.voucher_not_found"))
+    return voucher
+
+
+async def lock_voucher_or_404(session: AsyncSession, voucher_id: int) -> Voucher:
+    """The voucher, read under its write lock: for anything computed from the balance.
+
+    Reading first and writing a number computed from it lost money: two spends of 10
+    on a 50 card both read 50, both wrote 40, and the log recorded 20 spent while the
+    card dropped by 10. pysqlite opens no transaction for a SELECT, so nothing tied
+    the read to the write.
+
+    The no-op UPDATE is the first statement of the transaction, so the lock is taken
+    before anything is read — SQLite's writer lock, a row lock on a server database.
+    A concurrent request waits on it (busy_timeout) and then reads the committed
+    result instead of a stale one. Everything up to the commit — the balance, its
+    events, the status — lands or rolls back together, and the lock is held only
+    that long: keep slow work (notifications, decoding) out of it.
+
+    It sets `updated_at` to itself because a column left out of the SET gets its
+    `onupdate` — and a request that turns out to change nothing would then reorder
+    the lists that sort by it.
+    """
+    result = await session.execute(
+        update(Voucher)
+        .where(Voucher.id == voucher_id)
+        .values(updated_at=Voucher.updated_at)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount == 0:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, Message("error.voucher_not_found"))
+    # populate_existing: an object already in the session may predate the lock.
+    voucher = await session.get(Voucher, voucher_id, populate_existing=True)
+    assert voucher is not None  # the row was just updated inside this transaction
     return voucher
 
 
@@ -74,14 +107,27 @@ async def attach_barcode(voucher: Voucher) -> None:
     authority. Decoding a 1080p screenshot (with the upscale retry) takes long
     enough to be worth a thread.
     """
-    if not voucher.image_path:
-        voucher.barcode_format = None
+    if voucher.image_path and not storage.absolute_path(voucher.image_path).is_file():
         return
+    apply_barcode(voucher, await read_barcode(voucher.image_path))
 
-    path = storage.absolute_path(voucher.image_path)
+
+async def read_barcode(image_path: str | None) -> barcode.Decoded | None:
+    """The slow half of `attach_barcode`: decode the picture, touch no voucher.
+
+    Split out so a caller that locks the voucher can decode first and hold the lock
+    only for `apply_barcode`.
+    """
+    if not image_path:
+        return None
+    path = storage.absolute_path(image_path)
     if not path.is_file():
-        return
-    found = await asyncio.to_thread(barcode.decode, path.read_bytes())
+        return None
+    return await asyncio.to_thread(barcode.decode, path.read_bytes())
+
+
+def apply_barcode(voucher: Voucher, found: barcode.Decoded | None) -> None:
+    """The quick half: record what `read_barcode` found on the voucher."""
     voucher.barcode_format = found.format if found else None
     if found and not voucher.code:
         voucher.code = found.text[:128]

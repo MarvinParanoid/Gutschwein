@@ -87,6 +87,10 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
   append-only `balance_updated` event carrying `{spent, remaining, note}` — there is no
   separate ledger table. Corrections are ordinary updates, so never mutate past events.
   Emptying the balance auto-marks the voucher `used`; `POST /use` conversely zeroes it.
+  Anything that computes a new balance from the current one loads the voucher with
+  `lock_voucher_or_404()`, not `get_voucher_or_404()`: pysqlite runs a SELECT outside any
+  transaction, so a plain read-then-write lets two concurrent payments overwrite each other.
+  The lock lasts until commit — keep notifications and image decoding out of it.
 
 ## Deliberately not built
 
