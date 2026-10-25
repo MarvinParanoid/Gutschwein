@@ -214,6 +214,19 @@ the sessions they still have. `--prune` after the change signs those devices out
 come back only through a new link — but it ends no membership: to lock someone out for
 good, `--revoke` them.
 
+### Revision 0011: one card per picture
+
+0011 adds a unique index on the picture column. If two cards still share one picture
+from before the app refused that, the upgrade stops, the app does not start, and the log
+names the picture and the cards, with the one command that detaches it from all but one
+of them. Nothing is changed until you run it; then start again and upload the detached
+cards' screenshots in the app. To check beforehand, read-only:
+
+```sql
+SELECT image_path, group_concat(id) FROM vouchers
+WHERE image_path IS NOT NULL GROUP BY image_path HAVING count(*) > 1;
+```
+
 ### Upgrading to provenance (revision 0010)
 
 Before 0010 an invitation from the app left no record of who sent it, and that is how a

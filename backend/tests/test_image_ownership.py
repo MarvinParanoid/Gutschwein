@@ -219,28 +219,53 @@ async def test_a_failed_commit_keeps_the_pictures(api, monkeypatch, replacement)
         assert _file(new).is_file()
 
 
-async def test_cards_already_sharing_a_picture_keep_it(api) -> None:
-    """Duplicates from before this check stay readable, and deleting one is safe."""
+async def test_the_database_refuses_a_second_owner_too(api) -> None:
+    """Migration 0011: a duplicate written past the app is refused by SQLite itself."""
     image = await _upload(api)
-    first = await _card(api, "Shared-First", image)
-    second = await _card(api, "Shared-Second")
+    await _card(api, "Unique-First", image)
+    second = await _card(api, "Unique-Second")
+
     async with SessionLocal() as db:
-        await db.execute(update(Voucher).where(Voucher.id == second["id"]).values(image_path=image))
-        await db.commit()
+        with pytest.raises(IntegrityError, match="image_path"):
+            await db.execute(
+                update(Voucher).where(Voucher.id == second["id"]).values(image_path=image)
+            )
 
-    for card in (first, second):
-        assert (await api.get(f"/api/vouchers/{card['id']}", headers=ANNA)).json()[
-            "image_id"
-        ] == image
-    assert (await api.delete(f"/api/vouchers/{second['id']}", headers=ANNA)).status_code == 204
-    _age(image)
-    await _sweep()
 
-    assert (await api.get(f"/api/images/{image}")).status_code == 200
-    kept = await api.patch(
-        f"/api/vouchers/{first['id']}", headers=ANNA, json={"image_id": image, "notes": "ok"}
-    )
-    assert kept.status_code == 200
+async def test_cards_without_a_picture_do_not_collide(api) -> None:
+    for n in range(3):
+        await _card(api, f"Unique-None-{n}")
+    async with SessionLocal() as db:
+        nulls = await db.execute(
+            select(func.count())
+            .select_from(Voucher)
+            .where(Voucher.merchant.like("Unique-None-%"), Voucher.image_path.is_(None))
+        )
+        assert nulls.scalar_one() == 3
+
+
+@pytest.mark.parametrize("how", ["create", "patch"])
+async def test_the_databases_refusal_is_a_409_not_a_500(api, monkeypatch, how) -> None:
+    """With the app's own check out of the way, the index answers — still as a 409."""
+    image = await _upload(api)
+    await _card(api, f"Unique-Owner-{how}", image)
+
+    async def no_check(session, image_id, voucher_id):
+        return None
+
+    monkeypatch.setattr(vouchers_router, "_claim_image", no_check)
+    if how == "create":
+        response = await _create(api, "Unique-Bypass", image)
+        assert await _count("Unique-Bypass") == 0
+    else:
+        other = await _card(api, "Unique-Bypass-Patch")
+        response = await api.patch(
+            f"/api/vouchers/{other['id']}", headers=ANNA, json={"image_id": image}
+        )
+        assert await _events(other["id"]) == [EventKind.created]
+
+    assert response.status_code == 409
+    assert response.json()["detail"]
 
 
 # --- concurrency -------------------------------------------------------------------

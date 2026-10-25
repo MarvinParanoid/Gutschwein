@@ -121,7 +121,10 @@ class Voucher(Base):
     conditions: Mapped[str] = mapped_column(Text, default="")
     notes: Mapped[str] = mapped_column(Text, default="")
 
-    image_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # One card per picture (migration 0011); NULLs do not collide.
+    image_path: Mapped[str | None] = mapped_column(
+        String(512), nullable=True, unique=True, index=True
+    )
     # Symbology of the barcode found in the image ("Code 128", "Aztec", …), so the
     # scan screen can redraw it. Empty when the picture has no readable code.
     barcode_format: Mapped[str | None] = mapped_column(String(32), nullable=True)

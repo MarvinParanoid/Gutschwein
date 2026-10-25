@@ -1,8 +1,11 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from decimal import Decimal
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import storage
@@ -102,6 +105,22 @@ async def _claim_image(session: AsyncSession, image_id: str, voucher_id: int) ->
     )
     if owner.first() is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, Message("error.image_in_use"))
+
+
+@asynccontextmanager
+async def _picture_conflict_is_409() -> AsyncIterator[None]:
+    """The database's own refusal of a second owner (migration 0011) as the same 409.
+
+    `_claim_image` normally answers first, under the lock; this is for the case it
+    does not — a code path that skips it, or a row written behind the app's back —
+    which would otherwise reach the client as a 500.
+    """
+    try:
+        yield
+    except IntegrityError as exc:
+        if "image_path" not in str(exc.orig):
+            raise
+        raise HTTPException(status.HTTP_409_CONFLICT, Message("error.image_in_use")) from exc
 
 
 @router.get("", response_model=list[VoucherOut])
@@ -252,11 +271,12 @@ async def create_voucher(
     session.add(voucher)
     # The INSERT takes the writer lock, so the claim below cannot interleave with
     # another one; a refusal rolls the INSERT back with it.
-    await session.flush()
-    if voucher.image_path is not None:
-        await _claim_image(session, voucher.image_path, voucher.id)
-    record_event(session, voucher, user, EventKind.created)
-    await session.commit()
+    async with _picture_conflict_is_409():
+        await session.flush()
+        if voucher.image_path is not None:
+            await _claim_image(session, voucher.image_path, voucher.id)
+        record_event(session, voucher, user, EventKind.created)
+        await session.commit()
     await session.refresh(voucher)
 
     if voucher.status == VoucherStatus.active:
@@ -334,7 +354,8 @@ async def update_voucher(
         record_event(
             session, voucher, user, EventKind.updated, {"fields": changed_fields}
         )
-    await session.commit()
+    async with _picture_conflict_is_409():
+        await session.commit()
     await session.refresh(voucher)
     return await _serialize_one(session, voucher)
 

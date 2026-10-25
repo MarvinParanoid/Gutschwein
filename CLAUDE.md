@@ -76,7 +76,8 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
   `INIT_DATA_MAX_AGE` (24h). Reopening the Mini App issues a fresh one.
 - Uploads are two-step: `POST /api/uploads` returns an `image_id`, then the voucher is
   created/patched with it. A picture belongs to one voucher: `_claim_image()` refuses a
-  second owner with 409, under the writer lock. **No request handler deletes a file** —
+  second owner with 409, under the writer lock, and a unique index (0011) backs it up —
+  its IntegrityError is turned into the same 409 by `_picture_conflict_is_409()`. **No request handler deletes a file** —
   not on replace, not on delete. The maintenance sweep is the only deleter, and it makes
   its last reference check and the unlink under `take_writer_lock()`, the same lock the
   claim holds, so it cannot race an attachment. Deleting in the request either lost a
