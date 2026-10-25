@@ -1,0 +1,110 @@
+name: Deploy
+
+# Production is rolled out by hand, never by a push. Pushing to main used to
+# deploy whatever was pushed — migrations included — the moment CI went green.
+#
+# Actions → Deploy → Run workflow, from main, with the commit to deploy. The image
+# is the one CI built, tested and published for exactly that commit (tag: the first
+# 12 characters of its sha); nothing is built here. Rolling back is the same thing
+# with an older commit — after taking the database schema back first if a migration
+# lies in between (docs/deploy.md).
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Commit on main to deploy: its sha, 12 to 40 hex characters"
+        required: true
+        type: string
+
+# One deployment at a time. A second one waits rather than cancelling the first
+# half-way through a migration. GitHub keeps one waiting run per group: starting a
+# third replaces the second, so the last one asked for is the one that follows.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+  packages: read
+
+jobs:
+  deploy:
+    name: deploy to VPS
+    # A dispatch runs the copy of this file on the ref it was started from; only
+    # main's copy may deploy, so a branch cannot loosen the checks below.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Deployment history, and the place for required reviewers if the repository
+    # settings ever add them. Created on the first run if it does not exist.
+    environment: production
+    steps:
+      - name: Resolve the commit on main
+        id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Through the environment, never interpolated into the script: the input
+          # is free text typed into a form.
+          REQUESTED: ${{ inputs.commit }}
+        run: |
+          # The whole value, not line by line as grep would: an input sent through
+          # the API may contain newlines.
+          [[ "$REQUESTED" =~ ^[0-9a-f]{12,40}$ ]] || { echo "not a commit sha"; exit 1; }
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$REQUESTED" --jq .sha)
+          # Images are published only for commits pushed to main.
+          status=$(gh api "repos/$GITHUB_REPOSITORY/compare/$sha...main" --jq .status)
+          case "$status" in
+            identical|ahead) ;;
+            *) echo "$sha is not on main (main is $status of it)"; exit 1 ;;
+          esac
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "tag=${sha::12}" >> "$GITHUB_OUTPUT"
+
+      # The image is published by the docker job as soon as its own smoke test
+      # passes, without waiting for backend, frontend and e2e. A tag in the
+      # registry therefore says "it starts", not "CI passed" — this asks for both.
+      # A run's conclusion is success only if every job succeeded or was skipped;
+      # ci.yml has no job-level `if:`, so on a push to main none can be skipped.
+      - name: Require a successful CI run of that commit on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          passed=$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$SHA&branch=main&event=push&status=success" \
+            --jq .total_count)
+          test "$passed" -gt 0 || { echo "no successful CI run on main for $SHA"; exit 1; }
+
+      - name: Require the image in GHCR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.commit.outputs.tag }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          # Lowercase: registries reject capitals in a repository name.
+          image=$(echo "ghcr.io/$GITHUB_REPOSITORY_OWNER/gutschwein" | tr '[:upper:]' '[:lower:]')
+          docker manifest inspect "$image:$TAG" > /dev/null \
+            || { echo "$image:$TAG is not in the registry"; exit 1; }
+
+      # Only for .github/ssh_known_hosts; the token is not left in .git/config for
+      # the step that holds the deploy key.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Deploy
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          TAG: ${{ steps.commit.outputs.tag }}
+        run: |
+          test -n "$DEPLOY_HOST" || { echo "the DEPLOY_HOST secret is not set"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          # Host key is pinned in the repo (hostname hashed), so no blind TOFU here.
+          cp .github/ssh_known_hosts ~/.ssh/known_hosts
+          # The key is locked to /root/deploy.sh by a forced command, which reads
+          # "deploy <tag>" and pulls exactly that image; it cannot do anything else.
+          ssh -i ~/.ssh/deploy -o BatchMode=yes -o ConnectTimeout=15 \
+            "root@$DEPLOY_HOST" "deploy $TAG"

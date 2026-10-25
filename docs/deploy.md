@@ -60,12 +60,48 @@ developer wants and the only way to run changes that are not pushed yet.
 
 A git tag `v*` publishes an image under that name and deliberately leaves `:latest` alone,
 which belongs to `main`. Every commit on `main` is also tagged with its first twelve
-characters, and the deploy is
-pinned to the commit that produced it rather than to whatever `:latest` points at by the
-time the server gets round to pulling. Rolling back is therefore a tag:
+characters, and a deploy is always pinned to one of those tags rather than to whatever
+`:latest` points at by the time the server gets round to pulling.
+
+## Releasing and rolling back
+
+A push **never deploys**. It runs the checks and, on `main`, publishes the image; putting
+it into production is a separate, deliberate step, because a release can carry a
+migration and the moment for that is chosen, not inherited from a `git push`.
+
+To release: GitHub → Actions → **Deploy** → Run workflow, on `main`, with the commit's sha.
+The workflow refuses unless the commit is on `main`, its CI run on `main` succeeded
+(backend, frontend, image smoke test *and* e2e — the image itself is published before e2e
+finishes, so its presence alone proves less), and `gutschwein:<first 12 of the sha>` is in
+the registry. Then it asks the server for exactly that tag, through the deploy key, whose
+forced command (`/root/deploy.sh`) can do nothing else. Two runs of the workflow never
+overlap: a second waits for the first, and a third replaces the waiting second. The
+break-glass path below is not part of that queue — do not use it while a run is going.
+
+To roll back: the same workflow with the earlier commit. Images `main` produced stay in the
+registry (nothing deletes them unless the package settings are told to), so an old one
+needs no rebuild. **If a migration lies between the
+two commits, take the schema back first**, with the newer image and the app stopped — an
+older image refuses to start on a database newer than itself:
 
 ```bash
-ssh root@your-server "deploy <older-sha>"      # the same path CI uses
+cd /root/sparschwein                                   # the deployment directory
+docker compose stop app
+docker compose run --rm app alembic downgrade <revision the older commit expects>
+```
+
+then run **Deploy** with the older commit.
+
+What a rollback swaps is the **image only**. `deploy.sh` always resets the server's
+checkout to the current `main` first, whatever tag it was given, so `docker-compose.yml`
+and every other file there come from today's `main` while the container runs the older
+image. That is harmless while `docker-compose.yml` and `.env` mean the same thing to both
+versions — check that before rolling back across a change to either.
+
+From the server itself, without GitHub (the break-glass path — it skips the CI check):
+
+```bash
+ssh root@your-server "deploy <12-char sha>"    # what the workflow sends
 ssh root@your-server dry-run                   # what is running, with its digest
 ```
 
@@ -147,9 +183,9 @@ The sync path is pinned to the Makefile's own directory, so it can be run from a
 `data/` is excluded, and rsync never deletes excluded paths. Machine-specific values live
 in `.make.local` (gitignored) — copy the three defaults out of the Makefile.
 
-Pushing to `main` deploys through GitHub Actions instead, which is the safer route: CI
-would have caught the missing dependency that once put production into a crash loop, and
-`make deploy-vps` skips it.
+The **Deploy** workflow is the safer route: it only deploys what CI built and passed —
+CI would have caught the missing dependency that once put production into a crash loop,
+and `make deploy-vps` skips it.
 
 ## Re-reading the barcodes
 
