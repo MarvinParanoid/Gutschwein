@@ -115,7 +115,9 @@ old_cid=""
 old_id=""
 snapshot=""
 STAGE=""
-# shellcheck disable=SC2329  # invoked through the EXIT trap
+# Invoked through the EXIT trap. Older shellcheck (0.9, 0.10 — CI's Ubuntu) calls that
+# SC2317 "unreachable", newer (0.11) SC2329 "never invoked"; both are wrong here.
+# shellcheck disable=SC2317,SC2329
 cleanup() {
     status=$?
     trap - EXIT
@@ -326,7 +328,9 @@ docker images --format '{{.CreatedAt}}|{{.Tag}}' "$IMAGE" |
     grep -v -e '|latest$' -e '|previous$' -e "|$GUTSCHWEIN_TAG\$" |
     sort -r | tail -n +3 | cut -d"|" -f2 |
     while read -r old; do
-        [ -n "$old" ] && docker rmi "$IMAGE:$old" >/dev/null 2>&1 || true
+        if [ -n "$old" ]; then
+            docker rmi "$IMAGE:$old" >/dev/null 2>&1 || true  # in use or gone: keep going
+        fi
     done
 if [ -n "$old_id" ] && ! docker image inspect "$IMAGE:previous" >/dev/null 2>&1; then
     say "ВНИМАНИЕ: :previous пропал после очистки — откатываться будет не на что без сети"
