@@ -249,3 +249,109 @@ def test_a_new_picture_with_a_barcode_still_sets_its_format(client: TestClient) 
     updated = client.patch(f"/api/vouchers/{card['id']}", json={"image_id": image_id}).json()
 
     assert updated["barcode_format"] == "Code 128"
+
+
+# --- who may see a hand-typed card's bars -----------------------------------------------------
+#
+# One household per server (no groups, by design): "isolation" is members against
+# everyone else. The bars are the card's code, so they get exactly the card's check,
+# and every refusal carries the reason the client purges its caches on.
+
+
+@pytest.fixture
+def telegram_household(monkeypatch):
+    from app.config import settings
+    from tests.test_auth import TOKEN
+
+    monkeypatch.setattr(settings, "bot_token", TOKEN)
+    monkeypatch.setattr(settings, "allowed_telegram_ids", "151724313")
+
+
+@pytest.fixture
+def stranger_browser(client: TestClient):
+    with TestClient(client.app, base_url=str(client.base_url)) as plain:
+        yield plain
+
+
+def _barcode_path(client: TestClient) -> str:
+    card = _create(client, code="HOUSEHOLD-ONLY-1", barcode_format="Code 128")
+    return f"/api/vouchers/{card['id']}/barcode?v={card['barcode_version']}"
+
+
+def test_a_member_of_the_household_gets_the_bars(
+    client: TestClient, stranger_browser: TestClient, telegram_household
+) -> None:
+    from tests.test_auth import base_fields, sign
+
+    path = _barcode_path(client)
+    answer = stranger_browser.get(path, headers={"Authorization": f"tma {sign(base_fields())}"})
+    assert answer.status_code == 200
+
+
+def test_someone_outside_the_household_is_refused_and_told_why(
+    client: TestClient, stranger_browser: TestClient, telegram_household
+) -> None:
+    from tests.test_auth import base_fields, sign
+
+    path = _barcode_path(client)
+    outsider = sign(base_fields(user='{"id": 4242, "first_name": "Fremd"}'))
+
+    refused = stranger_browser.get(path, headers={"Authorization": f"tma {outsider}"})
+
+    assert refused.status_code == 403
+    assert refused.headers["x-auth-failure"] == "membership"
+    assert "svg" not in refused.text
+
+
+def test_without_credentials_the_device_is_told_it_is_out(
+    client: TestClient, stranger_browser: TestClient
+) -> None:
+    refused = stranger_browser.get(_barcode_path(client))
+
+    assert refused.status_code == 401
+    assert refused.headers["x-auth-failure"] == "signed-out"
+
+
+def test_a_member_whose_access_was_revoked_loses_the_bars(
+    client: TestClient, stranger_browser: TestClient, telegram_household
+) -> None:
+    import asyncio
+
+    from app.models import User, utcnow
+    from app.sessions import issue_login_token
+
+    async def signed_in_member() -> int:
+        async with SessionLocal() as db:
+            member = User(first_name="Bald weg", console_root=True)
+            db.add(member)
+            await db.flush()
+            token = await issue_login_token(db, member)
+            await db.commit()
+            return member.id, token
+
+    member_id, token = asyncio.run(signed_in_member())
+    assert stranger_browser.post("/api/auth/login", json={"token": token}).status_code == 200
+    path = _barcode_path(client)
+    assert stranger_browser.get(path).status_code == 200
+
+    async def revoke() -> None:
+        async with SessionLocal() as db:
+            await db.execute(update(User).where(User.id == member_id).values(revoked_at=utcnow()))
+            await db.commit()
+
+    asyncio.run(revoke())
+    refused = stranger_browser.get(path)
+
+    assert refused.status_code == 403
+    assert refused.headers["x-auth-failure"] == "membership"
+
+
+def test_the_capability_route_cannot_be_used_to_reach_a_hand_typed_card(
+    client: TestClient, stranger_browser: TestClient
+) -> None:
+    """A card without a picture has no /api/barcodes address at all: neither its id
+    nor its version is a name that route answers to."""
+    card = _create(client, code="NO-CAPABILITY-1", barcode_format="Code 128")
+
+    for guess in (str(card["id"]), card["barcode_version"], f"{card['id']}.svg"):
+        assert stranger_browser.get(f"/api/barcodes/{guess}").status_code == 404
