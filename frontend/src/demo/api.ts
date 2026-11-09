@@ -9,6 +9,7 @@
  */
 
 import type { ApiClient } from "../api";
+import { barcodeProblem } from "../barcodeFormats";
 import { trimAmount } from "../format";
 import { t } from "../i18n";
 import type {
@@ -21,6 +22,7 @@ import type {
   VoucherEvent,
   VoucherStatus,
 } from "../types";
+import { demoBarcodeSvg } from "./assets";
 import { blankVoucher, createSeed, PARTNER, YOU, type DemoState } from "./seed";
 
 const MONTHS_BACK = 6;
@@ -76,7 +78,9 @@ function fail(message: string): never {
  */
 function derive(voucher: Voucher): Voucher {
   const barcode_version =
-    voucher.code && voucher.barcode_format ? `demo:${voucher.code}` : null;
+    voucher.code && voucher.barcode_format
+      ? `demo:${voucher.barcode_format}:${voucher.code}`
+      : null;
   if (!voucher.valid_until)
     return { ...voucher, barcode_version, days_left: null, is_expired: false };
   const left = Math.round(
@@ -266,8 +270,13 @@ export function createDemoApi(): ApiClient {
 
     createVoucher: async (draft: VoucherDraft) => {
       const { status = "active", ...fields } = draft;
+      // The server's check, in the same words; no picture is decoded here, so a
+      // format left out simply means none.
+      const problem = barcodeProblem(fields.code, fields.barcode_format);
+      if (problem) fail(problem);
       const voucher = blankVoucher(state.nextId++, {
         ...fields,
+        barcode_format: fields.barcode_format || null,
         status,
         created_at: now(),
         updated_at: now(),
@@ -295,6 +304,8 @@ export function createDemoApi(): ApiClient {
       const voucher = find(id);
       const changed: string[] = [];
       const previousValue = voucher.value_amount;
+      // Refused means unchanged, as on the server.
+      const before = { ...voucher };
 
       for (const [field, value] of Object.entries(patch) as [
         keyof VoucherDraft,
@@ -304,6 +315,13 @@ export function createDemoApi(): ApiClient {
         if (voucher[field as keyof Voucher] !== value) {
           Object.assign(voucher, { [field]: value });
           changed.push(field);
+        }
+      }
+      if (changed.includes("code") || changed.includes("barcode_format")) {
+        const problem = barcodeProblem(voucher.code, voucher.barcode_format);
+        if (problem) {
+          Object.assign(voucher, before);
+          fail(problem);
         }
       }
       // Correcting the face value of an untouched card moves the balance with it.
@@ -450,6 +468,12 @@ export function createDemoApi(): ApiClient {
       find(voucherId).comments_count = state.comments.filter(
         (c) => c.voucher_id === voucherId,
       ).length;
+    },
+
+    cardBarcode: async (id) => {
+      const voucher = find(id);
+      if (!voucher.code || !voucher.barcode_format) fail(t.scan.noBarcode);
+      return { format: voucher.barcode_format, svg: demoBarcodeSvg(voucher.code) };
     },
 
     events: async (id) =>

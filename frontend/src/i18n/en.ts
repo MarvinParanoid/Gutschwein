@@ -35,6 +35,7 @@ export const en: Dictionary = {
   },
 
   list: {
+    till: 'Show at the till',
     search: 'Search: shop, note…',
     all: 'All',
     menu: 'Menu',
@@ -82,6 +83,7 @@ export const en: Dictionary = {
     copy: 'copy',
     copied: 'copied',
     copyFailed: 'Could not copy — select the code by hand.',
+    showAtTill: '▮▮ Show at the till',
     deleteConfirm: 'Delete this card along with its photo and history?',
   },
 
@@ -128,6 +130,27 @@ export const en: Dictionary = {
     hintBarcode:
       'Redrawn from the card — sharp at any zoom. Not scanning? Switch to the photo',
     offline: 'Offline: this is the card as it was last loaded',
+    balance: 'Balance',
+    copy: 'Copy',
+    copied: 'Copied ✓',
+    noBarcode: 'No barcode — show the cashier the number or read it out',
+    drawFailed: 'The barcode could not be drawn — show the cashier the number',
+    drawing: 'Drawing the barcode…',
+    hintTyped: 'Drawn from the card’s code — sharp at any zoom. Not scanning? Show the cashier the number',
+  },
+
+  barcode: {
+    label: 'Barcode',
+    auto: 'As in the photo',
+    none: 'None — number only',
+    fromPicture: (format: string) => `${format} (from the photo)`,
+    hint: 'The type printed on the card, usually Code 128 or EAN-13. It draws the barcode for the till',
+    digits: (format: string, count: number) => `${format}: exactly ${count} digits are needed`,
+    checkDigit: (format: string, digit: number) =>
+      `${format}: wrong check digit — the last one should be ${digit}. Check the code`,
+    itf: 'ITF: digits only, and an even number of them',
+    code39: 'Code 39: only capital A–Z, digits, space and - . $ / + %',
+    code128: 'Code 128: Latin letters, digits and plain symbols only — no accents or Cyrillic',
   },
 
   comments: {

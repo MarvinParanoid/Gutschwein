@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 
 import { api } from '../api'
 import MerchantMark from '../components/MerchantMark'
+import ScanOverlay from '../components/voucher/ScanOverlay'
 import {
   STATUS_TABS,
+  canShowAtTill,
   cardSubtitle,
   cardTitle,
   expiryInfo,
@@ -65,6 +67,8 @@ export default function ListPage({
   const [menuOpen, setMenuOpen] = useState(false)
   const [counts, setCounts] = useState<Counts | null>(null)
   const [shops, setShops] = useState<MerchantStat[]>([])
+  // The card shown at the till straight from the list, without opening it first.
+  const [atTill, setAtTill] = useState<Voucher | null>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 250)
@@ -246,10 +250,16 @@ export default function ListPage({
                 haptic()
                 onOpen(voucher.id)
               }}
+              onTill={() => {
+                haptic()
+                setAtTill(voucher)
+              }}
             />
           ))}
         </div>
       )}
+
+      {atTill && <ScanOverlay voucher={atTill} onClose={() => setAtTill(null)} />}
 
       <button className="fab" onClick={onCreate} aria-label={t.list.add}>
         +
@@ -357,7 +367,47 @@ function TabMenu({
   )
 }
 
-function VoucherCard({ voucher, onClick }: { voucher: Voucher; onClick: () => void }) {
+function VoucherCard({
+  voucher,
+  onClick,
+  onTill,
+}: {
+  voucher: Voucher
+  onClick: () => void
+  onTill: () => void
+}) {
+  const till = canShowAtTill(voucher)
+  return (
+    <div className={`card-row ${till ? 'with-till' : ''}`}>
+      <CardFace voucher={voucher} onClick={onClick} />
+      {/* A sibling, not a child: a button inside the card's button is invalid HTML
+          and a tap on it would open the card as well. */}
+      {till && (
+        <button
+          className="card-till"
+          onClick={onTill}
+          aria-label={t.list.till}
+          title={t.list.till}
+        >
+          <BarcodeGlyph />
+        </button>
+      )}
+    </div>
+  )
+}
+
+function BarcodeGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M3 5h2v14H3zM6.5 5h1v14h-1zM9 5h2.5v14H9zM13 5h1v14h-1zM15.5 5h2v14h-2zM19 5h1v14h-1zM21 5h1v14h-1z"
+      />
+    </svg>
+  )
+}
+
+function CardFace({ voucher, onClick }: { voucher: Voucher; onClick: () => void }) {
   const expiry = expiryInfo(voucher)
   const value = primaryAmount(voucher)
   const subtitle = cardSubtitle(voucher)

@@ -26,7 +26,10 @@ export interface Voucher {
   conditions: string
   notes: string
   image_id: string | null
-  /** Symbology decoded from the picture; null when there is no readable code. */
+  /**
+   * Symbology the code is drawn in: decoded from the picture, or chosen by hand for
+   * a code typed in. Null when there is no barcode.
+   */
   barcode_format: string | null
   /**
    * Goes into the barcode's address (`?v=`), so a corrected code is a new address
@@ -48,6 +51,12 @@ export interface Voucher {
   comments_count: number
 }
 
+/** A barcode drawn for a card with no picture (GET /api/vouchers/{id}/barcode). */
+export interface DrawnBarcode {
+  format: string
+  svg: string
+}
+
 export interface VoucherDraft {
   merchant: string
   title: string
@@ -60,6 +69,11 @@ export interface VoucherDraft {
   conditions: string
   notes: string
   image_id: string | null
+  /**
+   * Left out, the picture decides (and an edit leaves the format as it is); null
+   * means no barcode, just the number.
+   */
+  barcode_format?: string | null
   status?: VoucherStatus
   /** Only ever sent on its own, from the toggle on the card. */
   balance_uncertain?: boolean

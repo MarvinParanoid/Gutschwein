@@ -65,12 +65,17 @@ function bars(code: string, height: number, unit: number): { svg: string; width:
  */
 export function demoBarcode(code: string): string {
   if (!code) return ''
+  return dataUri(demoBarcodeSvg(code))
+}
+
+/** The same drawing as markup, for the card that has no picture to hang it on. */
+export function demoBarcodeSvg(code: string): string {
   const { svg, width } = bars(code, 90, 3)
-  return dataUri(
+  return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} 120" width="${width}" height="120">` +
-      `<rect width="100%" height="100%" fill="#ffffff"/><g fill="#000000">${svg}</g>` +
-      `<text x="${width / 2}" y="113" text-anchor="middle" font-family="monospace" font-size="16"` +
-      ` letter-spacing="2">${escapeXml(code)}</text></svg>`,
+    `<rect width="100%" height="100%" fill="#ffffff"/><g fill="#000000">${svg}</g>` +
+    `<text x="${width / 2}" y="113" text-anchor="middle" font-family="monospace" font-size="16"` +
+    ` letter-spacing="2">${escapeXml(code)}</text></svg>`
   )
 }
 

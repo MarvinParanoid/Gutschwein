@@ -38,6 +38,7 @@ export const de: Dictionary = {
   },
 
   list: {
+    till: 'An der Kasse zeigen',
     search: 'Suche: Laden, Notiz…',
     all: 'Alle',
     menu: 'Menü',
@@ -85,6 +86,7 @@ export const de: Dictionary = {
     copy: 'kopieren',
     copied: 'kopiert',
     copyFailed: 'Kopieren hat nicht geklappt — markiere den Code von Hand.',
+    showAtTill: '▮▮ An der Kasse zeigen',
     deleteConfirm: 'Karte mitsamt Foto und Historie löschen?',
   },
 
@@ -131,6 +133,27 @@ export const de: Dictionary = {
     hintBarcode:
       'Aus der Karte neu gezeichnet — scharf bei jedem Zoom. Wird nicht gelesen? Wechsle aufs Foto',
     offline: 'Offline: die Karte so, wie sie zuletzt geladen wurde',
+    balance: 'Guthaben',
+    copy: 'Kopieren',
+    copied: 'Kopiert ✓',
+    noBarcode: 'Kein Barcode — zeig der Kasse die Nummer oder lies sie vor',
+    drawFailed: 'Der Barcode ließ sich nicht zeichnen — zeig der Kasse die Nummer',
+    drawing: 'Barcode wird gezeichnet…',
+    hintTyped: 'Aus dem Code der Karte gezeichnet — scharf bei jedem Zoom. Wird nicht gelesen? Zeig der Kasse die Nummer',
+  },
+
+  barcode: {
+    label: 'Barcode',
+    auto: 'Wie auf dem Foto',
+    none: 'Keiner — nur die Nummer',
+    fromPicture: (format: string) => `${format} (vom Foto)`,
+    hint: 'Der Typ auf der Karte, meist Code 128 oder EAN-13. Daraus wird der Barcode für die Kasse',
+    digits: (format: string, count: number) => `${format}: es braucht genau ${count} Ziffern`,
+    checkDigit: (format: string, digit: number) =>
+      `${format}: falsche Prüfziffer — die letzte müsste ${digit} sein. Prüf den Code`,
+    itf: 'ITF: nur Ziffern, und eine gerade Anzahl davon',
+    code39: 'Code 39: nur große A–Z, Ziffern, Leerzeichen und - . $ / + %',
+    code128: 'Code 128: nur lateinische Buchstaben, Ziffern und einfache Zeichen — ohne Umlaute',
   },
 
   comments: {

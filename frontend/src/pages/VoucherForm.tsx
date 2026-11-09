@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { api, imageUrl } from '../api'
+import { barcodeProblem, MANUAL_FORMATS } from '../barcodeFormats'
 import { trimAmount } from '../format'
 import { t } from '../i18n'
 import { alertMessage, haptic, inTelegram } from '../telegram'
@@ -31,6 +32,10 @@ const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'PLN', 'CZK', 'SEK', 'DKK', 'NOK
 const pick = (options: readonly string[]) =>
   options[Math.floor(Math.random() * options.length)]
 
+// Select values for the two choices that are not a symbology.
+const AUTO = '__auto'
+const NONE = ''
+
 const EMPTY: VoucherDraft = {
   merchant: '',
   title: '',
@@ -59,6 +64,10 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The code and format as loaded, so a card is judged only once someone changes
+  // them — as the server does. A picture's format beside a hand-typed code has
+  // always been allowed to stand.
+  const loaded = useRef<{ code: string; format: string | null } | null>(null)
 
   useEffect(() => {
     api.merchants().then(setMerchants).catch(() => undefined)
@@ -92,7 +101,9 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
           conditions: voucher.conditions,
           notes: voucher.notes,
           image_id: voucher.image_id,
+          barcode_format: voucher.barcode_format,
         })
+        loaded.current = { code: voucher.code, format: voucher.barcode_format }
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
@@ -142,6 +153,21 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
   if (loading) return <div className="spinner" />
 
   const showAmount = draft.value_kind !== 'other'
+
+  // Untouched on a new card, the format is left to the picture; on an edit it is
+  // whatever the card has. A format only a picture produced is offered as it is.
+  const formatValue =
+    draft.barcode_format === undefined ? AUTO : (draft.barcode_format ?? NONE)
+  const extraFormat =
+    draft.barcode_format && !(MANUAL_FORMATS as readonly string[]).includes(draft.barcode_format)
+      ? draft.barcode_format
+      : null
+  const barcodeChanged =
+    !loaded.current ||
+    loaded.current.code !== draft.code ||
+    loaded.current.format !== (draft.barcode_format ?? null)
+  const codeProblem = barcodeChanged ? barcodeProblem(draft.code, draft.barcode_format) : null
+  const digitsOnly = ['EAN-13', 'EAN-8', 'UPC-A', 'ITF'].includes(draft.barcode_format ?? '')
 
   return (
     <>
@@ -284,8 +310,53 @@ export default function VoucherForm({ voucherId, onCancel, onSaved }: Props) {
                 id="code"
                 value={draft.code}
                 placeholder={t.form.codePlaceholder}
+                inputMode={digitsOnly ? 'numeric' : undefined}
+                autoCapitalize={draft.barcode_format === 'Code 39' ? 'characters' : 'off'}
+                autoComplete="off"
+                spellCheck={false}
+                aria-invalid={Boolean(codeProblem)}
+                aria-describedby="code-problem"
                 onChange={(e) => set('code', e.target.value)}
               />
+            </div>
+
+            <div className="field">
+              <label htmlFor="barcode-format">{t.barcode.label}</label>
+              <select
+                id="barcode-format"
+                value={formatValue}
+                onChange={(e) =>
+                  set(
+                    'barcode_format',
+                    e.target.value === AUTO
+                      ? undefined
+                      : e.target.value === NONE
+                        ? null
+                        : e.target.value,
+                  )
+                }
+              >
+                {/* Only a new card can leave it to the picture: an edit that
+                    replaces the picture without touching this does that anyway. */}
+                {!voucherId && draft.image_id && <option value={AUTO}>{t.barcode.auto}</option>}
+                {!voucherId && !draft.image_id && <option value={AUTO}>{t.barcode.none}</option>}
+                {(voucherId || draft.image_id) && <option value={NONE}>{t.barcode.none}</option>}
+                {extraFormat && (
+                  <option value={extraFormat}>{t.barcode.fromPicture(extraFormat)}</option>
+                )}
+                {MANUAL_FORMATS.map((format) => (
+                  <option key={format} value={format}>
+                    {format}
+                  </option>
+                ))}
+              </select>
+              {codeProblem ? (
+                <p className="field-error" id="code-problem" role="alert">
+                  {codeProblem}
+                </p>
+              ) : (
+                <p className="field-hint">{t.barcode.hint}</p>
+              )}
             </div>
 
             <div className="field-row">

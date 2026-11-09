@@ -354,6 +354,35 @@ body.scrolled .topbar {
   transform: scale(0.99);
 }
 
+/* The card and, beside it, its till button: two tap targets, one row. */
+.card-row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.card-row > .card {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Wide enough for a thumb at the till, narrow enough that a 360 px screen keeps
+   the shop name readable beside it. */
+.card-till {
+  flex: 0 0 48px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--accent-ink);
+  padding: 0;
+}
+
+.card-till:active {
+  transform: scale(0.95);
+}
+
 .card .thumb {
   width: 56px;
   height: 56px;
@@ -675,17 +704,90 @@ body.scrolled .topbar {
   font-size: 14px;
 }
 
+/* Which card and how much is on it: what the cashier asks before scanning. */
+.scan-head {
+  width: 100%;
+  text-align: center;
+  /* Clear of the notch and the Telegram header. */
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.scan-merchant {
+  font-size: 22px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-amount {
+  font-size: 17px;
+  color: #374151;
+}
+
+.scan-amount-label {
+  color: #6b7280;
+}
+
+/* No picture and no bars: the space the code would take, so the number sits in
+   the middle of the screen rather than at the top. */
+.scan-empty {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.scan-empty .scan-code {
+  color: #000000;
+}
+
+.scan-code-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
 .scan-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 20px;
-  letter-spacing: 0.08em;
-  word-break: break-all;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-align: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: 0.5em;
+  word-break: break-all;
+  user-select: text;
+}
+
+/* Read aloud or typed in by the cashier: as large as a phone allows. */
+.scan-code.large {
+  font-size: clamp(28px, 9vw, 40px);
+}
+
+.scan .scan-copy {
+  background: #eceff3;
+  color: #000000;
+  padding: 6px 14px;
+  font-size: 14px;
 }
 
 .scan-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .scan-actions .btn {
@@ -703,6 +805,16 @@ body.scrolled .topbar {
   color: #6b7280;
   text-align: center;
   margin: 0;
+}
+
+/* The till, for a card that has no picture to tap. */
+.btn.till-button {
+  width: 100%;
+  margin-bottom: 10px;
+  background: var(--bg);
+  color: var(--accent-ink);
+  font-weight: 600;
+  padding: 14px;
 }
 
 .hero-button {
@@ -762,6 +874,12 @@ body.scrolled .topbar {
   font-size: 17px;
   letter-spacing: 0.06em;
   word-break: break-all;
+}
+
+/* The code may wrap; the button beside it must not ("копирова-ть"). */
+.code .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .actions {
@@ -1046,6 +1164,24 @@ body.scrolled .topbar {
   padding: 12px;
   font: inherit;
   width: 100%;
+}
+
+.field-hint,
+.field-error {
+  margin: 0;
+  font-size: 12px;
+}
+
+.field-hint {
+  color: var(--hint);
+}
+
+.field-error {
+  color: var(--danger);
+}
+
+.field input[aria-invalid='true'] {
+  box-shadow: inset 0 0 0 1.5px var(--danger);
 }
 
 .field textarea {

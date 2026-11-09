@@ -79,14 +79,7 @@ export default function VoucherPage({ voucherId, me, onBack, onDeleted, onEdit }
 
   return (
     <>
-      {scanning && voucher.image_id && (
-        <ScanOverlay
-          imageId={voucher.image_id}
-          code={voucher.code}
-          barcodeVersion={voucher.barcode_version}
-          onClose={() => setScanning(false)}
-        />
-      )}
+      {scanning && <ScanOverlay voucher={voucher} onClose={() => setScanning(false)} />}
 
       <div className="topbar">
         {/* Telegram draws its own back button in the header; outside it we need one. */}
@@ -103,6 +96,12 @@ export default function VoucherPage({ voucherId, me, onBack, onDeleted, onEdit }
         <button className="hero-button" onClick={() => setScanning(true)}>
           <img className="hero" src={imageUrl(voucher.image_id)} alt="" />
           <span className="hero-hint">{t.card.scanHint}</span>
+        </button>
+      )}
+      {/* A card typed in by hand has no picture to tap, but still has a code to show. */}
+      {!voucher.image_id && voucher.code && (
+        <button className="btn till-button" onClick={() => setScanning(true)}>
+          {t.card.showAtTill}
         </button>
       )}
 

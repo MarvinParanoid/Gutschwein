@@ -31,6 +31,15 @@ export function money(amount: string, currency: string): string {
   return `${trimAmount(amount)} ${currency}`
 }
 
+/**
+ * Worth a till button: something to show (a picture or a code) on a card that can
+ * still be spent. A spent or archived card is one tap further, on its own page.
+ */
+export function canShowAtTill(voucher: Voucher): boolean {
+  const spendable = voucher.status === 'active' || voucher.status === 'draft'
+  return spendable && Boolean(voucher.image_id || voucher.code)
+}
+
 /** Headline figure for a card: what is left, falling back to the face value. */
 export function primaryAmount(voucher: Voucher): string {
   if (isGiftCard(voucher)) return money(voucher.balance_amount!, voucher.currency)

@@ -7,6 +7,7 @@ import { tg } from './telegram'
 import type {
   Comment,
   Counts,
+  DrawnBarcode,
   Invite,
   MerchantStat,
   Session,
@@ -152,6 +153,13 @@ const httpApi = {
 
   events: (id: number) => request<VoucherEvent[]>(`/api/vouchers/${id}/events`),
 
+  /**
+   * The bars for a card without a picture. Behind the card's own access check, so
+   * fetched with credentials rather than loaded by an <img> (see cardBarcodeSrc).
+   */
+  cardBarcode: (id: number, version: string) =>
+    request<DrawnBarcode>(`/api/vouchers/${id}/barcode?v=${encodeURIComponent(version)}`),
+
   uploadImage: async (file: File) => {
     const form = new FormData()
     form.append('file', file)
@@ -178,3 +186,7 @@ export const imageUrl = (imageId: string) =>
  */
 export const barcodeUrl = (imageId: string, code: string, version: string) =>
   isDemo() ? demoBarcode(code) : `/api/barcodes/${imageId}?v=${encodeURIComponent(version)}`
+
+/** An SVG document as something an <img> can show. */
+export const svgSource = (svg: string) =>
+  `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`

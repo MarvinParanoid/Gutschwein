@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { copyText } from '../../clipboard'
 import { expiryInfo, formatDate, isGiftCard, valueLabel } from '../../format'
 import { t } from '../../i18n'
 import { alertMessage, haptic } from '../../telegram'
@@ -80,12 +81,11 @@ function CodeBlock({ code }: { code: string }) {
   const [copied, setCopied] = useState(false)
 
   async function copy() {
-    try {
-      await navigator.clipboard.writeText(code)
+    if (await copyText(code)) {
       haptic('success')
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
-    } catch {
+    } else {
       alertMessage(t.card.copyFailed)
     }
   }

@@ -199,3 +199,55 @@ describe('"spent it all" and its undo', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 })
+
+describe('codes typed by hand', () => {
+  const card = {
+    merchant: 'Handkarte',
+    title: '',
+    value_kind: 'amount' as const,
+    value_amount: '20',
+    currency: 'EUR',
+    valid_from: null,
+    valid_until: null,
+    conditions: '',
+    notes: '',
+    image_id: null,
+  }
+
+  it('draws a card that has no picture, as the server does', async () => {
+    const created = await api.createVoucher({
+      ...card,
+      code: '4006381333931',
+      barcode_format: 'EAN-13',
+    })
+    expect(created.barcode_version).not.toBeNull()
+
+    const drawn = await api.cardBarcode(created.id, created.barcode_version!)
+    expect(drawn.format).toBe('EAN-13')
+    expect(drawn.svg).toContain('<svg')
+  })
+
+  it('refuses a wrong check digit in the server’s words, and stores nothing', async () => {
+    const before = (await api.listVouchers('all')).length
+    await expect(
+      api.createVoucher({ ...card, code: '4006381333932', barcode_format: 'EAN-13' }),
+    ).rejects.toThrow('1')
+    expect((await api.listVouchers('all')).length).toBe(before)
+  })
+
+  it('leaves the card as it was when an edit is refused', async () => {
+    const created = await api.createVoucher({
+      ...card,
+      code: '4006381333931',
+      barcode_format: 'EAN-13',
+    })
+    await expect(api.updateVoucher(created.id, { code: '12345' })).rejects.toThrow()
+    expect((await api.getVoucher(created.id)).code).toBe('4006381333931')
+  })
+
+  it('a code without a format is just a number', async () => {
+    const created = await api.createVoucher({ ...card, code: 'JUST-TEXT' })
+    expect(created.barcode_format).toBeNull()
+    expect(created.barcode_version).toBeNull()
+  })
+})
