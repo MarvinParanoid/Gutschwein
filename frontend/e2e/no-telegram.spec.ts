@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 import { ru } from '../src/i18n/ru'
 import { createCard, openCard, uniqueMerchant } from './helpers'

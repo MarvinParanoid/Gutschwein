@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 import {
   CARD_NUMBER,
@@ -34,7 +34,10 @@ test('a corrected code replaces the cached barcode, online and offline', async (
   const shown = await shownImage(page)
   const addressA = new URL((await shown.getAttribute('src'))!, page.url())
   expect(addressA.pathname).toBe(`/api/barcodes/${card.imageId}`)
-  expect(addressA.searchParams.get('v')).toMatch(/^[0-9a-f]{8}$/)
+  // The server's version of the card (SHA-256), copied as is into the address.
+  const before = await (await request.get(`/api/vouchers/${card.id}`)).json()
+  expect(before.barcode_version).toMatch(/^[0-9a-f]{64}$/)
+  expect(addressA.searchParams.get('v')).toBe(before.barcode_version)
   await expect(page.locator('.scan-code')).toHaveText(CARD_NUMBER)
   expect(await cachedUrls(page, 'gutschwein-barcodes')).toEqual([addressA.href])
   const barsA = await (await request.get(addressA.pathname + addressA.search)).text()
@@ -52,6 +55,7 @@ test('a corrected code replaces the cached barcode, online and offline', async (
   const addressB = new URL((await page.locator('.scan-image').getAttribute('src'))!, page.url())
   expect(addressB.pathname).toBe(addressA.pathname)
   expect(addressB.search).not.toBe(addressA.search)
+  expect(addressB.searchParams.get('v')).toBe((await patched.json()).barcode_version)
   await expect(page.locator('.scan-code')).toHaveText(CORRECTED)
 
   // What the worker stored under B is B's bars, not A's.

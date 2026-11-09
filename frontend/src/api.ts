@@ -1,4 +1,3 @@
-import { barcodeVersion } from './barcode'
 import { createDemoApi } from './demo/api'
 import { demoBarcode, demoImage } from './demo/assets'
 import { isDemo } from './demo/session'
@@ -29,14 +28,25 @@ export class ApiError extends Error {
 }
 
 /**
- * This device is not (or no longer) let in: signed out elsewhere, session expired,
- * membership ended. Whatever the worker cached while it was let in goes now, not
- * whenever it ages out — otherwise a revoked phone keeps every card it has seen
- * for offline use. 403 counts only on a read: on a write it may be the CSRF check
- * (app/csrf.py) refusing one request, which says nothing about the device.
+ * Answers that mean this device is out, as the server names them in the
+ * `X-Auth-Failure` header (app/auth.py). Whatever the worker cached while it was
+ * let in goes now, not whenever it ages out, and the screen stops showing it.
+ *
+ * Deliberately not on the list:
+ * - `telegram-auth`: Telegram's initData expired or failed. The member is still a
+ *   member and reopening the Mini App fixes it, so the offline copy stays.
+ * - an answer without the header: the CSRF check, "not your comment", a proxy, a
+ *   server from before the header. Nothing there says the device has lost access.
  */
-function lostAccess(status: number, method: string): boolean {
-  return status === 401 || (status === 403 && method === 'GET')
+const ACCESS_LOST = new Set(['session-ended', 'signed-out', 'membership'])
+
+type AccessLostListener = (message: string) => void
+const accessLostListeners = new Set<AccessLostListener>()
+
+/** Called when the server says this device is out; returns the unsubscribe. */
+export function onAccessLost(listener: AccessLostListener): () => void {
+  accessLostListeners.add(listener)
+  return () => accessLostListeners.delete(listener)
 }
 
 /** The server answers errors in this language; it matches what the UI shows. */
@@ -67,9 +77,6 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   })
 
   if (!response.ok) {
-    if (lostAccess(response.status, (init.method ?? 'GET').toUpperCase())) {
-      void purgeSensitiveCaches().catch(() => undefined)
-    }
     let detail = t.app.genericError(response.status)
     try {
       const body = await response.json()
@@ -77,6 +84,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       else if (Array.isArray(body.detail)) detail = body.detail[0]?.msg ?? detail
     } catch {
       // non-JSON error body: keep the status text
+    }
+    if (ACCESS_LOST.has(response.headers.get('X-Auth-Failure') ?? '')) {
+      void purgeSensitiveCaches().catch(() => undefined)
+      for (const listener of accessLostListeners) listener(detail)
     }
     throw new ApiError(detail, response.status)
   }
@@ -162,9 +173,8 @@ export const imageUrl = (imageId: string) =>
   isDemo() ? demoImage(imageId) : `/api/images/${imageId}`
 /**
  * Barcode redrawn from the decoded code — sharp at any zoom, unlike the screenshot.
- * Versioned by what it is drawn from, so a corrected code is a new address (T5).
+ * The server's version of what it is drawn from goes into the address, so a
+ * corrected code is a new address (T5).
  */
-export const barcodeUrl = (imageId: string, code: string, format: string) =>
-  isDemo()
-    ? demoBarcode(code)
-    : `/api/barcodes/${imageId}?v=${barcodeVersion(code, format)}`
+export const barcodeUrl = (imageId: string, code: string, version: string) =>
+  isDemo() ? demoBarcode(code) : `/api/barcodes/${imageId}?v=${encodeURIComponent(version)}`

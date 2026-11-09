@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 test('the app is installable: manifest, icons and service worker are served', async ({
   page,
@@ -23,6 +23,26 @@ test('the app is installable: manifest, icons and service worker are served', as
   expect(sw.status()).toBe(200)
 })
 
+test('a browser context opened by hand carries no credentials', async ({ browser, page }) => {
+  // The guard for every test below that opens a "plain browser": if the dev
+  // member's header leaked into it, a sign-in test would pass without its cookie
+  // doing anything (see e2e/fixtures.ts).
+  const plain = await browser.newContext()
+  const probe = await plain.newPage()
+  await probe.goto('/')
+  const answer = await probe.evaluate(async () => {
+    const response = await fetch('/api/me')
+    return { status: response.status, reason: response.headers.get('X-Auth-Failure') }
+  })
+  expect(answer).toEqual({ status: 401, reason: 'signed-out' })
+  expect((await plain.request.get('/api/me')).status()).toBe(401)
+  await plain.close()
+
+  // …while the test's own page is the dev member, as the rest of the suite needs.
+  await page.goto('/')
+  expect(await page.evaluate(async () => (await fetch('/api/me')).status)).toBe(200)
+})
+
 test('the login link from the bot opens a working session in a plain browser', async ({
   browser,
   request,
@@ -35,7 +55,8 @@ test('the login link from the bot opens a working session in a plain browser', a
 
   await page.goto(`/login#${token}`)
 
-  // The list loads, which means /api/me answered — the cookie is doing the work.
+  // The list loads, which means /api/me answered — the cookie is doing the work,
+  // since this context has no dev header (checked above).
   await expect(page.locator('.topbar h1')).toBeVisible()
   // And the one-time token is gone from the address bar.
   expect(new URL(page.url()).pathname).toBe('/')

@@ -58,6 +58,7 @@ export function blankVoucher(id: number, fields: Partial<Voucher> = {}): Voucher
     notes: '',
     image_id: null,
     barcode_format: null,
+    barcode_version: null,
     expiry_estimated: false,
     balance_uncertain: false,
     is_expired: false,

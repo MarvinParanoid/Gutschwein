@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 
-// A visitor following the demo link has no account and no dev header. Dropping
-// it here is the point of the spec: whatever the demo does, it does alone.
-test.use({ extraHTTPHeaders: {} })
+// A visitor following the demo link has no account and no dev header: this spec
+// uses Playwright's own `test`, not ./fixtures, so its page has no credentials.
+// That is the point of it — whatever the demo does, it does alone.
 
 /** Every request the page makes to the backend API, in order. */
 function watchApi(page: import('@playwright/test').Page): string[] {

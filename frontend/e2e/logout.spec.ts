@@ -1,4 +1,6 @@
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
+
+import { expect, test } from './fixtures'
 
 import {
   cacheNames,
@@ -73,7 +75,7 @@ test('signing out ends the session and leaves no card data on the device', async
   // What a browser cannot take back: the picture's address is a capability, not
   // a session. Whoever kept the URL can still open it — deleting caches does not
   // revoke it (docs/internals.md, "What signing out does not do").
-  const anonymous = await browser.newContext({ extraHTTPHeaders: {} })
+  const anonymous = await browser.newContext()
   expect((await anonymous.request.get(`/api/images/${card.imageId}`)).status()).toBe(200)
   await anonymous.close()
 
@@ -99,22 +101,27 @@ test('offline, signing out is refused rather than half done', async ({ browser, 
   await context.close()
 })
 
-test('a device signed out from elsewhere forgets its data on its next request', async ({
+test('a device signed out from elsewhere stops showing cards at its next request', async ({
   browser,
   request,
 }) => {
   const card = await cardWithBarcode(request, 'Logout-Remote')
   const { context, page } = await signedInWithWorker(browser, request)
   await useTheTill(page, card.merchant)
+  // The list is on screen, from a session that is about to end.
+  await expect(page.locator('.card', { hasText: card.merchant })).toBeVisible()
 
   // Another member signs this browser out from their Access screen.
   const sessions: { id: number }[] = await (await request.get('/api/auth/sessions')).json()
   const newest = Math.max(...sessions.map((s) => s.id))
   expect((await request.delete(`/api/auth/sessions/${newest}`)).status()).toBe(204)
 
-  await page.reload()
+  // No reload: the very next request is refused as "session-ended", and the
+  // screen goes to the door instead of keeping the list it already had.
+  await page.locator('.card', { hasText: card.merchant }).click()
 
   await expect(page.locator('.empty')).toContainText('Нужен вход')
+  await expect(page.getByText(card.merchant)).toHaveCount(0)
   await expect
     .poll(async () => (await cacheNames(page)).filter((name) => SENSITIVE.includes(name)))
     .toEqual([])
@@ -132,7 +139,6 @@ test('signing out also clears the HTTP cache that holds the pictures', async ({
   const context = await browser.newContext({
     serviceWorkers: 'block',
     locale: 'ru-RU',
-    extraHTTPHeaders: {},
   })
   const page = await context.newPage()
   await page.goto(`/login#${token}`)

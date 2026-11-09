@@ -25,9 +25,9 @@ export default defineConfig({
     // en-US would silently switch the whole suite to the English dictionary;
     // locale.spec.ts opts into each language explicitly.
     locale: 'ru-RU',
-    // The production bundle has no dev login of its own. The backend honours this
-    // header only when DEV_MODE is on, which is exactly the case here.
-    extraHTTPHeaders: { 'X-Dev-User': '1000' },
+    // No credentials here: `use` reaches every context, including those a test
+    // opens by hand to be a plain browser. The dev member's header is given to the
+    // test's own page and request client only, in e2e/fixtures.ts.
     viewport: { width: 420, height: 900 },
     trace: 'retain-on-failure',
     // The PWA service worker would serve cached responses mid-suite and make

@@ -17,8 +17,8 @@ test.skip(!process.env.RECORD, 'recording only: RECORD=1 make demo-gif')
 
 const t = process.env.RECORD_LANG === 'de' ? de : en
 
+// Playwright's own `test`, not ./fixtures: the demo needs no credentials.
 test.use({
-  extraHTTPHeaders: {},
   locale: t.locale,
   video: { mode: 'on', size: { width: 420, height: 900 } },
 })

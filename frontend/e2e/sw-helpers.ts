@@ -7,8 +7,8 @@ import { createCard, uniqueMerchant } from './helpers'
 /**
  * A real browser with the real service worker, signed in the way the PWA is: by
  * a login link and a cookie. The rest of the suite blocks the worker (see
- * playwright.config.ts) and authenticates with the dev header, which a worker's
- * own requests do not reliably carry.
+ * playwright.config.ts) and authenticates with the dev header (e2e/fixtures.ts),
+ * which a context opened here does not get.
  */
 export async function signedInWithWorker(browser: Browser, request: APIRequestContext) {
   const { token } = await (await request.post('/api/auth/dev-token')).json()
@@ -16,8 +16,6 @@ export async function signedInWithWorker(browser: Browser, request: APIRequestCo
     viewport: { width: 390, height: 844 },
     locale: 'ru-RU',
     serviceWorkers: 'allow',
-    // The config's dev header would let this browser in whatever its cookie says.
-    extraHTTPHeaders: {},
   })
   const page = await context.newPage()
   await page.goto(`/login#${token}`)

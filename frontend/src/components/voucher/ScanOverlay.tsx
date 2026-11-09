@@ -14,15 +14,16 @@ import ZoomableImage from '../ZoomableImage'
 export default function ScanOverlay({
   imageId,
   code,
-  barcodeFormat,
+  barcodeVersion,
   onClose,
 }: {
   imageId: string
   code: string
-  barcodeFormat: string | null
+  /** Null when there is nothing to redraw: no format decoded, or no code. */
+  barcodeVersion: string | null
   onClose: () => void
 }) {
-  const hasBarcode = Boolean(barcodeFormat)
+  const hasBarcode = Boolean(barcodeVersion)
   const online = useOnline()
   const [rotated, setRotated] = useState(false)
   // A redrawn barcode beats a screenshot of a screen — but only if the scanner
@@ -36,7 +37,7 @@ export default function ScanOverlay({
       <ZoomableImage
         key={showPhoto ? 'photo' : 'barcode'}
         className={`scan-image ${rotated ? 'rotated' : ''}`}
-        src={showPhoto ? imageUrl(imageId) : barcodeUrl(imageId, code, barcodeFormat ?? '')}
+        src={showPhoto ? imageUrl(imageId) : barcodeUrl(imageId, code, barcodeVersion ?? '')}
         alt={showPhoto ? t.scan.photoAlt : t.scan.barcodeAlt}
         rotated={rotated}
       />

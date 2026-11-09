@@ -28,6 +28,31 @@ from app.membership import membership
 from app.models import User, utcnow
 from app.sessions import resolve_session
 
+# Why a request was not let in, for the client to act on — the status code alone
+# cannot say it. A 401 is also an expired Telegram initData, which reopening the
+# Mini App fixes, and a 403 is also the CSRF check or "not your comment". Only the
+# reasons below say the device itself is out; the client forgets what it cached
+# for them and for nothing else (src/api.ts). No header means: not about access.
+AUTH_FAILURE = "X-Auth-Failure"
+# A session cookie came with the request, and no session answers to it: signed out
+# here or from another device, revoked with the member, or expired. Once expired
+# rows are swept (app.maintenance) the server cannot tell these apart, and it does
+# not need to: in every case only a new login link lets this browser back in.
+SESSION_ENDED = "session-ended"
+# No credentials at all: no cookie (the browser drops it at max-age, or it was
+# cleared) and no Telegram initData. A browser in this state is signed out.
+SIGNED_OUT = "signed-out"
+# Telegram's initData failed: expired after INIT_DATA_MAX_AGE, or malformed. The
+# member is still a member; reopening the Mini App issues fresh data. Recoverable,
+# so the device keeps its offline copy.
+TELEGRAM_AUTH = "telegram-auth"
+# The member is not let in: off the allowlist, a broken invitation chain, revoked.
+MEMBERSHIP = "membership"
+
+
+def _refused(status_code: int, detail: str, reason: str) -> HTTPException:
+    return HTTPException(status_code, detail, headers={AUTH_FAILURE: reason})
+
 
 class TelegramUser(dict):
     """The parsed `user` block from initData."""
@@ -90,7 +115,7 @@ async def check_allowed(session: AsyncSession, user: User) -> User:
         message = t("error.no_access", user.language, telegram_id=user.telegram_id)
     else:
         message = t(f"error.membership_{verdict.reason}", user.language)
-    raise HTTPException(status.HTTP_403_FORBIDDEN, message)
+    raise _refused(status.HTTP_403_FORBIDDEN, message, MEMBERSHIP)
 
 
 async def get_current_user(
@@ -114,9 +139,10 @@ async def get_current_user(
             return await check_allowed(session, user)
 
     if not authorization or not authorization.lower().startswith("tma "):
-        raise HTTPException(
+        raise _refused(
             status.HTTP_401_UNAUTHORIZED,
             t("error.auth_required", language),
+            SESSION_ENDED if gutschwein_session else SIGNED_OUT,
         )
     if not settings.bot_token:
         raise HTTPException(
@@ -128,14 +154,13 @@ async def get_current_user(
             authorization[4:].strip(), settings.bot_token, settings.init_data_max_age
         )
     except ValueError as exc:
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, t(str(exc), language)
-        ) from exc
+        raise _refused(status.HTTP_401_UNAUTHORIZED, t(str(exc), language), TELEGRAM_AUTH) from exc
 
     if tg.id not in settings.allowed_ids:
-        raise HTTPException(
+        raise _refused(
             status.HTTP_403_FORBIDDEN,
             t("error.no_access", language, telegram_id=tg.id),
+            MEMBERSHIP,
         )
 
     return await upsert_user(session, tg)

@@ -7,10 +7,12 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    computed_field,
     field_validator,
     model_validator,
 )
 
+from app import barcode
 from app.models import EventKind, ValueKind, VoucherStatus
 
 
@@ -178,6 +180,18 @@ class VoucherOut(VoucherFields):
     updated_at: datetime
     used_at: datetime | None
     comments_count: int = 0
+
+    @computed_field
+    @property
+    def barcode_version(self) -> str | None:
+        """What the client puts into the barcode's address (`?v=`), see barcode.version.
+
+        Null when there is nothing to draw. Computed here rather than in the client,
+        so the one implementation is the one the barcode route checks against.
+        """
+        if not self.code or not self.barcode_format:
+            return None
+        return barcode.version(self.code, self.barcode_format)
 
 
 class BalanceUpdate(BaseModel):

@@ -4,6 +4,7 @@ The redraw is verified by decoding it again: an unreadable barcode on the scan
 screen would only be discovered at the till, which is the worst possible place.
 """
 
+import hashlib
 import io
 
 import pytest
@@ -271,18 +272,32 @@ def test_no_barcode_means_no_endpoint(client: TestClient) -> None:
 
 # --- the address changes with the code (T5) --------------------------------------------
 
-# Shared with src/barcode.test.ts: the client computes the version, the server checks
-# it, and the two must agree byte for byte — non-ASCII included.
-VERSION_VECTORS = [
-    ("9998887776665", "Code 128", "31f6f200"),
-    ("Ё-1", "EAN-13", "fde4f6c1"),
-    ("", "", "0f0c6cdd"),
-]
+
+def test_the_version_is_sha256_of_what_the_drawing_depends_on() -> None:
+    """Collision-resistant on purpose: two codes sharing a version would share a
+    cached barcode — exactly the stale bars this exists to prevent."""
+    expected = hashlib.sha256(b"Code 128\n9998887776665").hexdigest()
+    assert barcode.version("9998887776665", "Code 128") == expected
+    assert len(expected) == 64
+    assert barcode.version("9998887776665", "EAN-13") != expected
+    assert barcode.version("9998887776666", "Code 128") != expected
 
 
-@pytest.mark.parametrize(("code", "fmt", "expected"), VERSION_VECTORS)
-def test_the_version_is_the_one_the_client_computes(code: str, fmt: str, expected: str) -> None:
-    assert barcode.version(code, fmt) == expected
+def test_cards_carry_their_version_and_none_without_a_barcode(client: TestClient) -> None:
+    plain = client.post("/api/vouchers", json={"merchant": "No-Barcode-T5"}).json()
+    assert plain["barcode_version"] is None
+
+    png = as_png(screenshot_with(render(CARD_NUMBER)))
+    image_id = client.post(
+        "/api/uploads", files={"file": ("card.png", io.BytesIO(png), "image/png")}
+    ).json()["image_id"]
+    card = client.post("/api/vouchers", json={"merchant": "With-T5", "image_id": image_id}).json()
+    assert card["barcode_version"] == barcode.version(CARD_NUMBER, "Code 128")
+
+    # A code typed away leaves a format but nothing to draw.
+    cleared = client.patch(f"/api/vouchers/{card['id']}", json={"code": ""}).json()
+    assert cleared["barcode_format"] == "Code 128"
+    assert cleared["barcode_version"] is None
 
 
 def test_a_corrected_code_gets_a_new_address_and_the_old_one_is_refused(
@@ -297,7 +312,7 @@ def test_a_corrected_code_gets_a_new_address_and_the_old_one_is_refused(
     voucher = client.post(
         "/api/vouchers", json={"merchant": "Penny-T5", "image_id": image_id}
     ).json()
-    old = barcode.version(voucher["code"], voucher["barcode_format"])
+    old = voucher["barcode_version"]
 
     with TestClient(client.app) as anon:
         before = anon.get(f"/api/barcodes/{image_id}?v={old}")
@@ -306,16 +321,19 @@ def test_a_corrected_code_gets_a_new_address_and_the_old_one_is_refused(
 
         corrected = client.patch(f"/api/vouchers/{voucher['id']}", json={"code": "4006381333931"})
         assert corrected.status_code == 200
-        new = barcode.version("4006381333931", corrected.json()["barcode_format"])
+        new = corrected.json()["barcode_version"]
         assert new != old
 
         stale = anon.get(f"/api/barcodes/{image_id}?v={old}")
         fresh = anon.get(f"/api/barcodes/{image_id}?v={new}")
+        # Only the whole version counts; a prefix of the right one is not it.
+        truncated = anon.get(f"/api/barcodes/{image_id}?v={new[:8]}")
         # An app from before versions still gets the current code, briefly cached.
         legacy = anon.get(f"/api/barcodes/{image_id}")
 
     assert stale.status_code == 404
     assert stale.json()["detail"] == "Код карты изменился — обновите карточку"
+    assert truncated.status_code == 404
     assert fresh.status_code == 200
     assert fresh.text != before.text
     assert fresh.text == barcode.to_svg("4006381333931", "Code 128")

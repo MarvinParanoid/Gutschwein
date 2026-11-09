@@ -28,6 +28,12 @@ export interface Voucher {
   image_id: string | null
   /** Symbology decoded from the picture; null when there is no readable code. */
   barcode_format: string | null
+  /**
+   * Goes into the barcode's address (`?v=`), so a corrected code is a new address
+   * and no cache can show the old bars (T5). Computed by the server; null when
+   * there is nothing to draw.
+   */
+  barcode_version: string | null
   /** valid_until came from the shop rule, not from the card. */
   expiry_estimated: boolean
   /** Nobody is sure the money is still there. */

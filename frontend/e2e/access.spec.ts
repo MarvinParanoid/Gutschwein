@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 test('the access screen lists devices and mints an invitation', async ({ page }) => {
   await page.goto('/')

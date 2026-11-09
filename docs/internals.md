@@ -146,8 +146,12 @@ Workbox) keeps three runtime caches next to the precached app shell:
 **Barcodes are versioned (T5).** A barcode's address is derived from its picture, but the
 bars are drawn from the card's code, which can be corrected later (the form, `app.rescan`).
 Cached by the picture alone, a corrected code kept showing the old bars. The address now
-carries `?v=` — FNV-1a of `format + "\n" + code`, computed by `src/barcode.ts` and checked by
-`app.barcode.version`, pinned to the same vectors on both sides. So:
+carries `?v=` — SHA-256 of `format + "\n" + code` (`app.barcode.version`). The server is
+the only place it is computed: cards carry it as `barcode_version` (null when there is
+nothing to draw), the client copies it into the address, and the barcode route checks it.
+A collision-resistant hash, because two codes sharing a version would share a cached
+barcode — the very failure this prevents; a 32-bit checksum made that unlikely, not
+impossible. So:
 
 - a corrected code is a new address, fetched from the network on first use;
 - the server answers a versioned address only while the card still has that code, so
@@ -184,10 +188,27 @@ the same reason sign-out is **refused offline** — the session would survive an
 with the network. The screen says so, and points to signing the device out from another
 one.
 
-**A lost or revoked session** purges the same caches: any `401`, or a `403` on a read, from
-the API (`lostAccess` in `api.ts`). A `403` on a write is not enough — it may be the CSRF
-check refusing one request. So a device signed out from elsewhere, or whose member was
-removed, forgets the cards on its next contact with the server.
+**When the device is out**, it purges the same caches and switches to the sign-in screen
+at once, without waiting for a reload. The status code cannot say when that is — a `401`
+is also expired Telegram data, a `403` also the CSRF check or someone else's comment — so
+the server names the reason in `X-Auth-Failure` (`app/auth.py`), and the client acts on
+the reason alone (`ACCESS_LOST` in `api.ts`):
+
+| Situation | Answer | Reason | Offline copy |
+|---|---|---|---|
+| Signed out here (button) | — | — | deleted by the button |
+| Session revoked from another device, or with the member | 401 | `session-ended` | deleted |
+| Browser session expired (90 days) | 401 | `session-ended`, or `signed-out` once the browser dropped the cookie | deleted |
+| Membership ended: off the allowlist, chain broken, revoked | 403 | `membership` | deleted |
+| Telegram initData expired or malformed | 401 | `telegram-auth` | **kept** — reopening the Mini App fixes it |
+| CSRF refusal, another member's comment, a dead login link | 401/403 | none | kept |
+| Network failure, 5xx, a 401/403 from a proxy | — | none | kept |
+
+Revoked and expired browser sessions get the same reason, and that is not a shortcut: once
+the maintenance sweep has deleted an expired row the server cannot tell them apart, and the
+browser does not need it to — either way only a new login link brings it back, and until
+then it must not show the household's cards. A Telegram member is different: their
+identity is still good, so an expired initData is not treated as losing access.
 
 Nothing sensitive is kept in `localStorage` or `sessionStorage`: the session is an httpOnly
 cookie, Telegram's `initData` is kept by Telegram's own script in session storage and

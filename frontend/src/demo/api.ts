@@ -69,14 +69,20 @@ function fail(message: string): never {
   throw new Error(message);
 }
 
-/** days_left and is_expired are derived on the server; here too, on every read. */
+/**
+ * days_left, is_expired and barcode_version are derived on the server; here too,
+ * on every read. The version only has to say whether there is a barcode and change
+ * with the code: the demo draws barcodes locally and caches none.
+ */
 function derive(voucher: Voucher): Voucher {
+  const barcode_version =
+    voucher.code && voucher.barcode_format ? `demo:${voucher.code}` : null;
   if (!voucher.valid_until)
-    return { ...voucher, days_left: null, is_expired: false };
+    return { ...voucher, barcode_version, days_left: null, is_expired: false };
   const left = Math.round(
     (Date.parse(voucher.valid_until) - today().getTime()) / 86_400_000,
   );
-  return { ...voucher, days_left: left, is_expired: left < 0 };
+  return { ...voucher, barcode_version, days_left: left, is_expired: left < 0 };
 }
 
 function matches(voucher: Voucher, query: string): boolean {

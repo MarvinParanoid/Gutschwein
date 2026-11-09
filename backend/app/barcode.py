@@ -27,6 +27,7 @@ any nesting and in any colour, are not. Six of the family's certificates were
 unreadable and all six read this way.
 """
 
+import hashlib
 import io
 import logging
 from collections.abc import Iterator
@@ -174,21 +175,21 @@ def decode(data: bytes) -> Decoded | None:
 
 
 def version(code: str, barcode_format: str) -> str:
-    """A short fingerprint of everything the drawing depends on.
+    """A fingerprint of everything the drawing depends on.
 
     The barcode's address is derived from the picture, but the bars are drawn from
-    the card's code, which can be corrected later. The client puts this into the
-    URL (`?v=`) so a corrected code is a new address, and no cache — the service
-    worker's or the browser's — can answer with the old bars. The frontend computes
-    the same value (`src/barcode.ts`); `test_barcode.py` pins both to one vector.
+    the card's code, which can be corrected later. The address carries this as
+    `?v=`, so a corrected code is a new address, and no cache — the service
+    worker's or the browser's — can answer it with the old bars. The server is the
+    only place it is computed: cards carry it as `barcode_version`, and the client
+    copies it into the address.
 
-    FNV-1a, 32 bits: a cache key, not a secret. The URL already shows the barcode
-    itself to whoever holds it.
+    SHA-256, not a short checksum: the guarantee is that two different codes never
+    share an address, and with a 32-bit hash a correction could land on the old
+    code's version and be served its cached bars. The format cannot contain a
+    newline, so the input is unambiguous.
     """
-    value = 0x811C9DC5
-    for byte in f"{barcode_format}\n{code}".encode():
-        value = ((value ^ byte) * 0x01000193) & 0xFFFFFFFF
-    return f"{value:08x}"
+    return hashlib.sha256(f"{barcode_format}\n{code}".encode()).hexdigest()
 
 
 def to_svg(text: str, barcode_format: str) -> str | None:

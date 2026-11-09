@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { api } from './api'
+import { api, onAccessLost } from './api'
 import { isDemo, startDemo, stopDemo } from './demo/session'
 import { t } from './i18n'
 import AccessPage from './pages/AccessPage'
@@ -47,6 +47,11 @@ export default function App() {
       .then((data) => setMe(data.user))
       .catch((error: Error) => setAuthError(error.message))
   }, [login.state])
+
+  // The server said this device is out (revoked, signed out, membership ended):
+  // the card on screen goes with the cache, rather than staying until the next
+  // reload. Recoverable failures, such as expired Telegram data, do not get here.
+  useEffect(() => onAccessLost(setAuthError), [])
 
   // Views are mirrored into the history stack, so Telegram's back button, the
   // Android system back gesture and the browser's back arrow all do the same
