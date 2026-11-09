@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     dev_mode: bool = False
 
     cors_origins: str = ""
+    # Origins besides WEBAPP_URL's from which a browser may change data (app.csrf),
+    # comma-separated: the Vite dev server, the e2e suite. Never a wildcard.
+    trusted_origins: str = ""
 
     @field_validator("family_chat_id", mode="before")
     @classmethod

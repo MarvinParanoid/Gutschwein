@@ -108,6 +108,17 @@ ssh root@your-server dry-run                   # what is running, with its diges
 Migrations apply themselves on startup. The container listens on `127.0.0.1:8000` only; the
 reverse proxy is what faces the world.
 
+### Which pages may change data
+
+A browser may change data only from a trusted origin — `WEBAPP_URL`'s, plus any listed in
+`TRUSTED_ORIGINS` (empty in production). The session cookie alone does not protect against
+the other apps on this server: they share its registrable domain, so to a browser they are
+the same *site*, and `SameSite=Lax` sends the cookie with their POSTs. A request carrying a
+different `Origin` gets 403 and a `refused POST … origin '…' is not trusted` line in the
+log; one with no `Origin` and no `Sec-Fetch-Site` (curl, scripts) is not a browser and is
+authenticated as usual. Keep `WEBAPP_URL` exactly the address the app is opened at — scheme,
+host and port — or every change from the app is refused.
+
 ## 5. Reverse proxy and TLS
 
 Caddy gets and renews the certificate on its own, which makes it the shortest path.

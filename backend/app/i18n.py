@@ -63,6 +63,11 @@ MESSAGES: dict[str, dict[str, str]] = {
         EN: "Invalid file path",
         DE: "Ungültiger Dateipfad",
     },
+    "error.cross_origin": {
+        RU: "Запрос пришёл не со страницы приложения и отклонён",
+        EN: "The request did not come from the app's own page and was refused",
+        DE: "Die Anfrage kam nicht von der Seite der App und wurde abgelehnt",
+    },
     "error.image_too_large": {
         RU: "Изображение слишком большое: больше {megapixels} мегапикселей",
         EN: "The image is too large: more than {megapixels} megapixels",

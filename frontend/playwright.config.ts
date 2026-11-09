@@ -53,6 +53,9 @@ export default defineConfig({
       // the real one — a suite that quietly borrows it passes locally and fails
       // in CI, where no such file exists.
       WEBAPP_URL: 'https://e2e.invalid',
+      // The browser talks to BASE_URL, not WEBAPP_URL: state changes are accepted
+      // only from trusted origins (app/csrf.py), so the suite's has to be one.
+      TRUSTED_ORIGINS: BASE_URL,
       DEFAULT_LANGUAGE: 'ru',
       DEV_MODE: 'true',
       // The dev user has to be a member: the whitelist is enforced on the

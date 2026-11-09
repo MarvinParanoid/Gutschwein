@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import notify
 from app.config import settings
+from app.csrf import OriginCheck, trusted_origins
 from app.db import SessionLocal
 from app.i18n import MESSAGES, Message, language_for, t
 from app.maintenance import maintenance_loop
@@ -96,6 +97,14 @@ if settings.cors_origin_list:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+    )
+
+# Added last, so it runs first: a cross-origin state change is refused before CORS,
+# authentication or any handler sees it.
+app.add_middleware(OriginCheck)
+if not trusted_origins():
+    log.warning(
+        "no trusted origin (WEBAPP_URL / TRUSTED_ORIGINS): browsers cannot change any data"
     )
 
 app.include_router(auth.router)

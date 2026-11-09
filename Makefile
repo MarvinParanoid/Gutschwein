@@ -11,7 +11,9 @@ install:
 
 # Local development: API on :8000, Vite on :5173 proxying /api to it.
 dev-api:
-	cd backend && DEV_MODE=true RUN_BOT=false .venv/bin/uvicorn app.main:app --reload
+	cd backend && DEV_MODE=true RUN_BOT=false \
+		TRUSTED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173 \
+		.venv/bin/uvicorn app.main:app --reload
 
 dev-web:
 	cd frontend && npm run dev
