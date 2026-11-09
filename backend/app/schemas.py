@@ -2,7 +2,14 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.models import EventKind, ValueKind, VoucherStatus
 
@@ -43,6 +50,28 @@ class UserOut(BaseModel):
     display_name: str
 
 
+# The column is NUMERIC(10, 2); SQLite enforces neither, so the schema does.
+MAX_MONEY = Decimal("99999999.99")
+
+
+def check_money(value: Decimal | None) -> Decimal | None:
+    """Cents, not below zero, within the column. Keys, so the reader's language applies."""
+    if value is None:
+        return value
+    if not value.is_finite():
+        raise ValueError("error.amount_invalid")
+    if value < 0:
+        raise ValueError("error.amount_negative")
+    if value > MAX_MONEY:  # before quantize(), which overflows on a huge value
+        raise ValueError("error.amount_too_large")
+    if value != value.quantize(Decimal("0.01")):
+        raise ValueError("error.amount_precision")
+    return value
+
+
+Money = Annotated[Decimal, AfterValidator(check_money)]
+
+
 def normalize_currency(value: object) -> object:
     """Uppercase a three-letter code, or leave it for the field to reject.
 
@@ -64,7 +93,7 @@ class VoucherFields(BaseModel):
     title: str = Field("", max_length=256)
     code: str = Field("", max_length=128)
     value_kind: ValueKind = ValueKind.other
-    value_amount: Decimal | None = None
+    value_amount: Money | None = None
     currency: str = Field("EUR", max_length=8)
     valid_from: date | None = None
     valid_until: date | None = None
@@ -100,7 +129,7 @@ class VoucherUpdate(BaseModel):
     title: str | None = Field(None, max_length=256)
     code: str | None = Field(None, max_length=128)
     value_kind: ValueKind | None = None
-    value_amount: Decimal | None = None
+    value_amount: Money | None = None
     currency: Currency | None = None
     valid_from: date | None = None
     valid_until: date | None = None
@@ -129,6 +158,10 @@ class VoucherUpdate(BaseModel):
 class VoucherOut(VoucherFields):
     model_config = ConfigDict(from_attributes=True)
 
+    # Checked where an amount is typed in, never where one is read back: a card
+    # stored before the rules must still list — one bad row would otherwise turn
+    # the whole list into a 500.
+    value_amount: Decimal | None = None
     id: int
     status: VoucherStatus
     balance_amount: Decimal | None
@@ -150,9 +183,17 @@ class VoucherOut(VoucherFields):
 class BalanceUpdate(BaseModel):
     """Either what was just spent, or what the receipt says is left. Not both."""
 
-    spent: Decimal | None = Field(None, gt=0)
-    remaining: Decimal | None = Field(None, ge=0)
+    spent: Money | None = None
+    remaining: Money | None = None
     note: str = Field("", max_length=200)
+
+    @field_validator("spent")
+    @classmethod
+    def something_was_spent(cls, value: Decimal | None) -> Decimal | None:
+        """A payment of nothing is not a payment — and would only add a 0 to the log."""
+        if value is not None and value == 0:
+            raise ValueError("error.spent_zero")
+        return value
 
     @model_validator(mode="after")
     def exactly_one(self) -> "BalanceUpdate":

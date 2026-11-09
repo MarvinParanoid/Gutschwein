@@ -85,6 +85,8 @@ export const en: Dictionary = {
   actions: {
     activate: 'Make active',
     useUp: '✅ Spent it all',
+    useUpConfirm: (balance: string) =>
+      `Mark all of it as spent — ${balance}? The balance becomes 0.`,
     markUsed: '✅ Used',
     unuse: 'Back to active',
     restore: 'Out of the archive',
@@ -276,6 +278,7 @@ export const en: Dictionary = {
       spendTooMuch: (spent: string, current: string) =>
         `Cannot spend ${spent} — the card holds ${current}`,
       aboveFace: (face: string) => `The balance exceeds the face value (${face})`,
+      notUsed: 'The card is not marked as used',
     },
     seed: {
       reweNote: 'a birthday present',

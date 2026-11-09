@@ -63,6 +63,36 @@ MESSAGES: dict[str, dict[str, str]] = {
         EN: "Invalid file path",
         DE: "Ungültiger Dateipfad",
     },
+    "error.amount_negative": {
+        RU: "Сумма не может быть отрицательной",
+        EN: "The amount cannot be negative",
+        DE: "Der Betrag darf nicht negativ sein",
+    },
+    "error.amount_precision": {
+        RU: "Не больше двух знаков после запятой",
+        EN: "No more than two decimal places",
+        DE: "Höchstens zwei Nachkommastellen",
+    },
+    "error.amount_too_large": {
+        RU: "Слишком большая сумма",
+        EN: "The amount is too large",
+        DE: "Der Betrag ist zu groß",
+    },
+    "error.amount_invalid": {
+        RU: "Это не сумма",
+        EN: "That is not an amount",
+        DE: "Das ist kein Betrag",
+    },
+    "error.spent_zero": {
+        RU: "Потраченная сумма должна быть больше нуля",
+        EN: "The amount spent must be more than zero",
+        DE: "Der bezahlte Betrag muss größer als null sein",
+    },
+    "error.not_used": {
+        RU: "Карта и так не отмечена использованной",
+        EN: "The card is not marked as used",
+        DE: "Die Karte ist nicht als verbraucht markiert",
+    },
     "error.cross_origin": {
         RU: "Запрос пришёл не со страницы приложения и отклонён",
         EN: "The request did not come from the app's own page and was refused",

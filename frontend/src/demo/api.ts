@@ -18,6 +18,7 @@ import type {
   User,
   Voucher,
   VoucherDraft,
+  VoucherEvent,
   VoucherStatus,
 } from "../types";
 import { blankVoucher, createSeed, PARTNER, YOU, type DemoState } from "./seed";
@@ -47,6 +48,22 @@ const byCurrency = (vouchers: Voucher[]) => {
 };
 const now = () => new Date().toISOString();
 const today = () => new Date(new Date().toISOString().slice(0, 10));
+
+/**
+ * services.counts_as_spending: an undone "used up" and the entry undoing it are
+ * history, not spending — statistics and the shop chips count neither.
+ */
+function undoneEvents(events: VoucherEvent[]): Set<number> {
+  const ids = new Set<number>();
+  for (const event of events) {
+    const reverses = event.payload.reverses;
+    if (event.kind === "balance_updated" && typeof reverses === "number") {
+      ids.add(event.id);
+      ids.add(reverses);
+    }
+  }
+  return ids;
+}
 
 function fail(message: string): never {
   throw new Error(message);
@@ -101,9 +118,12 @@ export function createDemoApi(): ApiClient {
     kind: EventKind,
     payload: Record<string, unknown> = {},
     actor: User | null = YOU,
-  ): void {
+  ): number {
+    // Not length + 1: deleting a card removes its events, and an id must never be
+    // handed out twice now that an undo refers to the payment it reverses.
+    const id = state.events.reduce((max, e) => Math.max(max, e.id), 0) + 1;
     state.events.push({
-      id: state.events.length + 1,
+      id,
       voucher_id: voucher.id,
       kind,
       payload,
@@ -111,6 +131,7 @@ export function createDemoApi(): ApiClient {
       created_at: now(),
     });
     voucher.updated_at = now();
+    return id;
   }
 
   function markUsed(voucher: Voucher): void {
@@ -183,8 +204,9 @@ export function createDemoApi(): ApiClient {
 
     merchantStats: async (status) => {
       const uses = new Map<string, number>();
+      const undone = undoneEvents(state.events);
       for (const event of state.events) {
-        if (event.kind !== "balance_updated") continue;
+        if (event.kind !== "balance_updated" || undone.has(event.id)) continue;
         const shop = state.vouchers.find(
           (v) => v.id === event.voucher_id,
         )?.merchant;
@@ -301,21 +323,46 @@ export function createDemoApi(): ApiClient {
       const voucher = find(id);
       if (action === "use") {
         if (voucher.status === "used") fail("used");
+        let usedPayload: Record<string, unknown> = {};
         if (cents(voucher.balance_amount) > 0) {
-          record(voucher, "balance_updated", {
-            spent: voucher.balance_amount,
+          const before = voucher.balance_amount!;
+          const payment = record(voucher, "balance_updated", {
+            spent: before,
             remaining: "0",
             note: "",
           });
           voucher.balance_amount = "0.00";
+          usedPayload = { balance_before: before, payment };
         }
         markUsed(voucher);
-        record(voucher, "used");
+        record(voucher, "used", usedPayload);
       } else if (action === "unuse") {
+        // The server's rule (routers/vouchers.py, mark_unused): put back what "used
+        // up" took, if nothing has changed since; otherwise come back as it is.
+        if (voucher.status !== "used") fail(t.demo.errors.notUsed);
+        const mine = state.events.filter((e) => e.voucher_id === voucher.id);
+        const used = mine.filter((e) => e.kind === "used").at(-1);
+        let unusedPayload: Record<string, unknown> = {};
+        if (
+          used &&
+          typeof used.payload.payment === "number" &&
+          cents(voucher.balance_amount) === 0 &&
+          !mine.some((e) => e.kind === "balance_updated" && e.id > used.id)
+        ) {
+          const before = String(used.payload.balance_before);
+          record(voucher, "balance_updated", {
+            spent: money(-cents(before)),
+            remaining: before,
+            note: "",
+            reverses: used.payload.payment,
+          });
+          voucher.balance_amount = before;
+          unusedPayload = { balance_restored: before };
+        }
         voucher.status = "active";
         voucher.used_at = null;
         voucher.used_by = null;
-        record(voucher, "unused");
+        record(voucher, "unused", unusedPayload);
       } else if (action === "archive") {
         voucher.status = "archived";
         record(voucher, "archived");
@@ -508,8 +555,9 @@ function buildStats(state: DemoState): Stats {
     }
   }
 
+  const undone = undoneEvents(state.events);
   for (const event of state.events) {
-    if (event.kind !== "balance_updated") continue;
+    if (event.kind !== "balance_updated" || undone.has(event.id)) continue;
     const amount = cents(String(event.payload.spent ?? "0"));
     if (amount <= 0) continue;
     const voucher = state.vouchers.find((v) => v.id === event.voucher_id);

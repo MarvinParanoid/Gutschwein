@@ -7,7 +7,7 @@ import HistoryPanel from '../components/voucher/HistoryPanel'
 import ScanOverlay from '../components/voucher/ScanOverlay'
 import VoucherActions, { type Transition } from '../components/voucher/VoucherActions'
 import VoucherFacts from '../components/voucher/VoucherFacts'
-import { cardTitle, isGiftCard, statusLabel } from '../format'
+import { cardTitle, isGiftCard, money, statusLabel } from '../format'
 import { t } from '../i18n'
 import { alertMessage, confirmAction, haptic, inTelegram } from '../telegram'
 import type { Comment, User, Voucher, VoucherEvent } from '../types'
@@ -40,6 +40,17 @@ export default function VoucherPage({ voucherId, me, onBack, onDeleted, onEdit }
   }, [voucherId, reloadHistory])
 
   async function transition(action: Transition) {
+    // "Spent it all" empties the card in one tap, right at the till: ask first
+    // whenever there is money on it. Undo can put it back, but only if noticed.
+    if (
+      action === 'use' &&
+      voucher &&
+      isGiftCard(voucher) &&
+      Number(voucher.balance_amount) > 0 &&
+      !(await confirmAction(t.actions.useUpConfirm(money(voucher.balance_amount!, voucher.currency))))
+    ) {
+      return
+    }
     setBusy(true)
     haptic(action === 'use' ? 'success' : 'tap')
     try {

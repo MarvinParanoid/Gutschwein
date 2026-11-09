@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 
+import { ru } from '../src/i18n/ru'
 import { createCard, openCard, uniqueMerchant } from './helpers'
 
 test('till flow: open a card and write down what the receipt says is left', async ({
@@ -51,4 +52,37 @@ test('a mistyped balance is refused with a readable reason', async ({ page, requ
 
   await expect(page.locator('.balance-form .error')).toContainText('больше номинала')
   await expect(page.locator('.balance-value')).toHaveText('20 EUR')
+})
+
+test('"spent it all" asks first, and undoing it puts the money back', async ({
+  page,
+  request,
+}) => {
+  const merchant = uniqueMerchant('Edeka')
+  const card = await createCard(request, { merchant, value_amount: '50' })
+  await request.post(`/api/vouchers/${card.id}/balance`, { data: { spent: '12.30' } })
+  await openCard(page, merchant)
+  await expect(page.locator('.balance-value')).toHaveText('37.7 EUR')
+
+  // A mis-tap at the till, declined: nothing happens.
+  const questions: string[] = []
+  page.once('dialog', (dialog) => {
+    questions.push(dialog.message())
+    void dialog.dismiss()
+  })
+  await page.getByRole('button', { name: ru.actions.useUp }).click()
+  await expect.poll(() => questions.length).toBe(1)
+  expect(questions[0]).toContain('37.7')
+  expect((await (await request.get(`/api/vouchers/${card.id}`)).json()).status).toBe('active')
+
+  // Confirmed: the card is used up…
+  page.once('dialog', (dialog) => void dialog.accept())
+  await page.getByRole('button', { name: ru.actions.useUp }).click()
+  await expect(page.getByRole('button', { name: ru.actions.unuse })).toBeVisible()
+
+  // …and undoing it brings back exactly what was on it.
+  await page.getByRole('button', { name: ru.actions.unuse }).click()
+  await expect(page.locator('.balance-value')).toHaveText('37.7 EUR')
+  const back = await (await request.get(`/api/vouchers/${card.id}`)).json()
+  expect([back.status, back.balance_amount]).toEqual(['active', '37.70'])
 })

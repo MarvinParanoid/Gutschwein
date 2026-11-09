@@ -24,7 +24,7 @@ from app.db import SessionLocal
 from app.i18n import group_t
 from app.models import Event, EventKind, Voucher, VoucherStatus, utcnow
 from app.schemas import CurrencyStats
-from app.services import format_amount
+from app.services import counts_as_spending, format_amount
 from app.stats import FALLBACK_CURRENCY, collect_stats
 
 log = logging.getLogger(__name__)
@@ -40,6 +40,7 @@ async def _spent_since(session: AsyncSession, since: datetime) -> dict[str, Deci
         select(Voucher.currency, Event.payload)
         .join(Event, Event.voucher_id == Voucher.id)
         .where(Event.kind == EventKind.balance_updated, Event.created_at >= since)
+        .where(counts_as_spending())
     )
     spent: dict[str, Decimal] = defaultdict(Decimal)
     for currency, payload in rows.all():

@@ -88,6 +88,8 @@ export const de: Dictionary = {
   actions: {
     activate: 'Aktiv setzen',
     useUp: '✅ Alles ausgegeben',
+    useUpConfirm: (balance: string) =>
+      `Alles als ausgegeben markieren — ${balance}? Das Guthaben wird 0.`,
     markUsed: '✅ Verbraucht',
     unuse: 'Zurück auf aktiv',
     restore: 'Aus dem Archiv holen',
@@ -280,6 +282,7 @@ export const de: Dictionary = {
       spendTooMuch: (spent: string, current: string) =>
         `${spent} geht nicht — auf der Karte sind ${current}`,
       aboveFace: (face: string) => `Das Guthaben liegt über dem Nennwert (${face})`,
+      notUsed: 'Die Karte ist nicht als verbraucht markiert',
     },
     seed: {
       reweNote: 'zum Geburtstag geschenkt',

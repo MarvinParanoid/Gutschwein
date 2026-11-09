@@ -158,3 +158,44 @@ describe('the rest of the API surface', () => {
     expect((await api.events(2))).toHaveLength(0)
   })
 })
+
+describe('"spent it all" and its undo', () => {
+  it('puts back exactly what "spent it all" took', async () => {
+    const card = await api.getVoucher(1)
+    const before = card.balance_amount!
+    const used = await api.transition(1, 'use')
+    expect(used.balance_amount).toBe('0.00')
+
+    const back = await api.transition(1, 'unuse')
+
+    expect(back.status).toBe('active')
+    expect(back.balance_amount).toBe(before)
+    const [latest] = await api.events(1)
+    expect(latest.kind).toBe('unused')
+  })
+
+  it('counts neither the undone payment nor its undo as spending', async () => {
+    const card = await api.getVoucher(1)
+    const stats = async () =>
+      (await api.stats()).currencies.find((c) => c.currency === card.currency)!
+    const before = (await stats()).spent_total
+
+    await api.transition(1, 'use')
+    await api.transition(1, 'unuse')
+
+    expect((await stats()).spent_total).toBe(before)
+  })
+
+  it('refuses to undo a card that is not used', async () => {
+    await expect(api.transition(1, 'unuse')).rejects.toThrow()
+  })
+
+  it('keeps event ids unique after a card is deleted', async () => {
+    await api.deleteVoucher(2)
+    await api.transition(1, 'use')
+    const cards = await api.listVouchers('all')
+    const events = (await Promise.all(cards.map((card) => api.events(card.id)))).flat()
+    const ids = events.map((e) => e.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+})

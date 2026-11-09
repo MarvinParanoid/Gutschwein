@@ -86,6 +86,8 @@ export const ru = {
   actions: {
     activate: 'В активные',
     useUp: '✅ Потратил всё',
+    useUpConfirm: (balance: string) =>
+      `Отметить, что потрачено всё — ${balance}? Остаток станет 0.`,
     markUsed: '✅ Использован',
     unuse: 'Вернуть в активные',
     restore: 'Достать из архива',
@@ -280,6 +282,7 @@ export const ru = {
       spendTooMuch: (spent: string, current: string) =>
         `Нельзя списать ${spent} — на карте ${current}`,
       aboveFace: (face: string) => `Остаток больше номинала (${face}) — поправьте номинал`,
+      notUsed: 'Карта и так не отмечена использованной',
     },
     seed: {
       reweNote: 'подарили на день рождения',

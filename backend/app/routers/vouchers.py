@@ -41,6 +41,7 @@ from app.services import (
     apply_expiry_rule,
     attach_barcode,
     comment_counts,
+    counts_as_spending,
     format_amount,
     get_voucher_or_404,
     lock_voucher_or_404,
@@ -215,6 +216,7 @@ async def merchant_stats(
         select(Voucher.merchant, func.count())
         .join(Event, Event.voucher_id == Voucher.id)
         .where(Event.kind == EventKind.balance_updated, Voucher.merchant != "")
+        .where(counts_as_spending())
         .group_by(Voucher.merchant)
     )
     uses = dict(uses_rows.all())
@@ -366,6 +368,7 @@ async def _transition(
     user: User,
     new_status: VoucherStatus,
     kind: EventKind,
+    payload: dict | None = None,
 ) -> None:
     voucher.status = new_status
     if new_status == VoucherStatus.used:
@@ -375,7 +378,7 @@ async def _transition(
         voucher.used_at = None
         voucher.used_by_id = None
     voucher.archived_at = utcnow() if new_status == VoucherStatus.archived else None
-    record_event(session, voucher, user, kind)
+    record_event(session, voucher, user, kind, payload)
     await session.commit()
     await session.refresh(voucher)
 
@@ -388,17 +391,22 @@ async def mark_used(
     voucher = await lock_voucher_or_404(session, voucher_id)
     if voucher.status == VoucherStatus.used:
         raise HTTPException(status.HTTP_409_CONFLICT, Message("error.already_used"))
-    # "Used up" on a gift card means nothing is left on it.
+    # "Used up" on a gift card means the rest was spent. The `used` event remembers what
+    # that was and which payment recorded it, so `/unuse` can put it back exactly.
+    payload = None
     if voucher.balance_amount is not None and voucher.balance_amount > 0:
-        record_event(
+        before = voucher.balance_amount
+        payment = record_event(
             session,
             voucher,
             user,
             EventKind.balance_updated,
-            {"spent": str(voucher.balance_amount), "remaining": "0", "note": ""},
+            {"spent": str(before), "remaining": "0", "note": ""},
         )
+        await session.flush()  # the payment's id, for the reference below
         voucher.balance_amount = Decimal("0.00")
-    await _transition(session, voucher, user, VoucherStatus.used, EventKind.used)
+        payload = {"balance_before": str(before), "payment": payment.id}
+    await _transition(session, voucher, user, VoucherStatus.used, EventKind.used, payload)
     await notify(
         group_t("notify.card_used", actor=user.display_name, label=voucher_label(voucher))
     )
@@ -528,8 +536,60 @@ async def activate_draft(
 
 @router.post("/{voucher_id}/unuse", response_model=VoucherOut)
 async def mark_unused(user: CurrentUser, session: Session, voucher_id: int) -> VoucherOut:
-    voucher = await get_voucher_or_404(session, voucher_id)
-    await _transition(session, voucher, user, VoucherStatus.active, EventKind.unused)
+    """Undo "used". Puts back the balance "used up" took, when nothing has changed since.
+
+    "Used up" spends whatever is left, and a mis-tap at the till used to lose that
+    amount: the card came back active with nothing on it, and the payment stayed in
+    the statistics. Now the payment it recorded is reversed by an entry of the
+    opposite sign that names it — the log keeps both, statistics count neither. Only
+    when the card is still exactly as "used up" left it: still at zero, and no other
+    payment or correction since. A card emptied by ordinary payments, or one marked
+    used before this was recorded, comes back as it is. Locked, like every change
+    derived from the balance; a repeated tap finds the card active and gets a 409.
+    """
+    voucher = await lock_voucher_or_404(session, voucher_id)
+    if voucher.status != VoucherStatus.used:
+        raise HTTPException(status.HTTP_409_CONFLICT, Message("error.not_used"))
+
+    used = (
+        await session.execute(
+            select(Event)
+            .where(Event.voucher_id == voucher.id, Event.kind == EventKind.used)
+            .order_by(Event.id.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    restore = None
+    if used is not None and "payment" in used.payload and voucher.balance_amount == 0:
+        later = await session.execute(
+            select(func.count())
+            .select_from(Event)
+            .where(
+                Event.voucher_id == voucher.id,
+                Event.kind == EventKind.balance_updated,
+                Event.id > used.id,
+            )
+        )
+        if later.scalar_one() == 0:
+            restore = Decimal(used.payload["balance_before"])
+
+    payload = None
+    if restore is not None:
+        record_event(
+            session,
+            voucher,
+            user,
+            EventKind.balance_updated,
+            {
+                "spent": str(-restore),
+                "remaining": str(restore),
+                "note": "",
+                "reverses": used.payload["payment"],
+            },
+        )
+        voucher.balance_amount = restore
+        payload = {"balance_restored": str(restore)}
+    await _transition(session, voucher, user, VoucherStatus.active, EventKind.unused, payload)
     return await _serialize_one(session, voucher)
 
 

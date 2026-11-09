@@ -4,8 +4,9 @@ import asyncio
 from decimal import Decimal
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app import barcode, storage
 from app.expiry import default_expiry
@@ -70,6 +71,26 @@ def record_event(
     )
     session.add(event)
     return event
+
+
+def counts_as_spending():
+    """A filter on balance_updated events: a payment that was undone, and the entry that
+    undid it, are history, not spending.
+
+    Undoing "used up" (`/unuse`) appends a payment of the opposite sign that names the
+    one it reverses (`payload.reverses`); the log stays append-only and shows both, while
+    statistics, the digest and the shop chips leave both out — as if neither happened,
+    whoever pressed the buttons and in whichever month.
+    """
+    reversal = aliased(Event)
+    undone = select(reversal.payload["reverses"].as_integer()).where(
+        reversal.kind == EventKind.balance_updated,
+        reversal.payload["reverses"].as_integer().is_not(None),
+    )
+    return and_(
+        Event.payload["reverses"].as_integer().is_(None),
+        Event.id.not_in(undone),
+    )
 
 
 async def comment_counts(session: AsyncSession, voucher_ids: list[int]) -> dict[int, int]:

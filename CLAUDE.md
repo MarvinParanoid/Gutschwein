@@ -100,7 +100,13 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
 - Gift card balance: `vouchers.balance_amount` is the current truth, and every change is an
   append-only `balance_updated` event carrying `{spent, remaining, note}` — there is no
   separate ledger table. Corrections are ordinary updates, so never mutate past events.
-  Emptying the balance auto-marks the voucher `used`; `POST /use` conversely zeroes it.
+  Emptying the balance auto-marks the voucher `used`; `POST /use` conversely zeroes it,
+  recording in the `used` event what it took and which payment did it, and `POST /unuse`
+  puts exactly that back — with a payment of the opposite sign naming the one it reverses
+  (`payload.reverses`) — when nothing changed since. Anything that sums spending filters
+  with `counts_as_spending()`, which drops both halves of such a pair. Money fields are
+  `schemas.Money` on input only (cents, ≥ 0, ≤ 99 999 999.99); outputs accept stored rows
+  as they are.
   Anything that computes a new balance from the current one loads the voucher with
   `lock_voucher_or_404()`, not `get_voucher_or_404()`: pysqlite runs a SELECT outside any
   transaction, so a plain read-then-write lets two concurrent payments overwrite each other.

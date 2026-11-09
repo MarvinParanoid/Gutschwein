@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.i18n import default_language, t
 from app.models import Event, EventKind, User, Voucher, VoucherStatus, utcnow
 from app.schemas import CurrencyStats, MemberSpend, MerchantSpend, MonthSpend, StatsOut
+from app.services import counts_as_spending
 
 EXPIRING_SOON_DAYS = 30
 TOP_MERCHANTS = 8
@@ -115,6 +116,7 @@ async def collect_stats(session: AsyncSession, language: str | None = None) -> S
         .join(Voucher, Voucher.id == Event.voucher_id)
         .outerjoin(User, User.id == Event.actor_id)
         .where(Event.kind == EventKind.balance_updated)
+        .where(counts_as_spending())
     )
 
     this_month = _month_key(today)
