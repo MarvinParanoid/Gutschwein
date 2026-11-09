@@ -8,7 +8,9 @@ test('the access screen lists devices and mints an invitation', async ({ page })
 
   // Signing in for the e2e run happens through the dev header, which creates no
   // session, so the list is empty and says so rather than showing a spinner.
-  await expect(page.locator('.panel').last()).toContainText(/В браузере пока никто|это устройство/)
+  await expect(page.locator('.panel', { has: page.getByRole('heading', { name: 'Устройства' }) })).toContainText(
+    /В браузере пока никто|это устройство/,
+  )
 
   await page.getByPlaceholder('Имя нового участника').fill('Бабушка')
   await page.getByRole('button', { name: 'Создать ссылку' }).click()

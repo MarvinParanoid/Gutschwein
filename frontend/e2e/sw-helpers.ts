@@ -16,6 +16,8 @@ export async function signedInWithWorker(browser: Browser, request: APIRequestCo
     viewport: { width: 390, height: 844 },
     locale: 'ru-RU',
     serviceWorkers: 'allow',
+    // The config's dev header would let this browser in whatever its cookie says.
+    extraHTTPHeaders: {},
   })
   const page = await context.newPage()
   await page.goto(`/login#${token}`)

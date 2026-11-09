@@ -155,6 +155,7 @@ nightly archive is a chat message. Back up `./data` yourself.
 - One-time login links
 - Device management
 - Remote sign-out
+- Sign out on this device, which also deletes the cards kept for offline use
 
 ### Languages
 

@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 
 import { api } from '../api'
+import { isDemo } from '../demo/session'
 import { formatDateTime } from '../format'
 import { t } from '../i18n'
-import { haptic } from '../telegram'
+import { purgeSensitiveCaches } from '../pwaCache'
+import { confirmAction, haptic, inTelegram } from '../telegram'
+import { useOnline } from '../useOnline'
 import type { Invite, Session } from '../types'
 
 /**
@@ -20,6 +23,7 @@ export default function AccessPage({ onBack }: { onBack: () => void }) {
   const [link, setLink] = useState<Invite | null>(null)
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
+  const online = useOnline()
 
   const load = () =>
     api
@@ -71,6 +75,35 @@ export default function AccessPage({ onBack }: { onBack: () => void }) {
     } catch {
       setCopied(false)
     }
+  }
+
+  /**
+   * Ends this browser's session, then forgets what the device kept (T6).
+   *
+   * The server goes first: the session cookie is httpOnly, so only the server can
+   * end it, and wiping the caches of a device that is still signed in would only
+   * look like a sign-out. Offline it is refused for the same reason — the session
+   * would survive, and the next time the phone has network it would be back in.
+   * The full reload drops everything the running app holds in memory.
+   */
+  async function signOut() {
+    if (!navigator.onLine) {
+      setError(t.access.signOutOffline)
+      return
+    }
+    if (!(await confirmAction(t.access.signOutConfirm))) return
+    setBusy(true)
+    setError(null)
+    try {
+      await api.logout()
+      await purgeSensitiveCaches()
+    } catch (e) {
+      setError((e as Error).message)
+      haptic('error')
+      setBusy(false)
+      return
+    }
+    window.location.replace('/')
   }
 
   return (
@@ -155,6 +188,18 @@ export default function AccessPage({ onBack }: { onBack: () => void }) {
 
         <p className="muted">{t.access.telegramNote}</p>
       </div>
+
+      {/* A browser session only: inside Telegram the account is the way in and
+          there is nothing here to end, and the demo has its own exit. */}
+      {!inTelegram && !isDemo() && (
+        <div className="panel">
+          <h2>{t.access.signOutTitle}</h2>
+          <p className="muted">{online ? t.access.signOutHint : t.access.signOutOffline}</p>
+          <button className="btn danger" disabled={busy || !online} onClick={signOut}>
+            {t.access.signOut}
+          </button>
+        </div>
+      )}
     </>
   )
 }

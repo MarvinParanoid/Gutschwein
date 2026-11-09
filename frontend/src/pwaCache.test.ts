@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { dropUnversionedBarcodes } from './pwaCache'
+import { dropUnversionedBarcodes, purgeSensitiveCaches } from './pwaCache'
 
 /** Just enough of Cache Storage: these tests check which entries are deleted, not
     how a browser stores them — that is for the e2e suite with a real worker. */
@@ -53,5 +53,32 @@ describe('dropUnversionedBarcodes', () => {
 
   it('does nothing where Cache Storage does not exist', async () => {
     await expect(dropUnversionedBarcodes()).resolves.toBeUndefined()
+  })
+})
+
+describe('purgeSensitiveCaches', () => {
+  it('deletes every cache with card data and keeps the app shell', async () => {
+    const fake = fakeCaches({
+      'gutschwein-api': ['https://app.test/api/me'],
+      'gutschwein-cards': ['https://app.test/api/images/ab/one.webp'],
+      'gutschwein-barcodes': ['https://app.test/api/barcodes/ab/one.webp?v=1'],
+      'workbox-precache-v2-https://app.test/': ['https://app.test/index.html'],
+    })
+    vi.stubGlobal('caches', fake)
+
+    await purgeSensitiveCaches()
+
+    expect([...fake.stores.keys()]).toEqual(['workbox-precache-v2-https://app.test/'])
+  })
+
+  it('is not undone by the startup housekeeping running at the same time', async () => {
+    // `open` creates what it opens: interleaved, the housekeeping re-created the
+    // pictures' cache right after the purge had deleted it.
+    const fake = fakeCaches({ 'gutschwein-cards': ['https://app.test/api/images/ab/one.webp'] })
+    vi.stubGlobal('caches', fake)
+
+    await Promise.all([dropUnversionedBarcodes(), purgeSensitiveCaches()])
+
+    expect(fake.stores.size).toBe(0)
   })
 })

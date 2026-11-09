@@ -266,6 +266,13 @@ export const de: Dictionary = {
     myDevice: 'Link für ein weiteres Gerät von mir',
     linkNote: (minutes: number) =>
       `Der Link gilt einmalig und ${minutes} Minuten. Nicht weiterleiten — er öffnet unsere Karten.`,
+    signOutTitle: 'Dieses Gerät',
+    signOutHint:
+      'Abmelden beendet die Sitzung dieses Browsers und löscht die Karten, Codes und Bilder, die hier für die Offline-Nutzung gespeichert sind. Zum Zurückkommen brauchst du einen neuen Anmeldelink.',
+    signOut: 'Auf diesem Gerät abmelden',
+    signOutConfirm: 'Abmelden? Zum Zurückkommen brauchst du einen neuen Anmeldelink.',
+    signOutOffline:
+      'Offline. Abmelden geht nur mit Netz, sonst bliebe die Sitzung gültig. Dieses Gerät lässt sich auch von einem anderen aus abmelden, unter „Zugang“.',
   },
 
   common: {

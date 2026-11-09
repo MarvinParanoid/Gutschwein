@@ -127,3 +127,63 @@ async def test_redeeming_marks_the_token_used(client: TestClient) -> None:
         assert await redeem_login_token(session, token) is not None
         # Second call inside the same session, straight against the helper.
         assert await redeem_login_token(session, token) is None
+
+
+# --- signing out (T6) -----------------------------------------------------------------
+
+
+def _without_dev_header(client: TestClient):
+    """A browser: only the cookie, as the PWA has."""
+    return TestClient(client.app, base_url=str(client.base_url))
+
+
+async def test_signing_out_ends_the_session_and_clears_the_http_cache(
+    client: TestClient,
+) -> None:
+    user = await _member(555003)
+    token = await _token(user)
+    with _without_dev_header(client) as browser:
+        assert browser.post("/api/auth/login", json={"token": token}).status_code == 200
+        assert browser.get("/api/me").status_code == 200
+
+        out = browser.post("/api/auth/logout")
+
+        assert out.status_code == 204
+        # Pictures sit in the HTTP cache for a year; only this header reaches it.
+        assert out.headers["clear-site-data"] == '"cache"'
+        # The cookie is expired in the response…
+        assert 'gutschwein_session=""' in out.headers["set-cookie"]
+        assert "Max-Age=0" in out.headers["set-cookie"]
+        # …and the session is gone on the server, so a copy of it is worthless.
+        assert browser.get("/api/me").status_code == 401
+
+    async with SessionLocal() as session:
+        left = (await session.execute(select(Session).where(Session.user_id == user.id))).all()
+    assert left == []
+
+
+async def test_a_session_revoked_elsewhere_can_still_sign_out(client: TestClient) -> None:
+    """The device that was signed out remotely still holds a cookie and caches; the
+    button must clean them up instead of answering 401 and leaving them."""
+    user = await _member(555004)
+    token = await _token(user)
+    with _without_dev_header(client) as browser:
+        browser.post("/api/auth/login", json={"token": token})
+        async with SessionLocal() as session:
+            for row in (
+                await session.execute(select(Session).where(Session.user_id == user.id))
+            ).scalars():
+                await session.delete(row)
+            await session.commit()
+        assert browser.get("/api/me").status_code == 401
+
+        out = browser.post("/api/auth/logout")
+
+    assert out.status_code == 204
+    assert out.headers["clear-site-data"] == '"cache"'
+
+
+def test_signing_out_without_any_session_is_harmless(client: TestClient) -> None:
+    with _without_dev_header(client) as browser:
+        out = browser.post("/api/auth/logout")
+    assert out.status_code == 204

@@ -3,6 +3,7 @@ import { createDemoApi } from './demo/api'
 import { demoBarcode, demoImage } from './demo/assets'
 import { isDemo } from './demo/session'
 import { language, t } from './i18n'
+import { purgeSensitiveCaches } from './pwaCache'
 import { tg } from './telegram'
 import type {
   Comment,
@@ -18,7 +19,25 @@ import type {
   VoucherStatus,
 } from './types'
 
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message)
+  }
+}
+
+/**
+ * This device is not (or no longer) let in: signed out elsewhere, session expired,
+ * membership ended. Whatever the worker cached while it was let in goes now, not
+ * whenever it ages out — otherwise a revoked phone keeps every card it has seen
+ * for offline use. 403 counts only on a read: on a write it may be the CSRF check
+ * (app/csrf.py) refusing one request, which says nothing about the device.
+ */
+function lostAccess(status: number, method: string): boolean {
+  return status === 401 || (status === 403 && method === 'GET')
+}
 
 /** The server answers errors in this language; it matches what the UI shows. */
 function languageHeader(): Record<string, string> {
@@ -48,6 +67,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   })
 
   if (!response.ok) {
+    if (lostAccess(response.status, (init.method ?? 'GET').toUpperCase())) {
+      void purgeSensitiveCaches().catch(() => undefined)
+    }
     let detail = t.app.genericError(response.status)
     try {
       const body = await response.json()
@@ -56,7 +78,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     } catch {
       // non-JSON error body: keep the status text
     }
-    throw new ApiError(detail)
+    throw new ApiError(detail, response.status)
   }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>

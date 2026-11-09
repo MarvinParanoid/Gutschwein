@@ -103,8 +103,9 @@ Neither path may become a way around the other; `tests/test_membership.py` asser
 
 Sessions are visible and revocable from *Access* in the app: the household sees every
 signed-in browser, not only its own, because the point is to notice a device that should
-not be there. The browser making the request cannot revoke itself from that list — logging
-out is a different button, and a screen that signs you out of itself reads as a crash.
+not be there. The browser making the request cannot revoke itself from that list — signing
+out is a different button below it (see *Signing out*), and a list entry that signs you out
+of the screen you are on reads as a crash.
 
 The PWA has no `initData`, so it uses a one-time link — from the bot's `/login` or from the
 console — exchanged for an httpOnly, Secure, SameSite=Lax cookie. Tokens are stored as
@@ -146,6 +147,56 @@ Offline, the card page and its barcode are the ones last loaded, and they agree 
 other. They may both be behind an edit made on another device since; the scan screen says
 so ("as last loaded") while the device is offline. Pictures never change under an address
 (a replaced picture is a new file), so they need no version.
+
+### Signing out (T6)
+
+*Access → This device → Sign out on this device*, in the PWA only: inside Telegram the
+account is the way in and there is no session to end, and the demo has its own exit.
+
+1. `POST /api/auth/logout` deletes the session row and expires the cookie. It needs no
+   valid session, so a device already signed out from elsewhere can still clean up; holding
+   the cookie is what it takes, and app.csrf refuses it cross-site. The response carries
+   `Clear-Site-Data: "cache"`, which drops the browser's HTTP cache for the origin —
+   pictures are served with a year's `max-age`, and no script can reach that cache.
+2. The page deletes `gutschwein-api`, `gutschwein-cards` and `gutschwein-barcodes`
+   (`purgeSensitiveCaches`). The precached app shell stays; it holds no data, and without
+   it the sign-in screen could not open offline.
+3. A full reload drops everything the running app held in memory.
+
+The server goes first: the cookie is httpOnly, so only the server can end the session, and
+wiping the caches of a browser that is still signed in would only look like a sign-out. For
+the same reason sign-out is **refused offline** — the session would survive and be back
+with the network. The screen says so, and points to signing the device out from another
+one.
+
+**A lost or revoked session** purges the same caches: any `401`, or a `403` on a read, from
+the API (`lostAccess` in `api.ts`). A `403` on a write is not enough — it may be the CSRF
+check refusing one request. So a device signed out from elsewhere, or whose member was
+removed, forgets the cards on its next contact with the server.
+
+Nothing sensitive is kept in `localStorage` or `sessionStorage`: the session is an httpOnly
+cookie, Telegram's `initData` is kept by Telegram's own script in session storage and
+expires after 24 hours, the demo flag is a boolean, and the chosen language is a device setting that survives sign-out on purpose.
+
+### What signing out does not do
+
+- **Picture and barcode URLs stay valid.** They are capability URLs: the address is the
+  permission, and no session is checked (see *Access model*). Deleting the device's caches
+  does not revoke an address someone already has — in another browser's cache, a forwarded
+  message, a screenshot of the network log. A member who is removed can still open the
+  pictures of cards they had opened, not of new ones. Replacing a picture, or deleting the
+  card, makes the maintenance sweep delete the old file, which is the only way to take one
+  back.
+- **A device that never comes online again keeps what it had.** While offline the worker
+  answers from its caches, and nothing reaches the device to tell it the session ended; it
+  forgets on its next request that gets an answer. The session itself is dead on the
+  server at once.
+- **`Clear-Site-Data` is a request.** Chromium honours `"cache"` (`e2e/logout.spec.ts`
+  checks it); other browsers' support depends on the browser and its version, and a browser that ignores it keeps the pictures it
+  fetched in its HTTP cache until they expire. They can only be opened again by their
+  addresses, which nothing left on the device lists.
+- **Telegram's WebView** keeps its own caches, which the page cannot always reach the same
+  way; inside Telegram there is no sign-out, and access ends by removing the member.
 
 ## Things worth knowing before changing something
 

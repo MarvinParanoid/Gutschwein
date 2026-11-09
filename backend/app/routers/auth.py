@@ -73,15 +73,28 @@ async def login(payload: LoginRequest, response: Response, session: Session) -> 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
-    user: CurrentUser,
     session: Session,
     response: Response,
     gutschwein_session: Annotated[str | None, Cookie()] = None,
 ) -> None:
-    """Drops this browser's session; other devices keep theirs."""
+    """Drops this browser's session; other devices keep theirs.
+
+    No signed-in member is required. A browser whose session was already revoked
+    from another device, or has expired, still holds the cookie and whatever its
+    caches kept; signing out must clean that up too rather than answer 401 and
+    leave it. Holding the cookie is all it takes to end that one session — the
+    same thing that let it be used. Cross-site POSTs are refused by app.csrf.
+
+    `Clear-Site-Data: "cache"` asks the browser to drop its HTTP cache for this
+    origin: pictures are served with a year's max-age, and a script cannot reach
+    that cache. The service worker's caches are deleted by the page itself
+    (src/pwaCache.ts); "storage" would do that too, but would also wipe settings
+    of the device that are not the member's, such as the chosen language.
+    """
     if gutschwein_session:
         await close_session(session, gutschwein_session)
-    response.delete_cookie(COOKIE_NAME, path="/")
+    response.delete_cookie(COOKIE_NAME, path="/", secure=True, httponly=True, samesite="lax")
+    response.headers["Clear-Site-Data"] = '"cache"'
 
 
 @router.get("/sessions", response_model=list[SessionOut])

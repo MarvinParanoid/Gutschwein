@@ -262,6 +262,13 @@ export const en: Dictionary = {
     myDevice: 'Link for another device of mine',
     linkNote: (minutes: number) =>
       `The link is single use and lives ${minutes} minutes. Do not forward it — it opens our cards.`,
+    signOutTitle: 'This device',
+    signOutHint:
+      'Signing out ends this browser’s session and deletes the cards, codes and pictures kept on it for offline use. To come back you will need a new login link.',
+    signOut: 'Sign out on this device',
+    signOutConfirm: 'Sign out? To come back you will need a new login link.',
+    signOutOffline:
+      'Offline. Signing out needs the network, or the session would stay valid. This device can also be signed out from another one, under Access.',
   },
 
   common: {
