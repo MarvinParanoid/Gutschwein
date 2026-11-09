@@ -16,7 +16,8 @@ dependencies = [
     "aiogram>=3.13",
     # Uploads are re-encoded to WebP: HEIC from iPhones is otherwise stored fine
     # and then fails to render in the webview.
-    "pillow>=10",
+    # 13.0: fixes for decoder memory-safety advisories that 12.x is affected by.
+    "pillow>=13",
     "pillow-heif>=0.16",
     # Reads the barcode out of a card screenshot and redraws it as SVG.
     "zxing-cpp>=2.2",

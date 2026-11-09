@@ -7,6 +7,7 @@ attached; the fields are then filled in inside the Mini App.
 import asyncio
 import logging
 from datetime import date, timedelta
+from html import escape
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
@@ -18,6 +19,7 @@ from aiogram.types import (
     Message,
     WebAppInfo,
 )
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +29,7 @@ from app.backup import backup_loop, send_backup
 from app.config import settings
 from app.db import SessionLocal
 from app.digest import build_digest, digest_loop
+from app.i18n import Message as I18nMessage
 from app.i18n import default_language, group_t, html_t, language_for
 from app.models import EventKind, Voucher, VoucherStatus, utcnow
 from app.notify import notify
@@ -156,9 +159,24 @@ def build_dispatcher() -> Dispatcher:
     async def on_image(message: Message, bot: Bot) -> None:
         if not allowed(message):
             return
-        file_id = message.photo[-1].file_id if message.photo else message.document.file_id
-        buffer = await bot.download(file_id)
-        image_path = storage.save_bytes(buffer.read())
+        picture = message.photo[-1] if message.photo else message.document
+        language = lang(message)
+        # The upload limit, applied before downloading: Telegram hands bots files of
+        # up to 20 MB, and a document claims "image/*" on the sender's word.
+        if (picture.file_size or 0) > storage.MAX_IMAGE_BYTES:
+            limit = storage.MAX_IMAGE_BYTES // 1024 // 1024
+            await message.answer(html_t("error.file_too_big", language, limit=limit))
+            return
+        buffer = await bot.download(picture.file_id)
+        try:
+            image_path = await storage.store(buffer.read())
+        except HTTPException as exc:
+            # Unreadable, a format the app does not take, or too large to decode: say
+            # which, instead of leaving the sender without an answer.
+            detail = exc.detail
+            text = detail.render(language) if isinstance(detail, I18nMessage) else str(detail)
+            await message.answer(escape(text))
+            return
 
         async with SessionLocal() as session:
             user = await upsert_user(session, _telegram_user(message))
@@ -176,7 +194,6 @@ def build_dispatcher() -> Dispatcher:
             # A caption like "Rewe 50" is all a gift card needs — no app required.
             parsed = parse_quick_add(message.caption or "")
             complete = await apply_quick_add(session, user, voucher, parsed)
-            language = lang(message)
             reply = _describe(voucher, complete, parsed, language) + _barcode_note(
                 voucher, language
             )

@@ -74,6 +74,10 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
   `tests/test_membership.py` and `tests/test_invite.py` guard that.
 - Auth carries no session: every request re-validates `initData`, which expires after
   `INIT_DATA_MAX_AGE` (24h). Reopening the Mini App issues a fresh one.
+- Pictures are decoded only through `storage`: `Image.open(..., formats=ACCEPTED_FORMATS)`
+  (JPEG, PNG, WEBP, HEIF — judged by the bytes, never the declared type), refused above
+  `MAX_PIXELS` from the header before any pixel is decoded, and from async code only via
+  `storage.store()`, which runs the decode in a thread, one at a time.
 - Uploads are two-step: `POST /api/uploads` returns an `image_id`, then the voucher is
   created/patched with it. A picture belongs to one voucher: `_claim_image()` refuses a
   second owner with 409, under the writer lock, and a unique index (0011) backs it up —

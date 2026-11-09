@@ -35,6 +35,8 @@ from dataclasses import dataclass
 import zxingcpp
 from PIL import Image, ImageOps
 
+from app import storage
+
 log = logging.getLogger(__name__)
 
 # Thin bars in a phone screenshot can fall below the decoder's resolution; the
@@ -155,7 +157,11 @@ def _attempts(image: Image.Image) -> Iterator[Image.Image]:
 def decode(data: bytes) -> Decoded | None:
     """Find a barcode in an image. Returns None when there is nothing to find."""
     try:
-        with Image.open(io.BytesIO(data)) as image:
+        # The stored pictures pass through the same gate as uploads: the formats the
+        # app accepts, and nothing larger than it would have stored.
+        with Image.open(io.BytesIO(data), formats=storage.ACCEPTED_FORMATS) as image:
+            if image.width * image.height > storage.MAX_PIXELS:
+                return None
             image.load()
             for attempt in _attempts(image):
                 found = _read(attempt)

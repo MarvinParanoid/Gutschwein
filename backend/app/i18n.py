@@ -63,6 +63,11 @@ MESSAGES: dict[str, dict[str, str]] = {
         EN: "Invalid file path",
         DE: "Ungültiger Dateipfad",
     },
+    "error.image_too_large": {
+        RU: "Изображение слишком большое: больше {megapixels} мегапикселей",
+        EN: "The image is too large: more than {megapixels} megapixels",
+        DE: "Das Bild ist zu groß: mehr als {megapixels} Megapixel",
+    },
     "error.unsupported_type": {
         RU: "Неподдерживаемый тип файла: {content_type}",
         EN: "Unsupported file type: {content_type}",

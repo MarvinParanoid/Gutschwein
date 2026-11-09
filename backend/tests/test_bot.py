@@ -18,7 +18,7 @@ import pytest
 from aiogram import Bot
 from aiogram.client.session.base import BaseSession
 from aiogram.methods import SendMessage, TelegramMethod
-from aiogram.types import Chat, Message, PhotoSize, Update
+from aiogram.types import Chat, Document, Message, PhotoSize, Update
 from aiogram.types import User as TgUser
 from sqlalchemy import select
 
@@ -203,3 +203,49 @@ async def test_a_group_reply_carries_no_app_button(bot, session, text) -> None:
 
     assert session.replies
     assert not any(_has_app_button(m) for m in session.calls)
+
+
+# --- pictures the bot is sent (T1, T8) ------------------------------------------------
+
+
+def _document(data_size: int, mime: str = "image/png") -> Message:
+    return Message(
+        message_id=1,
+        date=datetime.now(UTC),
+        chat=Chat(id=CHAT, type="private"),
+        from_user=TgUser(id=MEMBER, is_bot=False, first_name="Аня", language_code="ru"),
+        document=Document(file_id="D", file_unique_id="DU", mime_type=mime, file_size=data_size),
+    )
+
+
+async def test_a_document_over_the_limit_is_refused_before_downloading(bot, session, monkeypatch):
+    downloads = []
+    monkeypatch.setattr(
+        type(bot), "download", lambda self, file_id, **kw: downloads.append(file_id)
+    )
+    before = await _card_count()
+
+    await _feed(bot, _document(20 * 1024 * 1024))
+
+    assert downloads == []
+    assert "12" in session.replies[0]
+    assert await _card_count() == before
+
+
+async def test_a_picture_the_app_does_not_take_gets_an_answer_not_a_draft(
+    bot, session, monkeypatch
+) -> None:
+    """A TIFF sent as an "image/*" document: refused with a reason, nothing stored."""
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8)).save(buffer, "TIFF")
+    monkeypatch.setattr(
+        type(bot), "download", lambda self, file_id, **kw: _as_bytes(buffer.getvalue())
+    )
+    before = await _card_count()
+
+    await _feed(bot, _document(len(buffer.getvalue()), "image/tiff"))
+
+    assert session.replies == ["Не удалось прочитать изображение"]
+    assert await _card_count() == before
