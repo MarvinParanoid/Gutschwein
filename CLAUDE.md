@@ -94,6 +94,10 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
 - Auth refusals that mean the device is out carry `X-Auth-Failure` (`app/auth.py`); the
   client purges its offline caches on exactly those. A new 401/403 that is about access
   needs a reason there, and one that is not must not get one.
+- Backups (`app/backup.py`) count only after `verify_archive` read them back; the local
+  copy is written as `*.partial` and renamed, rotation never leaves fewer than one, and a
+  failure is posted to the family chat. Never log archive contents — sizes and counts.
+  The background loops start in `main.lifespan`, not inside the bot's polling.
 - Status changes go through `_transition()` in `routers/vouchers.py`, which also writes the
   event. Don't set `voucher.status` directly.
 - API errors carry a key, not a sentence: `raise HTTPException(404, Message("error.x"))`.

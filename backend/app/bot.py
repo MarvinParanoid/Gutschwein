@@ -24,7 +24,7 @@ from sqlalchemy import or_, select, update
 
 from app import storage
 from app.auth import TelegramUser, upsert_user
-from app.backup import backup_loop, send_backup
+from app.backup import BackupBusy, send_backup
 from app.config import settings
 from app.db import SessionLocal
 from app.digest import build_digest, digest_loop
@@ -92,6 +92,8 @@ def build_dispatcher() -> Dispatcher:
             reason = group_t("backup.reason_manual", name=message.from_user.first_name)
             summary = await send_backup(bot, reason)
             await message.answer(html_t("bot.backup_done", language, summary=summary))
+        except BackupBusy:
+            await message.answer(html_t("bot.backup_busy", language))
         except Exception as exc:  # noqa: BLE001 - report the reason to the user
             log.warning("manual backup failed", exc_info=True)
             await message.answer(html_t("bot.backup_failed", language, error=exc))
@@ -415,14 +417,13 @@ def create_bot() -> Bot:
 
 
 async def run_bot(bot: Bot) -> None:
+    """Polling only. The background loops are started by main's lifespan on their
+    own: as tasks of this one they ended with it, so a bot that stopped polling (a
+    revoked token, a crash) silently took the backups and reminders with it (T10)."""
     dp = build_dispatcher()
-    background = [
-        asyncio.create_task(expiry_reminder_loop(bot)),
-        asyncio.create_task(backup_loop(bot)),
-        asyncio.create_task(digest_loop(bot)),
-    ]
-    try:
-        await dp.start_polling(bot, handle_signals=False)
-    finally:
-        for task in background:
-            task.cancel()
+    await dp.start_polling(bot, handle_signals=False)
+
+
+def background_loops(bot: Bot) -> list:
+    """What runs beside the bot and needs it to send: reminders and the digest."""
+    return [expiry_reminder_loop(bot), digest_loop(bot)]

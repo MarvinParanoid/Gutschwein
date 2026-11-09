@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -12,6 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import notify
+from app.backup import backup_loop
 from app.config import settings
 from app.csrf import OriginCheck, trusted_origins
 from app.db import SessionLocal
@@ -48,13 +50,16 @@ async def lifespan(app: FastAPI):
 
     bot_task: asyncio.Task | None = None
     bot = None
+    loops: list[asyncio.Task] = []
     if settings.run_bot and settings.bot_token:
-        from app.bot import create_bot, run_bot
+        from app.bot import background_loops, create_bot, run_bot
 
         bot = create_bot()
         notify.set_notifier(bot)
         bot_task = asyncio.create_task(run_bot(bot))
         bot_task.add_done_callback(_report_bot_exit)
+        # Beside the polling, not inside it: they outlive a bot that stopped polling.
+        loops += [asyncio.create_task(loop) for loop in background_loops(bot)]
         log.info("telegram bot started")
     else:
         log.warning(
@@ -64,18 +69,23 @@ async def lifespan(app: FastAPI):
         )
 
     housekeeping = asyncio.create_task(maintenance_loop())
+    # With or without a bot: the local copy is the backup an install without
+    # Telegram has, and the one that survives a Telegram outage.
+    loops.append(asyncio.create_task(backup_loop(bot)))
 
     try:
         yield
     finally:
         notify.set_notifier(None)
         housekeeping.cancel()
+        for loop in loops:
+            loop.cancel()
         if bot_task is not None:
             bot_task.cancel()
-            try:
+            # A bot that already died has been reported by _report_bot_exit; its
+            # error must not turn the shutdown into a crash as well.
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await bot_task
-            except asyncio.CancelledError:
-                pass
         if bot is not None:
             await bot.session.close()
 

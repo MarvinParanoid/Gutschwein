@@ -26,8 +26,11 @@ class Settings(BaseSettings):
     # Data
     database_url: str = "sqlite+aiosqlite:///./data/gutschwein.db"
     data_dir: Path = Path("./data")
-    # Hour (UTC) of the nightly backup into FAMILY_CHAT_ID.
+    # Hour (UTC) from which the nightly backup is due: kept in DATA_DIR/backups,
+    # and sent to FAMILY_CHAT_ID when there is a bot.
     backup_hour_utc: int = 4
+    # Local archives kept in DATA_DIR/backups; never fewer than one.
+    backup_keep: int = 7
     # Group-chat messages have no single reader, so they use this language.
     default_language: str = "ru"
     # Weekly digest: Sunday evening, before the week's shopping starts.

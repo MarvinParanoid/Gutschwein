@@ -146,8 +146,8 @@ Every transaction is stored in the card history together with:
 - Nightly backups — *Telegram*
 
 Everything marked *Telegram* is delivered to the family chat, so without a bot those are
-simply off. Note that this leaves a Telegram-less install with no automatic backup: the
-nightly archive is a chat message. Back up `./data` yourself.
+simply off. The nightly backup is also kept on the server (`data/backups`), with or
+without a bot — but only the chat copy leaves the machine, so copy that directory elsewhere.
 
 ### Access
 

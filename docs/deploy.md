@@ -406,38 +406,109 @@ on every start, so run it as a one-off and then switch images:
 `docker compose run --rm app alembic downgrade 0009`. It removes the three columns and
 nothing else.
 
-A Telegram-less install has **no automatic backup**, because the nightly archive goes into
-the family chat. Back up `./data` yourself — the whole directory, not just the `.db`: SQLite
-runs in WAL mode, so recent transactions live in the `-wal` file next to it until they are
-checkpointed. The nightly archive is unaffected, it snapshots through sqlite's backup API
-and writes one complete file.
+A Telegram-less install still gets the nightly archive in `data/backups` (see *Backups*),
+but nothing off the machine. Copy `data/backups` elsewhere yourself; if you copy `./data`
+instead, take the whole directory, not just the `.db`: SQLite runs in WAL mode, so recent
+transactions live in the `-wal` file next to it until they are checkpointed.
 
 ## Backups
 
-Every night (`BACKUP_HOUR_UTC`, 04:00 UTC by default) the bot sends an archive into the
-family chat: the database plus every image. You read that chat daily anyway, so it is free
-off-site storage with no keys and no second server. Out of schedule: `/backup`.
+Every night, from `BACKUP_HOUR_UTC` on (04:00 UTC by default), the app packs the database
+and every picture into one archive and puts it in two places:
 
-The database is captured through **sqlite's online backup API** rather than by copying the
-file, because a copy taken mid-write can be unreadable; a test checks the snapshot with
-`PRAGMA integrity_check`. If the archive does not fit Telegram's 45 MB limit, the images
-are dropped and the caption says so.
+| | Where | Survives | Kept |
+|---|---|---|---|
+| Local copy | `data/backups/gutschwein-<UTC time>.tar.gz` (mode 600) | a Telegram outage, a revoked bot token, an install without a bot | the newest `BACKUP_KEEP` (7) |
+| Chat copy | the family chat (`FAMILY_CHAT_ID`) | losing the server | as long as Telegram keeps the message |
 
-The archive carries the card codes, both in the database and in the pictures — so they end
-up on Telegram's servers a second time. Leaving `FAMILY_CHAT_ID` empty switches the whole
-mechanism off.
+Out of schedule: `/backup` in the bot, or `docker compose exec app python -m app.backup now`
+(local copy only).
 
-## Restoring (rehearsed 2026-07-26)
+**A backup counts only once it has been read back.** The archive is unpacked into a
+temporary directory: the database must pass `PRAGMA integrity_check` and have its tables,
+every member must read to the end (a truncated gzip fails its CRC there), and every picture
+the cards point at must be in it. A missing picture does not void the backup — the
+database is still whole — but the summary and a chat message say how many are missing.
+
+**What can no longer fail silently:**
+- The run is due from `BACKUP_HOUR_UTC` on, checked every 15 minutes, so a server that was
+  down at four catches up when it is back. Once a day; the status file records the day.
+- Building the archive is tried twice. The upload is tried three times when the error is
+  transient (network, Telegram 5xx, "retry after"); a permanent one (chat not found, bot
+  removed) is not retried.
+- Whatever still fails is **posted to the family chat**: the local copy failed (with the
+  reason, e.g. `ENOSPC`), or the chat copy failed (saying whether the local one exists).
+  If even that message cannot be sent, it is an `ERROR` in the log.
+- If the newest local backup is older than 36 hours although the schedule has run, the chat
+  is told once a day — that catches the schedule stopping or the archives disappearing.
+- The loops run on their own, not as part of the bot's polling: a bot that stopped no
+  longer takes the backups and reminders with it.
+
+**Nothing pretends to be a backup.** The local archive is written as `*.partial` and renamed
+only after it passed its check; rotation runs only after that, keeps the newest
+`BACKUP_KEEP` and never fewer than one. A run is never two at a time: an in-process lock and
+a file lock on `data/.backup.lock`, which a console run respects too. Logs carry sizes and
+counts, never codes or picture names.
 
 ```bash
-cd /root/gutschwein
+docker compose exec app python -m app.backup status    # last run, local archives, exit 1 if stale
+docker compose exec app python -m app.backup verify data/backups/<file>
+```
+
+The database is captured through **sqlite's online backup API** rather than by copying the
+file: a copy taken mid-write can be unreadable, and the API also takes in what is still in
+the write-ahead log. If the archive does not fit Telegram's 45 MB limit, the chat copy
+drops the pictures and its caption says so; the local copy always has them.
+
+**Independent of this:** on the reference server, `/root/backup-services.sh` (cron, 04:30)
+snapshots `gutschwein.db` into `/root/backups/services/db` with its own integrity check —
+30 days plus the first of every month. It has no pictures, and it is on the same disk.
+
+### Who can read a backup
+
+An archive holds every card code, in the database and in the pictures. Today:
+
+- **The chat copy** goes unencrypted to the family chat: on Telegram's servers (encrypted in
+  transit and at rest by Telegram, readable by Telegram), and readable by **every member of
+  that chat** — who need not be the app's members, and who keep old archives after leaving
+  the app or the chat.
+- **The local copy** sits next to the live data, readable by root and by the app's uid —
+  exactly who can read `gutschwein.db` already. It adds no reader; it adds no protection
+  against losing the disk either.
+
+The options, none of which is implemented because each needs a decision:
+
+1. **A separate private chat for backups** (`BACKUP_CHAT_ID`, only the operator in it).
+   Cheapest change, no keys; Telegram can still read the archives.
+2. **Encrypt the chat copy** with a public key (`age`/`gpg` recipient in `.env`; the private
+   key never on the server). Telegram and the chat cannot read it; restoring needs the
+   private key, which must be stored somewhere safe *and tested* — a lost key is a lost
+   backup. Adds a dependency or a binary to the image.
+3. **Encrypted local copies mirrored off the machine** (`rsync` to another host, as the
+   services script's `BACKUP_MIRROR` already allows). No Telegram involvement at all, but a
+   second machine to keep.
+
+A reasonable path: 1 now; 2 if the chat must stay the off-site copy.
+
+## Restoring (rehearsed 2026-07-26; local archives 2026-11)
+
+Check the archive first, and restore into a fresh directory — never over the live one:
+
+```bash
+cd /root/sparschwein
+docker compose exec app python -m app.backup verify data/backups/<file>   # or a chat copy
 docker compose down
-rm -rf data && mkdir data
-tar xzf ~/gutschwein-2026-07-26.tar.gz -C data
+mv data data.before-restore            # keep it: it also holds data/backups
+mkdir data
+tar xzf data.before-restore/backups/<file> -C data    # or ~/gutschwein-YYYY-MM-DD.tar.gz
 # Required: the container runs as uid 10001 and SQLite needs to write.
 chown -R 10001:10001 data
 docker compose up -d
 ```
+
+`python -m app.backup extract <archive> <empty dir>` does the unpacking with the same
+check and refuses a directory that is not empty. `deploy.sh restore <snapshot>` is the
+other way back, from the snapshot a deployment took.
 
 **That `chown` is not belt-and-braces.** Without it the app starts and `/healthz` honestly
 answers `200`, because the health check never touches the database. Only the first write

@@ -397,6 +397,11 @@ MESSAGES: dict[str, dict[str, str]] = {
         EN: "Building the backup…",
         DE: "Erstelle das Backup…",
     },
+    "bot.backup_busy": {
+        RU: "Бэкап уже собирается — результат придёт в чат.",
+        EN: "A backup is already running — its result will arrive in the chat.",
+        DE: "Ein Backup läuft schon — das Ergebnis kommt in den Chat.",
+    },
     "bot.backup_done": {RU: "Готово: {summary}", EN: "Done: {summary}", DE: "Fertig: {summary}"},
     "bot.backup_failed": {
         RU: "Не получилось: {error}",
@@ -536,6 +541,40 @@ MESSAGES: dict[str, dict[str, str]] = {
         DE: "auf Anfrage von {name}",
     },
     "backup.reason_scheduled": {RU: "по расписанию", EN: "scheduled", DE: "planmäßig"},
+    "backup.images_missing": {
+        RU: "\n⚠️ В архиве нет картинок у {count} карт — их файлов нет и на сервере.",
+        EN: "\n⚠️ Pictures of {count} cards are missing from the archive and from the server.",
+        DE: "\n⚠️ Bilder von {count} Karten fehlen im Archiv und auch auf dem Server.",
+    },
+    "backup.failed_local": {
+        RU: "⚠️ Бэкап на сервере не получился: {error}. Последний удачный остался на месте.",
+        EN: "⚠️ The backup on the server failed: {error}. The last good one is still there.",
+        DE: "⚠️ Das Backup auf dem Server ist fehlgeschlagen: {error}. Das letzte gute ist noch da.",
+    },
+    "backup.failed_chat": {
+        RU: (
+            "⚠️ Бэкап не дошёл до чата: {error}. Копия на сервере: {kept}. "
+            "Завтра будет новая попытка, или пришлите /backup."
+        ),
+        EN: (
+            "⚠️ The backup did not reach the chat: {error}. Copy on the server: {kept}. "
+            "It will be tried again tomorrow, or send /backup."
+        ),
+        DE: (
+            "⚠️ Das Backup kam nicht im Chat an: {error}. Kopie auf dem Server: {kept}. "
+            "Morgen gibt es einen neuen Versuch, oder sende /backup."
+        ),
+    },
+    "backup.missing_report": {
+        RU: "⚠️ У {count} карт нет файла картинки на сервере — в бэкапе их тоже нет.",
+        EN: "⚠️ {count} cards have no picture file on the server, so the backup has none either.",
+        DE: "⚠️ Bei {count} Karten fehlt die Bilddatei auf dem Server, also auch im Backup.",
+    },
+    "backup.stale": {
+        RU: "⚠️ Свежего бэкапа нет уже {hours} ч. Проверьте сервер: python -m app.backup status",
+        EN: "⚠️ No fresh backup for {hours} h. Check the server: python -m app.backup status",
+        DE: "⚠️ Seit {hours} h kein frisches Backup. Server prüfen: python -m app.backup status",
+    },
     # --- weekly digest ---
     "digest.title": {
         RU: "🐷 <b>Сводка за неделю</b>",
