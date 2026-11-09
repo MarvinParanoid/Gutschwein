@@ -127,6 +127,7 @@ export const de: Dictionary = {
       'Zoomen mit zwei Fingern oder Doppeltipp. Helligkeit hochdrehen: ein helles Display liest der Scanner zuverlässiger',
     hintBarcode:
       'Aus der Karte neu gezeichnet — scharf bei jedem Zoom. Wird nicht gelesen? Wechsle aufs Foto',
+    offline: 'Offline: die Karte so, wie sie zuletzt geladen wurde',
   },
 
   comments: {

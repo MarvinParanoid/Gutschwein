@@ -37,9 +37,42 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
-            // Card pictures and barcodes never change: their names are content
-            // handles. Cache first means the till screen opens without network.
-            urlPattern: ({ url }) => /^\/api\/(images|barcodes)\//.test(url.pathname),
+            // Barcodes are drawn from the card's code, which can be corrected, so
+            // their address carries a version of it (`?v=`, src/barcode.ts) and the
+            // server refuses an outdated one. Under a versioned address the content
+            // never changes, so cache first is safe — the till screen opens without
+            // network — and a corrected code is simply a new address.
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/api/barcodes/') && url.searchParams.has('v'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'gutschwein-barcodes',
+              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 180 },
+              cacheableResponse: { statuses: [200] },
+              plugins: [
+                {
+                  // One version per barcode: once the new one is stored, the old
+                  // ones can only ever be asked for by a stale copy of the card,
+                  // and the server would refuse them anyway. Serialised into the
+                  // generated sw.js, so it may use nothing but the worker's globals.
+                  cacheDidUpdate: async ({ cacheName, request }) => {
+                    const stored = new URL(request.url)
+                    const cache = await caches.open(cacheName)
+                    for (const key of await cache.keys()) {
+                      const url = new URL(key.url)
+                      if (url.pathname === stored.pathname && url.search !== stored.search) {
+                        await cache.delete(key)
+                      }
+                    }
+                  },
+                },
+              ],
+            },
+          },
+          {
+            // Card pictures never change: their names are content handles. Cache
+            // first means the till screen opens without network.
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/images/'),
             handler: 'CacheFirst',
             options: {
               cacheName: 'gutschwein-cards',

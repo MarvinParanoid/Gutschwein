@@ -83,7 +83,7 @@ export default function VoucherPage({ voucherId, me, onBack, onDeleted, onEdit }
         <ScanOverlay
           imageId={voucher.image_id}
           code={voucher.code}
-          hasBarcode={Boolean(voucher.barcode_format)}
+          barcodeFormat={voucher.barcode_format}
           onClose={() => setScanning(false)}
         />
       )}

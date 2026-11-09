@@ -86,6 +86,11 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
   its last reference check and the unlink under `take_writer_lock()`, the same lock the
   claim holds, so it cannot race an attachment. Deleting in the request either lost a
   still-referenced picture when the commit failed or took another card's with it.
+- A barcode's address carries `?v=` — a hash of `format + "\n" + code`, computed in
+  `src/barcode.ts` and checked by `app.barcode.version` (shared test vectors). The worker
+  caches barcodes cache-first, so anything new the drawing depends on must go into that
+  hash on both sides, or a cached barcode will no longer match its card. See
+  `docs/internals.md`, *Offline and the device's caches*.
 - Status changes go through `_transition()` in `routers/vouchers.py`, which also writes the
   event. Don't set `voucher.status` directly.
 - API errors carry a key, not a sentence: `raise HTTPException(404, Message("error.x"))`.

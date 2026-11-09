@@ -173,6 +173,24 @@ def decode(data: bytes) -> Decoded | None:
         return None
 
 
+def version(code: str, barcode_format: str) -> str:
+    """A short fingerprint of everything the drawing depends on.
+
+    The barcode's address is derived from the picture, but the bars are drawn from
+    the card's code, which can be corrected later. The client puts this into the
+    URL (`?v=`) so a corrected code is a new address, and no cache — the service
+    worker's or the browser's — can answer with the old bars. The frontend computes
+    the same value (`src/barcode.ts`); `test_barcode.py` pins both to one vector.
+
+    FNV-1a, 32 bits: a cache key, not a secret. The URL already shows the barcode
+    itself to whoever holds it.
+    """
+    value = 0x811C9DC5
+    for byte in f"{barcode_format}\n{code}".encode():
+        value = ((value ^ byte) * 0x01000193) & 0xFFFFFFFF
+    return f"{value:08x}"
+
+
 def to_svg(text: str, barcode_format: str) -> str | None:
     """Redraw a decoded code as SVG, or None if this format cannot be written."""
     name = barcode_format.replace(" ", "").replace("-", "")

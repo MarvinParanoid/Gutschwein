@@ -1,3 +1,4 @@
+import { barcodeVersion } from './barcode'
 import { createDemoApi } from './demo/api'
 import { demoBarcode, demoImage } from './demo/assets'
 import { isDemo } from './demo/session'
@@ -137,6 +138,11 @@ export const api: ApiClient = isDemo() ? createDemoApi() : httpApi
 
 export const imageUrl = (imageId: string) =>
   isDemo() ? demoImage(imageId) : `/api/images/${imageId}`
-/** Barcode redrawn from the decoded code — sharp at any zoom, unlike the screenshot. */
-export const barcodeUrl = (imageId: string) =>
-  isDemo() ? demoBarcode(imageId) : `/api/barcodes/${imageId}`
+/**
+ * Barcode redrawn from the decoded code — sharp at any zoom, unlike the screenshot.
+ * Versioned by what it is drawn from, so a corrected code is a new address (T5).
+ */
+export const barcodeUrl = (imageId: string, code: string, format: string) =>
+  isDemo()
+    ? demoBarcode(code)
+    : `/api/barcodes/${imageId}?v=${barcodeVersion(code, format)}`

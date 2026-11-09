@@ -124,6 +124,7 @@ export const en: Dictionary = {
       'Pinch or double-tap to zoom. Turn the brightness up: scanners read a bright screen better',
     hintBarcode:
       'Redrawn from the card — sharp at any zoom. Not scanning? Switch to the photo',
+    offline: 'Offline: this is the card as it was last loaded',
   },
 
   comments: {

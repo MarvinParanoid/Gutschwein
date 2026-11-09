@@ -156,6 +156,11 @@ MESSAGES: dict[str, dict[str, str]] = {
         EN: "Barcode not found",
         DE: "Barcode nicht gefunden",
     },
+    "error.barcode_outdated": {
+        RU: "Код карты изменился — обновите карточку",
+        EN: "The card's code has changed — reload the card",
+        DE: "Der Code der Karte hat sich geändert — lade die Karte neu",
+    },
     "error.barcode_not_drawable": {
         RU: "Этот формат не перерисовывается",
         EN: "This symbology cannot be redrawn",

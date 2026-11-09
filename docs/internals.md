@@ -116,6 +116,37 @@ authorisation, because `<img src>` cannot send headers. The filename is 128 bits
 randomness, unguessable and never listed, and a link can simply be forwarded into the
 chat. If that ever stops being acceptable, serve them through `fetch` and a blob URL.
 
+## Offline and the device's caches
+
+The installed app works at a till without network. The service worker (`vite.config.ts`,
+Workbox) keeps three runtime caches next to the precached app shell:
+
+| Cache | What | Strategy | Bound |
+|---|---|---|---|
+| `gutschwein-cards` | pictures, `/api/images/…` | cache first | 300 entries, 180 days |
+| `gutschwein-barcodes` | redrawn barcodes, `/api/barcodes/…?v=` | cache first | 100 entries, 180 days, one version per barcode |
+| `gutschwein-api` | every other `GET /api/…` | network first, 4 s timeout | 60 entries, 7 days |
+
+**Barcodes are versioned (T5).** A barcode's address is derived from its picture, but the
+bars are drawn from the card's code, which can be corrected later (the form, `app.rescan`).
+Cached by the picture alone, a corrected code kept showing the old bars. The address now
+carries `?v=` — FNV-1a of `format + "\n" + code`, computed by `src/barcode.ts` and checked by
+`app.barcode.version`, pinned to the same vectors on both sides. So:
+
+- a corrected code is a new address, fetched from the network on first use;
+- the server answers a versioned address only while the card still has that code, so
+  nothing cached under an address can be anything but what the address names — an outdated
+  one is a 404, which the worker does not cache;
+- once the new version is stored, the worker deletes the other versions of that barcode;
+  unversioned entries left in `gutschwein-cards` by older installs are deleted at startup;
+- an address without `v` — an app from before versions — still works and is cached by the
+  browser for an hour, as before.
+
+Offline, the card page and its barcode are the ones last loaded, and they agree with each
+other. They may both be behind an edit made on another device since; the scan screen says
+so ("as last loaded") while the device is offline. Pictures never change under an address
+(a replaced picture is a new file), so they need no version.
+
 ## Things worth knowing before changing something
 
 - `settings` is a module-level singleton built at import time; tests set the environment in

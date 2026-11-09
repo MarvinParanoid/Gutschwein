@@ -267,3 +267,58 @@ def test_no_barcode_means_no_endpoint(client: TestClient) -> None:
 
     with TestClient(client.app) as anon:
         assert anon.get(f"/api/barcodes/{image_id}").status_code == 404
+
+
+# --- the address changes with the code (T5) --------------------------------------------
+
+# Shared with src/barcode.test.ts: the client computes the version, the server checks
+# it, and the two must agree byte for byte — non-ASCII included.
+VERSION_VECTORS = [
+    ("9998887776665", "Code 128", "31f6f200"),
+    ("Ё-1", "EAN-13", "fde4f6c1"),
+    ("", "", "0f0c6cdd"),
+]
+
+
+@pytest.mark.parametrize(("code", "fmt", "expected"), VERSION_VECTORS)
+def test_the_version_is_the_one_the_client_computes(code: str, fmt: str, expected: str) -> None:
+    assert barcode.version(code, fmt) == expected
+
+
+def test_a_corrected_code_gets_a_new_address_and_the_old_one_is_refused(
+    client: TestClient,
+) -> None:
+    """A cache keyed by the old address must never be handed the new bars, and the
+    new address must never be answered from a cache holding the old ones."""
+    png = as_png(screenshot_with(render(CARD_NUMBER)))
+    image_id = client.post(
+        "/api/uploads", files={"file": ("card.png", io.BytesIO(png), "image/png")}
+    ).json()["image_id"]
+    voucher = client.post(
+        "/api/vouchers", json={"merchant": "Penny-T5", "image_id": image_id}
+    ).json()
+    old = barcode.version(voucher["code"], voucher["barcode_format"])
+
+    with TestClient(client.app) as anon:
+        before = anon.get(f"/api/barcodes/{image_id}?v={old}")
+        assert before.status_code == 200
+        assert "immutable" in before.headers["cache-control"]
+
+        corrected = client.patch(f"/api/vouchers/{voucher['id']}", json={"code": "4006381333931"})
+        assert corrected.status_code == 200
+        new = barcode.version("4006381333931", corrected.json()["barcode_format"])
+        assert new != old
+
+        stale = anon.get(f"/api/barcodes/{image_id}?v={old}")
+        fresh = anon.get(f"/api/barcodes/{image_id}?v={new}")
+        # An app from before versions still gets the current code, briefly cached.
+        legacy = anon.get(f"/api/barcodes/{image_id}")
+
+    assert stale.status_code == 404
+    assert stale.json()["detail"] == "Код карты изменился — обновите карточку"
+    assert fresh.status_code == 200
+    assert fresh.text != before.text
+    assert fresh.text == barcode.to_svg("4006381333931", "Code 128")
+    assert legacy.status_code == 200
+    assert legacy.text == fresh.text
+    assert legacy.headers["cache-control"] == "private, max-age=3600"

@@ -30,6 +30,10 @@ function parse(imageId: string): DemoCard | null {
   return { shop, code: code ?? '', colour: brand.background, ink: brand.color }
 }
 
+// The code is typed by the visitor now, not taken from the seed.
+const escapeXml = (text: string) =>
+  text.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`)
+
 const dataUri = (svg: string) => `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 
 /**
@@ -41,7 +45,8 @@ function bars(code: string, height: number, unit: number): { svg: string; width:
   const rects: string[] = []
   let x = 0
   for (const character of code) {
-    const digit = Number(character)
+    // A typed code may hold letters as well; any character maps to some bars.
+    const digit = /\d/.test(character) ? Number(character) : character.charCodeAt(0) % 10
     const widths = [1 + (digit % 3), 1 + ((digit + 1) % 2), 1 + ((digit + 2) % 3), 1]
     widths.forEach((width, index) => {
       if (index % 2 === 0) {
@@ -53,16 +58,19 @@ function bars(code: string, height: number, unit: number): { svg: string; width:
   return { svg: rects.join(''), width: x }
 }
 
-/** The redrawn code, the same idea as the server's barcode endpoint. */
-export function demoBarcode(imageId: string): string {
-  const card = parse(imageId)
-  if (!card?.code) return ''
-  const { svg, width } = bars(card.code, 90, 3)
+/**
+ * The redrawn code, the same idea as the server's barcode endpoint: drawn from the
+ * card's current code, not from the one baked into the picture's id, so a corrected
+ * code shows here exactly as it would on a real card.
+ */
+export function demoBarcode(code: string): string {
+  if (!code) return ''
+  const { svg, width } = bars(code, 90, 3)
   return dataUri(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} 120" width="${width}" height="120">` +
       `<rect width="100%" height="100%" fill="#ffffff"/><g fill="#000000">${svg}</g>` +
       `<text x="${width / 2}" y="113" text-anchor="middle" font-family="monospace" font-size="16"` +
-      ` letter-spacing="2">${card.code}</text></svg>`,
+      ` letter-spacing="2">${escapeXml(code)}</text></svg>`,
   )
 }
 
