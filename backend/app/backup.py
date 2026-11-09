@@ -196,7 +196,8 @@ def _safe_members(tar: tarfile.TarFile) -> Iterator[tarfile.TarInfo]:
     for member in tar.getmembers():
         path = PurePosixPath(member.name)
         if path.is_absolute() or ".." in path.parts or not (member.isfile() or member.isdir()):
-            raise BackupError(f"unexpected entry in archive: {member.name!r}")
+            # Not named: an entry's name may be a picture's capability URL.
+            raise BackupError("unexpected entry in archive")
         yield member
 
 
@@ -238,7 +239,12 @@ def verify_archive(archive: Path, expect_images: bool = True) -> Checked:
                         "SELECT image_path FROM vouchers WHERE image_path IS NOT NULL"
                     )
                 ]
-    except (tarfile.TarError, EOFError, OSError, sqlite3.DatabaseError) as exc:
+    except OSError as exc:
+        if isinstance(exc, FileNotFoundError) or exc.errno not in (errno.ENOSPC, errno.EDQUOT):
+            raise BackupError(f"archive cannot be read: {type(exc).__name__}") from exc
+        # A full disk where the archive is unpacked says nothing about the archive.
+        raise BackupError(f"cannot check the archive: {_describe(exc)}") from exc
+    except (tarfile.TarError, EOFError, sqlite3.DatabaseError) as exc:
         raise BackupError(f"archive cannot be read: {type(exc).__name__}") from exc
 
     images = sum(1 for n in names if n.startswith("uploads/"))
@@ -303,18 +309,24 @@ def store_locally(now: datetime | None = None) -> tuple[Path, Checked]:
         os.replace(partial, final)
     finally:
         partial.unlink(missing_ok=True)
-    rotate()
+    rotate(protect=final)
     return final, checked
 
 
-def rotate(keep: int | None = None) -> list[Path]:
+def rotate(keep: int | None = None, protect: Path | None = None) -> list[Path]:
     """Delete local archives beyond the newest `keep`, and leftover partial files.
 
-    Never leaves fewer than one: with keep < 1 it still keeps the newest.
+    Never leaves fewer than one: with keep < 1 it still keeps the newest. `protect`
+    is the archive just written, which stays whatever its name: archives are ordered
+    by the time in their names, and after the clock went back the newest backup
+    would sort as the oldest and be the first one deleted.
     """
     keep = max(1, settings.backup_keep if keep is None else keep)
+    archives = [p for p in local_archives() if p != protect]
+    if protect is not None and protect.exists():
+        keep -= 1
     removed = []
-    for old in local_archives()[:-keep]:
+    for old in archives[: max(0, len(archives) - keep)]:
         old.unlink(missing_ok=True)
         removed.append(old)
     directory = backup_dir()
@@ -347,6 +359,15 @@ def _save_status(status: dict) -> None:
     os.replace(tmp, _status_path())
 
 
+def _try_save_status(status: dict) -> None:
+    """The status is bookkeeping. On a full disk it cannot be written — and that
+    must not stop the run from reporting the full disk, which is the news."""
+    try:
+        _save_status(status)
+    except OSError as exc:
+        log.error("backup status could not be written: %s", _describe(exc))
+
+
 def _write_status(outcome: Outcome, scheduled_day: str | None) -> None:
     status = read_status()
     status["last_run"] = asdict(outcome)
@@ -356,7 +377,7 @@ def _write_status(outcome: Outcome, scheduled_day: str | None) -> None:
         status["last_local_success"] = outcome.started
     if outcome.telegram == "sent":
         status["last_telegram_success"] = outcome.started
-    _save_status(status)
+    _try_save_status(status)
 
 
 def newest_good_backup_age(now: datetime | None = None) -> timedelta | None:
@@ -525,7 +546,10 @@ async def _report(bot: Bot | None, text: str) -> None:
 async def report_failures(bot: Bot | None, outcome: Outcome) -> None:
     if outcome.local_error:
         await _report(bot, group_t("backup.failed_local", error=outcome.local_error))
-    if outcome.telegram == "failed":
+    # Without a local archive the chat copy is rebuilt, and on a full disk it fails
+    # the same way: one message for one cause.
+    same_cause = outcome.local_error and outcome.telegram_error == outcome.local_error
+    if outcome.telegram == "failed" and not same_cause:
         await _report(
             bot,
             group_t(
@@ -542,6 +566,7 @@ async def report_failures(bot: Bot | None, outcome: Outcome) -> None:
 
 
 LEGACY_MARKER = ".last_backup"
+_attempted: dict[str, str | None] = {"day": None}
 
 
 def _due(now: datetime) -> str | None:
@@ -554,7 +579,9 @@ def _due(now: datetime) -> str | None:
     if now.hour < settings.backup_hour_utc:
         return None
     today = now.strftime("%Y-%m-%d")
-    if read_status().get("last_scheduled_day") == today:
+    # The status file, and this process's memory of it for when the file could not
+    # be written (a full disk): either way, one scheduled run a day.
+    if today in (read_status().get("last_scheduled_day"), _attempted["day"]):
         return None
     with contextlib.suppress(OSError):
         if (settings.data_dir / LEGACY_MARKER).read_text().strip() == today:
@@ -572,6 +599,10 @@ async def scheduled_tick(bot: Bot | None, now: datetime | None = None) -> Outcom
             outcome = await run_backup(bot, group_t("backup.reason_scheduled"), scheduled_day=day)
         except BackupBusy:
             return None  # a manual run is in progress; this one comes back next tick
+        except Exception as exc:  # noqa: BLE001 - e.g. no room even for the lock file
+            outcome = Outcome(started=now.isoformat(timespec="seconds"), local_error=_describe(exc))
+            log.error("backup could not start: %s", outcome.local_error)
+        _attempted["day"] = day
         await report_failures(bot, outcome)
 
     # A run that failed has just said so. Otherwise: is there a recent good backup at
@@ -586,7 +617,7 @@ async def scheduled_tick(bot: Bot | None, now: datetime | None = None) -> Outcom
         hours = "?" if age is None else str(int(age.total_seconds() // 3600))
         await _report(bot, group_t("backup.stale", hours=hours))
         status["stale_warned_day"] = today
-        _save_status(status)
+        _try_save_status(status)
     return outcome
 
 

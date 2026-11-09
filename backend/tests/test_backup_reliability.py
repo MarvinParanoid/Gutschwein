@@ -80,6 +80,8 @@ def data(client: TestClient, tmp_path: Path, monkeypatch) -> Path:
     monkeypatch.setattr(settings, "backup_keep", 3)
     monkeypatch.setattr(backup, "SEND_RETRY_DELAYS", (0, 0))
     monkeypatch.setattr(backup, "BUILD_RETRY_DELAYS", (0,))
+    # This process's memory of the day already attempted (see backup._due).
+    monkeypatch.setitem(backup._attempted, "day", None)
     return root
 
 
