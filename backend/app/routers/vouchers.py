@@ -8,7 +8,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import storage
+from app import barcode, storage
 from app.auth import CurrentUser
 from app.db import get_session
 from app.i18n import Message, group_t, request_language
@@ -25,6 +25,7 @@ from app.models import (
 from app.notify import notify
 from app.schemas import (
     BalanceUpdate,
+    BarcodeOut,
     CommentCreate,
     CommentOut,
     CountsOut,
@@ -261,7 +262,7 @@ async def list_merchants(user: CurrentUser, session: Session) -> list[str]:
 async def create_voucher(
     user: CurrentUser, session: Session, payload: VoucherCreate
 ) -> VoucherOut:
-    data = payload.model_dump(exclude={"image_id"})
+    data = payload.model_dump(exclude={"image_id", "barcode_format"})
     voucher = Voucher(
         **data, image_path=_resolve_image(payload.image_id), created_by_id=user.id
     )
@@ -270,6 +271,12 @@ async def create_voucher(
         voucher.balance_amount = voucher.value_amount
     apply_expiry_rule(voucher)
     await attach_barcode(voucher)
+    # Named by hand, the format overrides whatever the picture said — and is held to
+    # the code it has to draw. Left out, the picture's word stands unchecked: a typed
+    # code beside a decoded format is how a card has always been allowed to look.
+    if "barcode_format" in payload.model_fields_set:
+        voucher.barcode_format = payload.barcode_format
+        _check_barcode(voucher)
     session.add(voucher)
     # The INSERT takes the writer lock, so the claim below cannot interleave with
     # another one; a refusal rolls the INSERT back with it.
@@ -290,6 +297,42 @@ async def create_voucher(
             )
         )
     return await _serialize_one(session, voucher)
+
+
+def _check_barcode(voucher: Voucher) -> None:
+    """Refuse a code the chosen symbology cannot carry as it is written.
+
+    Without a code there is nothing to draw and nothing to check: clearing the code
+    leaves the format for when a new one is typed.
+    """
+    if not voucher.code or not voucher.barcode_format:
+        return
+    problem = barcode.problem(voucher.code, voucher.barcode_format)
+    if problem is not None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, problem)
+
+
+@router.get("/{voucher_id}/barcode", response_model=BarcodeOut)
+async def get_card_barcode(
+    user: CurrentUser, session: Session, voucher_id: int, v: str | None = None
+) -> BarcodeOut:
+    """The bars for a card without a picture, for members only.
+
+    A card with a picture has its barcode at /api/barcodes/<image>, a capability URL
+    an <img> can load. A card typed in by hand has no unguessable name to build one
+    from, and an address made of its id and the code's hash would let anyone confirm
+    a guessed code — so this one is behind the same check as the card itself, and
+    the client fetches it with its credentials. Same `?v=` rule as the other.
+    """
+    voucher = await get_voucher_or_404(session, voucher_id)
+    if not voucher.code or not voucher.barcode_format:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, Message("error.barcode_not_found"))
+    if v is not None and v != barcode.version(voucher.code, voucher.barcode_format):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, Message("error.barcode_outdated"))
+    svg = barcode.to_svg(voucher.code, voucher.barcode_format)
+    if svg is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, Message("error.barcode_not_drawable"))
+    return BarcodeOut(format=voucher.barcode_format, svg=svg)
 
 
 @router.get("/{voucher_id}", response_model=VoucherOut)
@@ -349,8 +392,13 @@ async def update_voucher(
         # was lost for good when the commit then failed. Once nothing points at it,
         # the maintenance sweep removes it.
         voucher.image_path = image_id
-        apply_barcode(voucher, found)
+        apply_barcode(voucher, found, keep_format="barcode_format" in wanted)
         record_event(session, voucher, user, EventKind.image_replaced)
+
+    # A code or a format changed by hand has to make bars that match it. Under the
+    # lock, so it judges the pair as it will be stored.
+    if {"code", "barcode_format"} & set(changed_fields):
+        _check_barcode(voucher)
 
     if changed_fields:
         record_event(

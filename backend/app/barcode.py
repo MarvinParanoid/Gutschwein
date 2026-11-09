@@ -30,6 +30,7 @@ unreadable and all six read this way.
 import hashlib
 import io
 import logging
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 
@@ -37,6 +38,7 @@ import zxingcpp
 from PIL import Image, ImageOps
 
 from app import storage
+from app.i18n import Message
 
 log = logging.getLogger(__name__)
 
@@ -203,3 +205,72 @@ def to_svg(text: str, barcode_format: str) -> str | None:
     except Exception:  # noqa: BLE001 - e.g. a checksum the writer refuses to forge
         log.info("cannot redraw %s barcode", barcode_format, exc_info=True)
         return None
+
+
+# --- codes typed by hand ---------------------------------------------------------------
+#
+# A plastic card or a code read off a receipt has no screenshot to decode, so the
+# member names the symbology. These are the ones cards and tills actually use; a
+# format the decoder found on a picture stays whatever it is, listed here or not.
+#
+# The writer is forgiving in ways that would put the wrong bars at the till: it pads
+# a short EAN or an odd ITF with zeros and upper-cases Code 39. Bars that differ
+# from the number printed under them are worse than no bars, so each format is held
+# to exactly what it encodes, before the writer gets to be helpful.
+
+MANUAL_FORMATS = (
+    "Code 128",
+    "EAN-13",
+    "EAN-8",
+    "UPC-A",
+    "Code 39",
+    "ITF",
+    "QR Code",
+    "Data Matrix",
+    "PDF417",
+    "Aztec",
+)
+
+# Digits, and how many, for the retail codes with a check digit.
+_CHECKED_LENGTH = {"EAN-13": 13, "EAN-8": 8, "UPC-A": 12}
+_DIGITS = re.compile(r"^[0-9]+$")
+_CODE39 = re.compile(r"^[0-9A-Z \-.$/+%]+$")
+# Printable ASCII: a till scanner reads anything beyond it in its own way, if at all.
+_CODE128 = re.compile(r"^[\x20-\x7e]+$")
+
+
+def check_digit(digits: str) -> int:
+    """The GS1 check digit for `digits` (the number without its last digit)."""
+    total = sum(int(d) * (3 if i % 2 == 0 else 1) for i, d in enumerate(reversed(digits)))
+    return (10 - total % 10) % 10
+
+
+def problem(code: str, barcode_format: str) -> Message | None:
+    """Why `code` cannot be drawn as `barcode_format`, or None when it can."""
+    length = _CHECKED_LENGTH.get(barcode_format)
+    if length is not None:
+        if not _DIGITS.match(code) or len(code) != length:
+            return Message("error.barcode_digits", format=barcode_format, count=length)
+        expected = check_digit(code[:-1])
+        if int(code[-1]) != expected:
+            return Message("error.barcode_check_digit", format=barcode_format, digit=expected)
+    elif barcode_format == "ITF":
+        if not _DIGITS.match(code) or len(code) % 2:
+            return Message("error.barcode_itf")
+    elif barcode_format == "Code 39":
+        if not _CODE39.match(code):
+            return Message("error.barcode_code39")
+    elif barcode_format == "Code 128":
+        if not _CODE128.match(code):
+            return Message("error.barcode_code128")
+    elif barcode_format not in MANUAL_FORMATS and not _known(barcode_format):
+        return Message("error.barcode_format_unknown")
+
+    if to_svg(code, barcode_format) is None:
+        return Message("error.barcode_not_drawable")
+    return None
+
+
+def _known(barcode_format: str) -> bool:
+    name = barcode_format.replace(" ", "").replace("-", "")
+    return getattr(zxingcpp.BarcodeFormat, name, None) is not None

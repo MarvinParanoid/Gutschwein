@@ -147,10 +147,21 @@ async def read_barcode(image_path: str | None) -> barcode.Decoded | None:
     return await asyncio.to_thread(barcode.decode, path.read_bytes())
 
 
-def apply_barcode(voucher: Voucher, found: barcode.Decoded | None) -> None:
-    """The quick half: record what `read_barcode` found on the voucher."""
-    voucher.barcode_format = found.format if found else None
-    if found and not voucher.code:
+def apply_barcode(
+    voucher: Voucher, found: barcode.Decoded | None, *, keep_format: bool = False
+) -> None:
+    """The quick half: record what `read_barcode` found on the voucher.
+
+    A picture with nothing readable in it says nothing about the card's code, so the
+    format already there stays: it may be one a member chose for a code typed by
+    hand, and the bars it draws come from that code, not from the picture. With
+    `keep_format` the member has just named the format themselves, and that wins.
+    """
+    if found is None:
+        return
+    if not keep_format:
+        voucher.barcode_format = found.format
+    if not voucher.code:
         voucher.code = found.text[:128]
 
 

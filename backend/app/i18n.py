@@ -161,6 +161,36 @@ MESSAGES: dict[str, dict[str, str]] = {
         EN: "The card's code has changed — reload the card",
         DE: "Der Code der Karte hat sich geändert — lade die Karte neu",
     },
+    "error.barcode_digits": {
+        RU: "{format}: нужно ровно {count} цифр",
+        EN: "{format}: exactly {count} digits are needed",
+        DE: "{format}: es braucht genau {count} Ziffern",
+    },
+    "error.barcode_check_digit": {
+        RU: "{format}: неверная контрольная цифра — последней должна быть {digit}. Проверьте код",
+        EN: "{format}: wrong check digit — the last one should be {digit}. Check the code",
+        DE: "{format}: falsche Prüfziffer — die letzte müsste {digit} sein. Prüf den Code",
+    },
+    "error.barcode_itf": {
+        RU: "ITF: только цифры, и их должно быть чётное количество",
+        EN: "ITF: digits only, and an even number of them",
+        DE: "ITF: nur Ziffern, und eine gerade Anzahl davon",
+    },
+    "error.barcode_code39": {
+        RU: "Code 39: только заглавные A–Z, цифры, пробел и - . $ / + %",
+        EN: "Code 39: only capital A–Z, digits, space and - . $ / + %",
+        DE: "Code 39: nur große A–Z, Ziffern, Leerzeichen und - . $ / + %",
+    },
+    "error.barcode_code128": {
+        RU: "Code 128: только латиница, цифры и обычные знаки — без кириллицы и умлаутов",
+        EN: "Code 128: Latin letters, digits and plain symbols only — no accents or Cyrillic",
+        DE: "Code 128: nur lateinische Buchstaben, Ziffern und einfache Zeichen — ohne Umlaute",
+    },
+    "error.barcode_format_unknown": {
+        RU: "Неизвестный тип штрихкода",
+        EN: "Unknown barcode type",
+        DE: "Unbekannter Barcode-Typ",
+    },
     "error.barcode_not_drawable": {
         RU: "Этот формат не перерисовывается",
         EN: "This symbology cannot be redrawn",

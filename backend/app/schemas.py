@@ -110,11 +110,23 @@ class VoucherFields(BaseModel):
     normalize_currency = field_validator("currency", mode="before")(normalize_currency)
 
 
+def blank_is_none(value: object) -> object:
+    """An empty or blank string means no barcode, the same as null."""
+    if isinstance(value, str):
+        return value.strip() or None
+    return value
+
+
 class VoucherCreate(VoucherFields):
     # Relative path returned by POST /api/uploads.
     image_id: str | None = None
+    # The symbology to draw `code` in, named by hand. Left out, the picture decides;
+    # null means "no barcode, just the number".
+    barcode_format: str | None = Field(None, max_length=32)
     status: VoucherStatus = VoucherStatus.active
     currency: Currency = "EUR"
+
+    normalize_barcode_format = field_validator("barcode_format", mode="before")(blank_is_none)
 
     @field_validator("status")
     @classmethod
@@ -138,9 +150,11 @@ class VoucherUpdate(BaseModel):
     conditions: str | None = None
     notes: str | None = None
     image_id: str | None = None
+    barcode_format: str | None = Field(None, max_length=32)
     balance_uncertain: bool | None = None
 
     normalize_currency = field_validator("currency", mode="before")(normalize_currency)
+    normalize_barcode_format = field_validator("barcode_format", mode="before")(blank_is_none)
 
     @model_validator(mode="before")
     @classmethod
@@ -192,6 +206,13 @@ class VoucherOut(VoucherFields):
         if not self.code or not self.barcode_format:
             return None
         return barcode.version(self.code, self.barcode_format)
+
+
+class BarcodeOut(BaseModel):
+    """A barcode drawn for a card with no picture to hang a capability URL on."""
+
+    format: str
+    svg: str
 
 
 class BalanceUpdate(BaseModel):
