@@ -119,10 +119,14 @@ Every transaction is stored in the card history together with:
 
 ### Checkout
 
-- White fullscreen scan mode
+- One tap from the list straight to the till
+- White fullscreen scan mode with the shop and the balance on top
 - Full-width barcode
+- The code in large type, grouped for reading aloud, with a copy button
 - Zoom, and a rotate button for cards printed sideways
 - SVG barcode rendering for crisp scaling
+- A barcode for a code typed by hand: pick the type (Code 128, EAN-13, QR, …) and the
+  server draws it, after checking the code fits — a wrong EAN check digit is named
 
 ### Adding cards
 

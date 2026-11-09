@@ -162,6 +162,22 @@ impossible. So:
 - an address without `v` — an app from before versions — still works and is cached by the
   browser for an hour, as before.
 
+**A card without a picture** has no capability URL to draw at: there is no unguessable
+name, and an address made of the card id and the code's hash would let anyone confirm a
+guessed code by asking for it. Its bars come from `GET /api/vouchers/{id}/barcode?v=`,
+behind the card's own access check, as JSON with the SVG inside; the client fetches it with
+credentials and shows it inline. It is an ordinary API answer, so offline it comes from
+`gutschwein-api` (network first), which is purged with the others on a lost session. The
+same `?v=` rule applies. Cards with a picture keep `/api/barcodes/<image>?v=` whether their
+format was decoded or chosen by hand.
+
+**Codes typed by hand** are held to their symbology before anything is drawn
+(`barcode.problem()`, mirrored in `src/barcodeFormats.ts` for the form's hint): the writer
+pads a short EAN or an odd ITF with zeros and upper-cases Code 39, which would put bars at
+the till that differ from the printed number. The check runs only when a member changes
+the code or the format; a decoded format beside a typed code is left as it was. A picture
+with nothing readable in it no longer clears the format.
+
 Offline, the card page and its barcode are the ones last loaded, and they agree with each
 other. They may both be behind an edit made on another device since; the scan screen says
 so ("as last loaded") while the device is offline. Pictures never change under an address
