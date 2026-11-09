@@ -228,6 +228,8 @@ class Host:
             "DEPLOY_MIN_FREE_MB": "1",
             "DEPLOY_HEALTH_TRIES": "2",
             "DEPLOY_HEALTH_DELAY": "0",
+            # Restoring hands the data to uid 10001; the tests do not run as root.
+            "DEPLOY_DATA_OWNER": "",
             **extra,
         }
 
@@ -237,6 +239,19 @@ class Host:
             [SHELL, str(SCRIPT)],
             check=False,
             env=self.env(SSH_ORIGINAL_COMMAND=command, **extra),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    def shell(self, *args: str, **extra: str):
+        """deploy.sh run from a shell on the server: arguments, no forced command."""
+        env = self.env(**extra)
+        env.pop("SSH_ORIGINAL_COMMAND", None)
+        return subprocess.run(
+            [SHELL, str(SCRIPT), *args],
+            check=False,
+            env=env,
             capture_output=True,
             text=True,
             timeout=60,
@@ -866,3 +881,186 @@ def test_dry_run_works_while_a_deployment_holds_the_lock(host: Host) -> None:
     assert report.returncode == 0
     assert "stage=preflight" in report.stdout  # it sees the running deployment's note
     assert first.wait(timeout=30) == 0
+
+
+# --- restore --------------------------------------------------------------------------
+
+
+def _rows(db: Path) -> int:
+    return sqlite3.connect(db).execute("SELECT count(*) FROM vouchers").fetchone()[0]
+
+
+def _deployed_then_changed(host: Host) -> Path:
+    """A deployment, then the new version writing: what a restore has to undo."""
+    assert host.deploy().returncode == 0
+    (snapshot,) = host.snapshots()
+    db = sqlite3.connect(host.data / "gutschwein.db")
+    db.executemany("INSERT INTO vouchers (merchant) VALUES (?)", [("After",)] * 4)
+    db.commit()
+    db.close()
+    (host.data / "uploads" / "2026-10" / f"{'c' * 32}.webp").write_bytes(b"new picture")
+    return snapshot
+
+
+def test_restore_puts_the_snapshot_and_its_image_back_and_keeps_the_rest(host: Host) -> None:
+    snapshot = _deployed_then_changed(host)
+
+    result = host.shell("restore", snapshot.name, "--accept-loss")
+
+    assert result.returncode == 0, result.stderr
+    assert _sha(host.data / "gutschwein.db") == _sha(snapshot / "gutschwein.db")
+    assert _rows(host.data / "gutschwein.db") == 3
+    assert sorted(p.name for p in (host.data / "uploads").rglob("*.webp")) == sorted(
+        p.name for p in (snapshot / "uploads").rglob("*.webp")
+    )
+    state = host.load()
+    assert state["container"]["image"] == OLD and state["container"]["running"]
+    assert f"{IMAGE}:latest" in host.tags(OLD)
+    # Nothing that was there is lost: it is set aside, with the newer rows and picture.
+    (aside,) = host.dir.glob("data.before-restore-*")
+    assert _rows(aside / "gutschwein.db") == 7
+    assert (aside / "uploads" / "2026-10" / f"{'c' * 32}.webp").exists()
+    assert snapshot.is_dir()  # the snapshot itself is kept
+
+
+def test_restore_refuses_to_discard_newer_data_without_being_told(host: Host) -> None:
+    snapshot = _deployed_then_changed(host)
+    before = (_tree(host.dir, host.snapshot_root), _docker(host))
+
+    result = host.shell("restore", snapshot.name)
+
+    assert result.returncode != 0
+    assert "--accept-loss" in result.stderr
+    assert "vouchers: сейчас 7" in result.stdout and "картинок новее снимка: 1" in result.stdout
+    assert (_tree(host.dir, host.snapshot_root), _docker(host)) == before
+
+
+def test_restore_with_nothing_newer_needs_no_flag(host: Host) -> None:
+    assert host.deploy().returncode == 0
+    (snapshot,) = host.snapshots()
+
+    result = host.shell("restore", snapshot.name)
+
+    assert result.returncode == 0, result.stderr
+    assert host.load()["container"]["image"] == OLD
+
+
+@pytest.mark.parametrize("damage", ["tampered", "missing-image", "partial"])
+def test_restore_refuses_a_snapshot_it_cannot_trust(host: Host, damage: str) -> None:
+    assert host.deploy().returncode == 0
+    (snapshot,) = host.snapshots()
+    name = snapshot.name
+    if damage == "tampered":
+        db = sqlite3.connect(snapshot / "gutschwein.db")
+        db.execute("DELETE FROM vouchers")
+        db.commit()
+        db.close()
+    elif damage == "missing-image":
+        host.state = host.load()
+        del host.state["images"][OLD]
+        host.save()
+    else:
+        snapshot.rename(snapshot.with_name(name + ".partial"))
+    before = (_tree(host.dir, host.snapshot_root), _docker(host))
+
+    result = host.shell("restore", name, "--accept-loss")
+
+    assert result.returncode != 0
+    assert "ничего не тронуто" in result.stderr
+    assert (_tree(host.dir, host.snapshot_root), _docker(host)) == before
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["", "../sparschwein", "20260101T000000Z-aaaaaaaaaaaa/..", "x\n20260101T000000Z-aaaaaaaaaaaa"],
+)
+def test_restore_accepts_only_a_snapshot_name(host: Host, name: str) -> None:
+    result = host.shell("restore", name, "--accept-loss")
+
+    assert result.returncode != 0
+    assert host.load()["log"] == []
+
+
+def test_a_failed_restore_puts_the_data_back_and_restarts_the_app(host: Host) -> None:
+    snapshot = _deployed_then_changed(host)
+    before_db = _sha(host.data / "gutschwein.db")
+    next((snapshot / "uploads").rglob("*.webp")).chmod(0)  # the copy will fail
+
+    result = host.shell("restore", snapshot.name, "--accept-loss")
+
+    assert result.returncode != 0
+    assert "данные возвращены как были" in result.stdout
+    assert _sha(host.data / "gutschwein.db") == before_db
+    assert not list(host.dir.glob("data.before-restore-*"))
+    state = host.load()
+    assert state["container"]["image"] == NEW and state["container"]["running"]
+
+
+def test_the_deploy_key_cannot_restore(host: Host) -> None:
+    assert host.deploy().returncode == 0
+    (snapshot,) = host.snapshots()
+    calls = len(host.load()["log"])
+
+    result = host.deploy(f"restore {snapshot.name} --accept-loss")
+
+    assert result.returncode != 0
+    assert "неизвестная команда" in result.stderr
+    assert len(host.load()["log"]) == calls
+
+
+def test_restore_answers_a_note_left_by_a_failed_deployment(host: Host) -> None:
+    host.state["health"] = False
+    host.save()
+    assert host.deploy().returncode != 0
+    note = host.snapshot_root / "in-progress"
+    assert "stage=health" in note.read_text()
+    (snapshot,) = host.snapshots()
+
+    host.state = host.load()
+    host.state["health"] = True
+    host.save()
+    restored = host.shell("restore", snapshot.name, "--accept-loss")
+
+    assert restored.returncode == 0, restored.stderr
+    assert not note.exists()
+    assert list(host.snapshot_root.glob("in-progress.restored-*"))
+    assert host.deploy(f"deploy {TAG_NEWER}").returncode == 0  # no longer blocked
+
+
+def test_restore_waits_for_nobody(host: Host) -> None:
+    assert host.deploy().returncode == 0
+    (snapshot,) = host.snapshots()
+    host.state = host.load()
+    host.state["pull_sleep"] = 3
+    host.save()
+    running = host.start(f"deploy {TAG_NEWER}")
+    host.wait_for(f"pull -q {IMAGE}:{TAG_NEWER}")
+
+    result = host.shell("restore", snapshot.name, "--accept-loss")
+
+    assert result.returncode != 0
+    assert "уже идёт другой деплой" in result.stderr
+    assert running.wait(timeout=30) == 0
+
+
+def test_dry_run_lists_the_snapshots_to_restore(host: Host) -> None:
+    assert host.deploy().returncode == 0
+    (snapshot,) = host.snapshots()
+
+    report = host.deploy("dry-run")
+
+    assert f"{snapshot.name}  ревизия 0011" in report.stdout
+
+
+def test_the_snapshot_leaves_the_live_database_files_as_they_were(host: Host) -> None:
+    """Opening the live database, even read-only, creates -wal/-shm when a clean
+    shutdown removed them — as root, on the server, where the app's uid then cannot
+    write its own database. The snapshot reads a copy instead."""
+    database = host.data / "gutschwein.db"
+    for suffix in ("-wal", "-shm"):
+        assert not Path(f"{database}{suffix}").exists()  # a clean close removed them
+    before = _tree(host.data)
+
+    assert host.deploy().returncode == 0
+
+    assert _tree(host.data) == before

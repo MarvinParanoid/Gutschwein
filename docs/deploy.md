@@ -261,19 +261,25 @@ on.
 `dry-run` is read-only: it pulls, tags, starts, stops, creates and deletes nothing, takes no
 lock, and works while a deployment is running.
 
-Going back to the snapshot by hand — this **discards everything written since it was
-taken**, so it is for a deployment that failed, not for one that has been in use:
+Going back to a snapshot — after a deployment whose new version migrated the database and
+then failed — is one command, run from a shell on the server (the deploy key cannot run it):
 
 ```bash
-cd /root/sparschwein
-docker compose stop app
-mv data data.before-restore-$(date -u +%Y%m%dT%H%M%SZ)          # never delete it
-mkdir -p data
-cp -a /root/gutschwein-snapshots/<name>/gutschwein.db /root/gutschwein-snapshots/<name>/uploads data/
-chown -R 10001:10001 data
-docker tag ghcr.io/marvinparanoid/gutschwein:previous ghcr.io/marvinparanoid/gutschwein:latest
-GUTSCHWEIN_TAG=latest docker compose up -d
+ssh root@your-server 'SSH_ORIGINAL_COMMAND=dry-run /root/deploy.sh'          # lists the snapshots
+ssh root@your-server '/root/deploy.sh restore <snapshot>'                      # or, if it warns:
+ssh root@your-server '/root/deploy.sh restore <snapshot> --accept-loss'
 ```
+
+Before touching anything it checks the snapshot against its recorded checksum and with
+`PRAGMA integrity_check`, makes sure the image the snapshot was taken from is on the machine,
+and compares the live data with the snapshot. **If anything was written since the snapshot
+was taken** — cards, payments, sessions, pictures — it lists what and refuses unless
+`--accept-loss` is given, because restoring discards it. Then it stops the app, moves the
+current `data/` to `data.before-restore-<time>` (never deleted), puts the snapshot's database
+and pictures in place, hands them to uid 10001, and starts the snapshot's image. If putting
+the snapshot in place fails before the app starts, the move is undone and the old app started
+again. A note left by a failed deployment is moved to `in-progress.restored-<time>`, which
+unblocks the next deployment.
 
 The snapshot directory holds every card's code, so it is `700` and belongs on the server
 only.

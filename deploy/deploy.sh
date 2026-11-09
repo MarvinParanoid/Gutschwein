@@ -7,6 +7,13 @@
 #   deploy                 the same with :latest
 #   dry-run                report state, change nothing
 #
+# From a shell on the server only (an argument, which the forced key cannot pass):
+#
+#   deploy.sh restore <snapshot> [--accept-loss]
+#                          put a snapshot's database and pictures back and start the
+#                          image it was taken from; refuses to discard newer data
+#                          unless told to, and never deletes the data it replaces
+#
 # Before anything is stopped, the disk is checked and the new image is pulled and
 # import-checked; a failure there leaves the running version untouched. Then the
 # app is stopped, the database and the pictures are snapshotted, and only then is
@@ -63,8 +70,11 @@ if [ "$ACTION" = "dry-run" ]; then
     echo "образ: $(docker inspect --format "{{.Config.Image}}" sparschwein-app-1 2>/dev/null || echo нет)"
     echo "digest: $(docker inspect --format "{{index .RepoDigests 0}}" ghcr.io/marvinparanoid/gutschwein:latest 2>/dev/null | cut -d@ -f2 | cut -c1-19 || echo -)"
     echo "кандидат для отката (:previous): $(docker image inspect --format "{{.Id}}" "$IMAGE:previous" 2>/dev/null | cut -c8-19 || echo нет)"
+    echo "снимки (для deploy.sh restore <имя>):"
     # shellcheck disable=SC2010  # snapshot names are generated below: timestamp-tag
-    echo "последний снимок: $(ls -1 "$SNAPSHOTS" 2>/dev/null | grep -E "$SNAPSHOT_NAME" | sort | tail -n 1 || true)"
+    for name in $(ls -1 "$SNAPSHOTS" 2>/dev/null | grep -E "$SNAPSHOT_NAME" | sort); do
+        echo "  $name  ревизия $(sed -n 's/^alembic_version=//p' "$SNAPSHOTS/$name/snapshot.txt" 2>/dev/null)"
+    done
     if [ -f "$PROGRESS" ]; then
         echo "ПРЕРВАННЫЙ ДЕПЛОЙ (см. docs/deploy.md, «Interrupted deployments»):"
         sed 's/^/  /' "$PROGRESS"
@@ -73,7 +83,13 @@ if [ "$ACTION" = "dry-run" ]; then
     exit 0
 fi
 
-[ "$ACTION" = "deploy" ] || die "неизвестная команда: $ACTION"
+# Restoring is chosen by argument, never by SSH_ORIGINAL_COMMAND: sshd runs the forced
+# command without the client's arguments, so the deploy key cannot reach it.
+if [ "${1:-}" = "restore" ] && [ -z "${SSH_ORIGINAL_COMMAND:-}" ]; then
+    ACTION=restore
+elif [ "$ACTION" != "deploy" ]; then
+    die "неизвестная команда: $ACTION"
+fi
 # A tag goes into image references and a directory name: twelve hex characters
 # exactly. `case` sees the whole value, newlines included, unlike a line-wise grep.
 if [ "$GUTSCHWEIN_TAG" != "latest" ]; then
@@ -88,6 +104,152 @@ fi
 mkdir -p "$(dirname "$LOCK")"
 exec 9>"$LOCK"
 flock -n 9 || die "уже идёт другой деплой (замок $LOCK) — ничего не тронуто"
+
+wait_healthy() {
+    i=0
+    while [ $i -lt "$HEALTH_TRIES" ]; do
+        if curl -fsS http://127.0.0.1:8000/healthz >/dev/null 2>&1; then
+            return 0
+        fi
+        i=$((i + 1))
+        sleep "$HEALTH_DELAY"
+    done
+    return 1
+}
+
+# --- restore (by hand) ----------------------------------------------------------------
+#
+# The way back from a deployment whose new version migrated the database and then
+# failed: the old image refuses a schema newer than itself, so the snapshot taken
+# right before goes back together with the image it was taken from. Every check runs
+# before anything is touched; the data being replaced is moved aside, never deleted;
+# and if putting the snapshot in place fails before the app is started, that move is
+# undone, so a failed restore leaves the host exactly as it found it.
+if [ "$ACTION" = "restore" ]; then
+    name=${2:-}
+    accept_loss=${3:-}
+    [ -n "$name" ] || die "укажите снимок: deploy.sh restore <имя> (список: dry-run)"
+    # One line exactly, in the generated shape: the name becomes a path below.
+    if [ "$(printf '%s' "$name" | wc -l)" -ne 0 ] || ! printf '%s' "$name" | grep -Eq "$SNAPSHOT_NAME"; then
+        die "нет такого снимка: $name"
+    fi
+    source_dir="$SNAPSHOTS/$name"
+    if [ ! -f "$source_dir/snapshot.txt" ] || [ ! -f "$source_dir/gutschwein.db" ]; then
+        die "снимок $name неполный или отсутствует — ничего не тронуто"
+    fi
+    [ -z "$accept_loss" ] || [ "$accept_loss" = "--accept-loss" ] || die "неизвестный флаг: $accept_loss"
+
+    from_image=$(sed -n 's/^from_image=//p' "$source_dir/snapshot.txt")
+    [ -n "$from_image" ] || die "в снимке $name нет образа, из которого он снят — ничего не тронуто"
+    docker image inspect "$from_image" >/dev/null 2>&1 \
+        || die "образа $from_image нет на этой машине — ничего не тронуто"
+
+    # The snapshot must be what was written, and readable; then what would be lost.
+    python3 - "$source_dir" "$DIR/data/gutschwein.db" "$DIR/data/uploads" <<'PY' >&2 || die "снимок не прошёл проверку — ничего не тронуто"
+import hashlib, sqlite3, sys
+from pathlib import Path
+snap, live_db, live_uploads = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+meta = dict(l.split("=", 1) for l in (snap / "snapshot.txt").read_text().splitlines() if "=" in l)
+if hashlib.sha256((snap / "gutschwein.db").read_bytes()).hexdigest() != meta.get("db_sha256"):
+    sys.exit("checksum differs from snapshot.txt")
+copy = sqlite3.connect((snap / "gutschwein.db").resolve().as_uri() + "?mode=ro", uri=True)
+if copy.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+    sys.exit("integrity_check failed")
+PY
+    loss=$(python3 - "$source_dir" "$DIR/data/gutschwein.db" "$DIR/data/uploads" <<'PY'
+import sqlite3, sys
+from pathlib import Path
+snap, live_db, live_uploads = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+def shape(path, live=False):
+    # The live database is read through a copy, for the reason given at the snapshot.
+    if live:
+        import shutil, tempfile
+        work = tempfile.mkdtemp()
+        for suffix in ("", "-wal"):
+            if Path(f"{path}{suffix}").exists():
+                shutil.copyfile(f"{path}{suffix}", f"{work}/live.db{suffix}")
+        path = Path(work) / "live.db"
+    db = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
+    out = {}
+    for table in ("vouchers", "events", "comments", "users", "sessions", "login_tokens"):
+        try:
+            out[table] = db.execute(f"SELECT count(*), coalesce(max(id), 0) FROM {table}").fetchone()
+        except sqlite3.Error:
+            out[table] = None
+    return out
+if not live_db.exists():
+    sys.exit(0)
+try:
+    then, now = shape(snap / "gutschwein.db"), shape(live_db, live=True)
+except sqlite3.Error as exc:
+    print(f"текущая база не читается ({exc}) — что в ней, неизвестно")
+    sys.exit(0)
+for table, row in now.items():
+    if row is not None and then.get(table) != row:
+        print(f"{table}: сейчас {row[0]} строк (max id {row[1]}), в снимке {then[table][0] if then.get(table) else '-'}")
+known = {p.relative_to(snap / "uploads").as_posix() for p in (snap / "uploads").rglob("*") if p.is_file()} if (snap / "uploads").exists() else set()
+newer = [p for p in live_uploads.rglob("*") if p.is_file() and p.relative_to(live_uploads).as_posix() not in known] if live_uploads.exists() else []
+if newer:
+    print(f"картинок новее снимка: {len(newer)}")
+PY
+)
+    if [ -n "$loss" ]; then
+        say "С момента снимка в данных появилось то, чего в нём нет — это будет отложено в сторону:"
+        printf '%s\n' "$loss" | sed 's/^/  /' >&8
+        [ "$accept_loss" = "--accept-loss" ] \
+            || die "повторите с --accept-loss, если это ожидаемо. Ничего не тронуто"
+    fi
+
+    aside="$DIR/data.before-restore-$(date -u +%Y%m%dT%H%M%SZ)"
+    RESTORE_MOVED=0
+    # shellcheck disable=SC2317,SC2329  # invoked through the EXIT trap
+    undo_restore() {
+        status=$?
+        trap - EXIT
+        set +e
+        if [ "$status" -ne 0 ] && [ "$RESTORE_MOVED" = 1 ]; then
+            rm -rf "$DIR/data"
+            mv "$aside" "$DIR/data"
+            docker compose start app >/dev/null 2>&1
+            say "восстановление не удалось — данные возвращены как были, прежний контейнер запущен"
+        fi
+        exit "$status"
+    }
+    trap undo_restore EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    trap '' PIPE
+
+    docker compose stop app >/dev/null 2>&1 || true
+    mv "$DIR/data" "$aside"
+    RESTORE_MOVED=1
+    mkdir "$DIR/data"
+    cp -a "$source_dir/gutschwein.db" "$DIR/data/gutschwein.db"
+    if [ -d "$source_dir/uploads" ]; then
+        cp -a "$source_dir/uploads" "$DIR/data/uploads"
+    fi
+    # The container runs as uid 10001; without this the app starts and every write
+    # fails with "readonly database" (docs/deploy.md, Restoring).
+    if [ -n "${DEPLOY_DATA_OWNER-10001:10001}" ]; then
+        chown -R "${DEPLOY_DATA_OWNER-10001:10001}" "$DIR/data"
+    fi
+    docker tag "$from_image" "$IMAGE:latest"
+    RESTORE_MOVED=0  # from here the restored data is what runs; nothing is moved back
+    GUTSCHWEIN_TAG=latest docker compose up -d \
+        || die "контейнер не создан. Восстановленные данные на месте, прежние — в $aside"
+    if [ -f "$PROGRESS" ]; then
+        # The question the note kept open is answered by this restore.
+        mv "$PROGRESS" "$PROGRESS.restored-$(date -u +%Y%m%dT%H%M%SZ)"
+    fi
+    if wait_healthy; then
+        say "восстановлено из $name; прежние данные — в $aside (не удалены)"
+        exit 0
+    fi
+    say "приложение не ответило после восстановления; прежние данные — в $aside"
+    docker compose logs --tail=50 app >&8 2>/dev/null || true
+    exit 1
+fi
 
 # A run that ended while the new version was being switched in or checked may have
 # left the database half-migrated, and its note is the only record of that. Nothing
@@ -249,14 +411,23 @@ if [ -f data/gutschwein.db ]; then
         echo "to_tag=$GUTSCHWEIN_TAG"
         echo "to_image=$new_id"
         # SQLite's backup API, not a file copy: it reads committed transactions
-        # still sitting in the -wal file too, and never a half-written page.
+        # still sitting in the -wal file too, and never a half-written page. It reads
+        # a copy of the files, not the live ones: opening the live database — even
+        # read-only — creates -wal/-shm beside it when a clean shutdown removed them,
+        # and created by root they would leave the app's uid unable to write. With
+        # the app stopped, the copy is exact.
         python3 - "$DIR/data/gutschwein.db" "$PARTIAL/gutschwein.db" <<'PY' || die "снимок базы не удался"
-import hashlib, sqlite3, sys
+import hashlib, shutil, sqlite3, sys, tempfile
 from pathlib import Path
-source = sqlite3.connect(Path(sys.argv[1]).resolve().as_uri() + "?mode=ro", uri=True)
-target = sqlite3.connect(sys.argv[2])
-source.backup(target)
-source.close()
+live = Path(sys.argv[1])
+with tempfile.TemporaryDirectory() as work:
+    for suffix in ("", "-wal"):
+        if Path(f"{live}{suffix}").exists():
+            shutil.copyfile(f"{live}{suffix}", f"{work}/live.db{suffix}")
+    source = sqlite3.connect(f"{work}/live.db")
+    target = sqlite3.connect(sys.argv[2])
+    source.backup(target)
+    source.close()
 # The copy inherits WAL mode; one self-contained file is what a snapshot should be.
 target.execute("PRAGMA journal_mode=DELETE")
 result = target.execute("PRAGMA integrity_check").fetchone()[0]
