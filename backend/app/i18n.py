@@ -352,6 +352,20 @@ MESSAGES: dict[str, dict[str, str]] = {
             "Bildunterschrift — oder schreib es einfach."
         ),
     },
+    "bot.unknown_command": {
+        RU: (
+            "Такой команды нет — я умею /start, /login, /digest, /backup и /id. "
+            "Чтобы добавить карту, пришлите скрин с подписью «Rewe 50»."
+        ),
+        EN: (
+            "There is no such command — I know /start, /login, /digest, /backup and /id. "
+            "To add a card, send a screenshot captioned “Rewe 50”."
+        ),
+        DE: (
+            "Diesen Befehl gibt es nicht — ich kenne /start, /login, /digest, /backup und /id. "
+            "Für eine neue Karte schick einen Screenshot mit „Rewe 50“ als Bildunterschrift."
+        ),
+    },
     "bot.no_drafts": {
         RU: "Черновиков нет. Пришлите скрин карты — можно сразу с подписью «Rewe 50».",
         EN: "No drafts. Send a card screenshot — with a caption like “Rewe 50” if you like.",

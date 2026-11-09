@@ -249,3 +249,91 @@ async def test_a_picture_the_app_does_not_take_gets_an_answer_not_a_draft(
 
     assert session.replies == ["Не удалось прочитать изображение"]
     assert await _card_count() == before
+
+
+# --- "/invite · 80.45 EUR": a command and a stray amount published a forgotten draft ---------
+
+_next_member = iter(range(770100, 770200))
+
+
+@pytest.fixture
+def member(monkeypatch) -> int:
+    """A member of the test's own: the others leave fresh drafts of MEMBER's behind, and
+    the bot fills the newest one."""
+    telegram_id = next(_next_member)
+    monkeypatch.setattr(settings, "allowed_telegram_ids", f"{MEMBER},{telegram_id}")
+    return telegram_id
+
+
+async def _photo_draft(member: int, minutes_ago: int, *, source: str = "bot") -> int:
+    """A draft as the photo handler leaves it, created `minutes_ago` minutes back."""
+    from datetime import timedelta
+
+    from sqlalchemy import update
+
+    from app.auth import TelegramUser, upsert_user
+    from app.models import EventKind, utcnow
+    from app.services import record_event
+
+    async with SessionLocal() as db:
+        user = await upsert_user(db, TelegramUser({"id": member, "first_name": "Аня"}))
+        voucher = Voucher(status=VoucherStatus.draft, created_by_id=user.id)
+        db.add(voucher)
+        await db.flush()
+        record_event(db, voucher, user, EventKind.created, {"source": source})
+        await db.execute(
+            update(Voucher)
+            .where(Voucher.id == voucher.id)
+            .values(created_at=utcnow() - timedelta(minutes=minutes_ago))
+        )
+        await db.commit()
+        return voucher.id
+
+
+async def _voucher(voucher_id: int) -> Voucher:
+    async with SessionLocal() as db:
+        return await db.get(Voucher, voucher_id)
+
+
+async def test_an_unknown_command_is_not_a_shop_name(bot, session, member) -> None:
+    draft = await _photo_draft(member, minutes_ago=1)
+
+    await _feed(bot, _message("/invite", user_id=member))
+
+    assert not (await _voucher(draft)).merchant
+    assert "/login" in session.replies[0]  # the commands it does know
+
+
+async def test_a_bare_amount_does_not_publish_a_forgotten_draft(bot, session, member) -> None:
+    """The production incident: an old draft took "/invite" as its shop, and a later
+    "80.45" made it a card the family chat was told about."""
+    forgotten = await _photo_draft(member, minutes_ago=24 * 60)
+    before = await _card_count()
+
+    await _feed(bot, _message("80.45", user_id=member))
+
+    card = await _voucher(forgotten)
+    assert card.status == VoucherStatus.draft
+    assert card.value_amount is None
+    assert await _card_count() == before
+    assert "Черновиков нет" in session.replies[0]
+
+
+async def test_a_draft_saved_in_the_app_is_not_filled_from_the_bot(bot, session, member) -> None:
+    in_the_app = await _photo_draft(member, minutes_ago=1, source="app")
+
+    await _feed(bot, _message("Appladen 40", user_id=member))
+
+    assert not (await _voucher(in_the_app)).merchant
+
+
+async def test_the_amount_right_after_a_photo_still_completes_it(bot, session, member) -> None:
+    draft = await _photo_draft(member, minutes_ago=2)
+
+    await _feed(bot, _message("Nachladen", user_id=member))
+    await _feed(bot, _message("25", user_id=member))
+
+    card = await _voucher(draft)
+    assert card.status == VoucherStatus.active
+    assert card.merchant == "Nachladen"
+    assert str(card.balance_amount) == "25.00"

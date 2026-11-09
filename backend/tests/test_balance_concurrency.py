@@ -30,7 +30,7 @@ from app.db import SessionLocal
 from app.main import app
 from app.models import Event, EventKind, User, Voucher
 from app.routers import vouchers as vouchers_router
-from app.services import lock_voucher_or_404
+from app.services import lock_voucher_or_404, record_event
 
 ANNA = {"X-Dev-User": "1000"}
 BORIS = {"X-Dev-User": "2000"}
@@ -467,13 +467,23 @@ async def test_taking_the_lock_changes_nothing_by_itself(api) -> None:
 
 
 async def _spendable_draft(api: httpx.AsyncClient, value: str) -> int:
-    response = await api.post(
-        "/api/vouchers",
-        headers=ANNA,
-        json={"status": "draft", "value_kind": "amount", "value_amount": value},
-    )
-    assert response.status_code == 201
-    return response.json()["id"]
+    """Anna's photo to the bot, then the amount alone: a draft that can be paid from.
+
+    Made the bot's way, not through the form: the bot completes only its own drafts.
+    """
+    assert (await api.get("/api/vouchers", headers=ANNA)).status_code == 200  # Anna exists
+    async with SessionLocal() as db:
+        user = (await db.execute(select(User).where(User.telegram_id == 1000))).scalar_one()
+        voucher = Voucher(status="draft", created_by_id=user.id)
+        db.add(voucher)
+        await db.flush()
+        record_event(db, voucher, user, EventKind.created, {"source": "bot"})
+        await db.commit()
+        complete = await quickadd.apply_quick_add(
+            db, user, voucher, quickadd.parse_quick_add(value)
+        )
+        assert complete is False  # an amount without a shop stays a draft
+        return voucher.id
 
 
 async def _caption(card: int, text: str, *, found: Voucher | None = None) -> bool:

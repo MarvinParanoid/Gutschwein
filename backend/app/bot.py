@@ -32,7 +32,13 @@ from app.i18n import Message as I18nMessage
 from app.i18n import default_language, group_t, html_t, language_for
 from app.models import EventKind, Voucher, VoucherStatus, utcnow
 from app.notify import notify
-from app.quickadd import QuickAdd, apply_quick_add, find_pending_draft, parse_quick_add
+from app.quickadd import (
+    QuickAdd,
+    apply_quick_add,
+    find_pending_draft,
+    is_command,
+    parse_quick_add,
+)
 from app.services import attach_barcode, format_amount, record_event, voucher_label
 from app.sessions import LOGIN_TOKEN_TTL, issue_login_token
 
@@ -213,6 +219,11 @@ def build_dispatcher() -> Dispatcher:
         if not allowed(message):
             return
         language = lang(message)
+        if is_command(message.text or ""):
+            # A command the bot does not have. Read as a shop name it used to land in
+            # a forgotten draft, which the next bare amount then published as a card.
+            await message.answer(html_t("bot.unknown_command", language))
+            return
         parsed = parse_quick_add(message.text or "")
         if parsed.is_empty:
             await message.answer(

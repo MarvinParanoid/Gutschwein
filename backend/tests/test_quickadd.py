@@ -139,3 +139,8 @@ def test_long_names_are_truncated_to_the_column_width() -> None:
     parsed = parse_quick_add("Ш" * 200 + " 50")
     assert parsed.merchant is not None
     assert len(parsed.merchant) == 128
+
+
+@pytest.mark.parametrize("text", ["/invite", "/invite 50", " /help@GutschweinBot", "/rewe 50"])
+def test_a_command_is_never_a_shop(text: str) -> None:
+    assert parse_quick_add(text).is_empty
