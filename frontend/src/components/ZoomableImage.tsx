@@ -14,6 +14,13 @@ interface Props {
   /** Rotated 90°: the layout box keeps its pre-rotation size. */
   rotated: boolean
   className?: string
+  /**
+   * The picture is a barcode drawn one SVG unit per module: fit it so every module
+   * is a whole number of device pixels. At a fractional scale the narrow bars came
+   * out one pixel here and two there — or grey — and a long Code 128 stopped
+   * reading on 1x and 1.5x screens.
+   */
+  snapModules?: boolean
 }
 
 const clamp = (value: number, min: number, max: number) =>
@@ -27,7 +34,7 @@ const clamp = (value: number, min: number, max: number) =>
  * Gestures are handled here with pointer events and `touch-action: none`, which
  * also stops Telegram from reading a drag as swipe-to-close.
  */
-export default function ZoomableImage({ src, alt, rotated, className }: Props) {
+export default function ZoomableImage({ src, alt, rotated, className, snapModules }: Props) {
   const [scale, setScale] = useState(1)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [frame, setFrame] = useState({ width: 0, height: 0 })
@@ -59,16 +66,22 @@ export default function ZoomableImage({ src, alt, rotated, className }: Props) {
   // The element is sized to the picture itself instead of being letterboxed by
   // object-fit: then the layout box and the visible image are the same thing, and
   // the rotation maths below has nothing to guess.
+  const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1
+  // Down to whole device pixels per unit — unless that would be none at all, where
+  // rounding cannot help and the largest fit is the best there is.
+  const snap = (perUnit: number) =>
+    snapModules && perUnit * dpr >= 1 ? Math.floor(perUnit * dpr) / dpr : perUnit
   const contain =
     natural.width && frame.width
-      ? Math.min(frame.width / natural.width, frame.height / natural.height)
+      ? snap(Math.min(frame.width / natural.width, frame.height / natural.height))
       : 0
   const shown = { width: natural.width * contain, height: natural.height * contain }
   // Rotated, the picture takes its height across and its width down.
-  const fit =
+  const rotatedFit =
     rotated && shown.width
       ? Math.min(frame.width / shown.height, frame.height / shown.width)
       : 1
+  const fit = rotated && contain ? snap(contain * rotatedFit) / contain : rotatedFit
   fitRef.current = fit
 
   /** Keep the image from being dragged off-screen. */

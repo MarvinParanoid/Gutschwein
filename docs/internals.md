@@ -178,6 +178,14 @@ the till that differ from the printed number. The check runs only when a member 
 the code or the format; a decoded format beside a typed code is left as it was. A picture
 with nothing readable in it no longer clears the format.
 
+**Bars are drawn on whole device pixels.** The SVG is one unit per module with
+`shape-rendering="crispEdges"`, and the till screen fits it so that every module is a whole
+number of device pixels (`ZoomableImage`'s `snapModules`). At a fractional scale the narrow
+bars came out grey, or one pixel here and two there, and a Code 128 that read on a 2x screen
+did not on 1x or 1.5x. Acceptance decoded the till screen itself at 1x–3x: what still fails
+is a long alphanumeric Code 128 (30+ characters) on a narrow screen, which is under a pixel
+per module whatever the rounding — rotating helps, and a physical scanner is the judge.
+
 Offline, the card page and its barcode are the ones last loaded, and they agree with each
 other. They may both be behind an edit made on another device since; the scan screen says
 so ("as last loaded") while the device is offline. Pictures never change under an address

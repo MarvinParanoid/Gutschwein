@@ -201,10 +201,15 @@ def to_svg(text: str, barcode_format: str) -> str | None:
     if fmt is None:
         return None
     try:
-        return zxingcpp.write_barcode_to_svg(zxingcpp.create_barcode(text, fmt))
+        svg = zxingcpp.write_barcode_to_svg(zxingcpp.create_barcode(text, fmt))
     except Exception:  # noqa: BLE001 - e.g. a checksum the writer refuses to forge
         log.info("cannot redraw %s barcode", barcode_format, exc_info=True)
         return None
+    # Bars on pixel edges, not anti-aliased. A long Code 128 fills a phone screen at
+    # about 1.3 CSS px per module; scaled by that, smoothed edges turned the narrow
+    # bars grey on a 1x screen and the code no longer read. Crisp edges round each
+    # bar to whole pixels, which a scanner tolerates; grey it does not.
+    return svg.replace("<svg ", '<svg shape-rendering="crispEdges" ', 1)
 
 
 # --- codes typed by hand ---------------------------------------------------------------
