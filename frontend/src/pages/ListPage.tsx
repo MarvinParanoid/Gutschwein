@@ -12,7 +12,15 @@ import {
   money,
   primaryAmount,
 } from '../format'
-import { t } from '../i18n'
+import {
+  chooseLanguage,
+  detectedLanguage,
+  LANGUAGE_CHOICES,
+  LANGUAGE_NAMES,
+  languageChoice,
+  type LanguageChoice,
+  t,
+} from '../i18n'
 import { haptic, inTelegram } from '../telegram'
 import { useOverlay } from '../useOverlay'
 import { useSheetDrag } from '../useSheetDrag'
@@ -318,6 +326,28 @@ function TabMenu({
             <span className="sheet-hint">{t.list.accessHint}</span>
           </span>
         </button>
+
+        {/* A native select: on a phone it opens the system picker, which is
+            reachable, readable and sized for a thumb without any work here. */}
+        <label className="sheet-item">
+          <span className="sheet-label">
+            {t.list.language}
+            <span className="sheet-hint">{t.list.languageHint}</span>
+          </span>
+          <select
+            className="language-select"
+            value={languageChoice}
+            onChange={(e) => chooseLanguage(e.target.value as LanguageChoice)}
+          >
+            {LANGUAGE_CHOICES.map((choice) => (
+              <option key={choice} value={choice}>
+                {choice === 'auto'
+                  ? t.list.languageAuto(LANGUAGE_NAMES[detectedLanguage])
+                  : LANGUAGE_NAMES[choice]}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <button className="btn" onClick={onClose}>
           {t.list.close}

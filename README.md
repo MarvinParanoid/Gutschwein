@@ -163,7 +163,7 @@ nightly archive is a chat message. Back up `./data` yourself.
 - Deutsch
 - Русский
 
-Automatically selected from Telegram or the browser.
+Follows Telegram or the browser by default; each device can pick one by hand in the menu.
 
 ---
 

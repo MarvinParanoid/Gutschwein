@@ -26,9 +26,24 @@ wrong screen.
 
 ## Languages
 
-English, German and Russian, with no switch by design: the language comes from wherever
-the app is open — `initDataUnsafe.user.language_code` in Telegram, `navigator.language` in
-the PWA. Anything else falls back to `DEFAULT_LANGUAGE`.
+English, German and Russian. By default the language comes from wherever the app is open —
+`initDataUnsafe.user.language_code` in Telegram, `navigator.language` in the PWA; anything
+other than Russian or German gets English. Since GitHub issue #3 a device can override that
+in the menu (*🌐 Language*: Auto, Русский, Deutsch, English):
+
+- The choice belongs to the **device**, not the member: `localStorage["gutschwein-language"]`,
+  never sent to the server, no migration, no sync. It survives reloads, app updates and
+  sign-out; *Auto* removes the key. An unknown stored value counts as *Auto*.
+- Choosing reloads the page. Dictionaries are read at module level in places (tab labels,
+  the form's value kinds), and a reload is the one way to be sure no string is left in the
+  old language. The Mini App reloads fine: Telegram's script keeps its launch data.
+- Everything follows the one decision in `src/i18n/index.ts`: the dictionary, `locale` for
+  dates and month names, `<html lang>`, and `Accept-Language` on API calls, so server
+  errors arrive in the chosen language too. Amounts are not locale-formatted (`20.5 EUR` in
+  every language); that is unchanged.
+- The bot and the family chat are not affected: the bot answers in the language of whoever
+  wrote to it, and the family chat uses `DEFAULT_LANGUAGE`.
+- Storage that refuses writes leaves the choice on *Auto*; the menu then changes nothing.
 
 - `frontend/src/i18n/ru.ts` is the source of truth; `en.ts` and `de.ts` are typed as
   `Dictionary = typeof ru`, so a forgotten key is a compile error rather than a blank.

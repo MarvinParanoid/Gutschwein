@@ -45,6 +45,9 @@ export const de: Dictionary = {
     stats: '📊 Statistik',
     access: '🔑 Zugang',
     accessHint: 'wer hereinkommt und von welchen Geräten',
+    language: '🌐 Sprache',
+    languageHint: 'nur auf diesem Gerät',
+    languageAuto: (name: string) => `Auto (${name})`,
     statsHint: 'was da ist, wohin es geht, wer ausgibt',
     close: 'Schließen',
     inArchive: (amount: string) =>

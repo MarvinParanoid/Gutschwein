@@ -42,6 +42,9 @@ export const ru = {
     stats: '📊 Статистика',
     access: '🔑 Доступ',
     accessHint: 'кто заходит и с каких устройств',
+    language: '🌐 Язык',
+    languageHint: 'только на этом устройстве',
+    languageAuto: (name: string) => `Авто (${name})`,
     statsHint: 'сколько лежит, куда уходит, кто тратит',
     close: 'Закрыть',
     inArchive: (amount: string) =>

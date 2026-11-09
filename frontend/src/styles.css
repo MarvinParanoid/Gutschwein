@@ -232,6 +232,18 @@ body.scrolled .topbar {
 }
 
 /* Statistics is not one of the lists above; a hairline says so. */
+.language-select {
+  flex-shrink: 0;
+  max-width: 60%;
+  text-overflow: ellipsis;
+  font: inherit;
+  color: var(--text);
+  background: var(--secondary-bg);
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
 .sheet-item.separated {
   border-top: 1px solid var(--secondary-bg);
   margin-top: 6px;

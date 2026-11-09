@@ -120,5 +120,6 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
 ## Deliberately not built
 
 Per the product decisions: no OCR/vision recognition, no groups/households/invites,
-no manual language switch (the client's language wins). The voucher model is recognition-ready (all fields optional) but nothing
+no account-level language setting (a device may pick one by hand, kept in its
+localStorage — `docs/internals.md`, *Languages*). The voucher model is recognition-ready (all fields optional) but nothing
 fills it automatically.
