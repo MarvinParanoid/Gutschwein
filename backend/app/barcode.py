@@ -176,6 +176,12 @@ def decode(data: bytes) -> Decoded | None:
         return None
 
 
+# Bump whenever to_svg() draws differently. "crisp-1": crispEdges, added after
+# acceptance found smoothed bars that a 1x screen could not read; the barcodes cached
+# before it were exactly those.
+RENDERING = "crisp-1"
+
+
 def version(code: str, barcode_format: str) -> str:
     """A fingerprint of everything the drawing depends on.
 
@@ -188,10 +194,14 @@ def version(code: str, barcode_format: str) -> str:
 
     SHA-256, not a short checksum: the guarantee is that two different codes never
     share an address, and with a 32-bit hash a correction could land on the old
-    code's version and be served its cached bars. The format cannot contain a
-    newline, so the input is unambiguous.
+    code's version and be served its cached bars. Neither the rendering tag nor the
+    format can contain a newline, so the input is unambiguous.
+
+    The drawing depends on how it is drawn, too: RENDERING goes in first, so a
+    change to `to_svg` is a new address for every barcode and no cache keeps the
+    old drawing (cached barcodes are immutable for a year).
     """
-    return hashlib.sha256(f"{barcode_format}\n{code}".encode()).hexdigest()
+    return hashlib.sha256(f"{RENDERING}\n{barcode_format}\n{code}".encode()).hexdigest()
 
 
 def to_svg(text: str, barcode_format: str) -> str | None:

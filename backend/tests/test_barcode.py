@@ -276,11 +276,39 @@ def test_no_barcode_means_no_endpoint(client: TestClient) -> None:
 def test_the_version_is_sha256_of_what_the_drawing_depends_on() -> None:
     """Collision-resistant on purpose: two codes sharing a version would share a
     cached barcode — exactly the stale bars this exists to prevent."""
-    expected = hashlib.sha256(b"Code 128\n9998887776665").hexdigest()
+    expected = hashlib.sha256(f"{barcode.RENDERING}\nCode 128\n9998887776665".encode()).hexdigest()
     assert barcode.version("9998887776665", "Code 128") == expected
     assert len(expected) == 64
     assert barcode.version("9998887776665", "EAN-13") != expected
     assert barcode.version("9998887776666", "Code 128") != expected
+
+
+def test_a_new_rendering_is_a_new_address_for_every_barcode(client: TestClient) -> None:
+    """Barcodes cached before the crisp rendering were drawn smoothed, and cached as
+    immutable for a year. Their address must not be answered any more: the version
+    of the drawing is part of it, and the old one — format and code alone — is
+    refused, so a client can only ever get the bars as they are drawn now."""
+    before_crisp = hashlib.sha256(f"Code 128\n{CARD_NUMBER}".encode()).hexdigest()
+    assert barcode.version(CARD_NUMBER, "Code 128") != before_crisp
+
+    png = as_png(screenshot_with(render(CARD_NUMBER)))
+    image_id = client.post(
+        "/api/uploads", files={"file": ("card.png", io.BytesIO(png), "image/png")}
+    ).json()["image_id"]
+    card = client.post("/api/vouchers", json={"merchant": "Crisp", "image_id": image_id}).json()
+
+    stale = client.get(f"/api/barcodes/{image_id}?v={before_crisp}")
+    assert stale.status_code == 404
+    fresh = client.get(f"/api/barcodes/{image_id}?v={card['barcode_version']}")
+    assert fresh.status_code == 200
+    assert 'shape-rendering="crispEdges"' in fresh.text
+
+    hand = client.post(
+        "/api/vouchers",
+        json={"merchant": "Crisp hand", "code": "CRISP-1", "barcode_format": "Code 128"},
+    ).json()
+    old_hand = hashlib.sha256(b"Code 128\nCRISP-1").hexdigest()
+    assert client.get(f"/api/vouchers/{hand['id']}/barcode?v={old_hand}").status_code == 404
 
 
 def test_cards_carry_their_version_and_none_without_a_barcode(client: TestClient) -> None:

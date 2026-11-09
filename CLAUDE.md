@@ -87,10 +87,11 @@ Both venv and node_modules are local: `backend/.venv`, `frontend/node_modules`.
   claim holds, so it cannot race an attachment. Deleting in the request either lost a
   still-referenced picture when the commit failed or took another card's with it.
 - A barcode's address carries `?v=` — `app.barcode.version`, SHA-256 of
-  `format + "\n" + code`, sent to the client as `VoucherOut.barcode_version` and checked by
-  the barcode route. The worker caches barcodes cache-first, so anything new the drawing
-  depends on must go into that hash, or a cached barcode will no longer match its card. See
-  `docs/internals.md`, *Offline and the device's caches*.
+  `RENDERING + "\n" + format + "\n" + code`, sent to the client as
+  `VoucherOut.barcode_version` and checked by both barcode routes. The worker caches barcodes
+  cache-first, so anything new the drawing depends on must go into that hash, or a cached
+  barcode will no longer match its card — **bump `barcode.RENDERING` whenever `to_svg()`
+  draws differently**. See `docs/internals.md`, *Offline and the device's caches*.
 - Auth refusals that mean the device is out carry `X-Auth-Failure` (`app/auth.py`); the
   client purges its offline caches on exactly those. A new 401/403 that is about access
   needs a reason there, and one that is not must not get one.

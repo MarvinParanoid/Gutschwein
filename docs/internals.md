@@ -146,7 +146,9 @@ Workbox) keeps three runtime caches next to the precached app shell:
 **Barcodes are versioned (T5).** A barcode's address is derived from its picture, but the
 bars are drawn from the card's code, which can be corrected later (the form, `app.rescan`).
 Cached by the picture alone, a corrected code kept showing the old bars. The address now
-carries `?v=` — SHA-256 of `format + "\n" + code` (`app.barcode.version`). The server is
+carries `?v=` — SHA-256 of `RENDERING + "\n" + format + "\n" + code`
+(`app.barcode.version`); `RENDERING` names how `to_svg()` draws, so a new drawing (the crisp
+bars of Stage 1) is a new address for every barcode, and no cache keeps the old one. The server is
 the only place it is computed: cards carry it as `barcode_version` (null when there is
 nothing to draw), the client copies it into the address, and the barcode route checks it.
 A collision-resistant hash, because two codes sharing a version would share a cached
