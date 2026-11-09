@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { api, barcodeUrl, imageUrl, svgSource } from '../../api'
 import { codeGroups } from '../../barcodeFormats'
@@ -70,6 +70,34 @@ export default function ScanOverlay({
   const src = showPhoto ? imageUrl(voucher.image_id!) : bars.state === 'ready' ? bars.src : null
 
   useOverlay(onClose)
+  const dialog = useRef<HTMLDivElement | null>(null)
+  const done = useRef<HTMLButtonElement | null>(null)
+
+  // Keyboard: the screen is a modal dialog. Focus moves in (to "Done", which Enter
+  // or Escape then closes), Tab stays inside rather than wandering to the list
+  // behind it, and closing hands focus back to the button that opened it.
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    done.current?.focus()
+    return () => opener?.focus()
+  }, [])
+
+  function keepFocusInside(event: React.KeyboardEvent) {
+    if (event.key !== 'Tab' || !dialog.current) return
+    const focusable = Array.from(
+      dialog.current.querySelectorAll<HTMLElement>('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'),
+    )
+    if (focusable.length === 0) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
 
   const amount = primaryAmount(voucher)
   const hint = showPhoto
@@ -85,7 +113,14 @@ export default function ScanOverlay({
           : null
 
   return (
-    <div className="scan">
+    <div
+      className="scan"
+      role="dialog"
+      aria-modal="true"
+      aria-label={cardTitle(voucher)}
+      ref={dialog}
+      onKeyDown={keepFocusInside}
+    >
       <div className="scan-head">
         <div className="scan-merchant">{cardTitle(voucher)}</div>
         {amount && (
@@ -97,23 +132,23 @@ export default function ScanOverlay({
       </div>
 
       {src ? (
-        <>
-          <ZoomableImage
-            key={showPhoto ? 'photo' : 'barcode'}
-            className={`scan-image ${rotated ? 'rotated' : ''}`}
-            src={src}
-            alt={showPhoto ? t.scan.photoAlt : t.scan.barcodeAlt}
-            rotated={rotated}
-          />
-          {voucher.code && <CodeLine code={voucher.code} large={false} />}
-        </>
+        <ZoomableImage
+          key={showPhoto ? 'photo' : 'barcode'}
+          className={`scan-image ${rotated ? 'rotated' : ''}`}
+          src={src}
+          alt={showPhoto ? t.scan.photoAlt : t.scan.barcodeAlt}
+          rotated={rotated}
+          snapModules={!showPhoto}
+        />
       ) : (
-        // No picture to show: the number takes the middle of the screen.
-        <div className="scan-empty">
-          {bars.state === 'loading' && <span>{t.scan.drawing}</span>}
-          {voucher.code && <CodeLine code={voucher.code} large />}
-        </div>
+        <div className="scan-empty">{bars.state === 'loading' && t.scan.drawing}</div>
       )}
+      {/* Always this element, in this place: when the bars finish loading the
+          number must not be remounted, or a keyboard user's focus on "Copy" is
+          dropped onto the page behind the dialog. */}
+      {voucher.code && <CodeLine code={voucher.code} large={!src} />}
+      {/* No picture: an equal space below, so the number sits mid-screen. */}
+      {!src && <div className="scan-empty" aria-hidden="true" />}
 
       <div className="scan-actions">
         {hasPhoto && bars.state === 'ready' && (
@@ -126,7 +161,7 @@ export default function ScanOverlay({
             {t.scan.rotate}
           </button>
         )}
-        <button className="btn primary" onClick={onClose}>
+        <button className="btn primary" ref={done} onClick={onClose}>
           {t.scan.done}
         </button>
       </div>

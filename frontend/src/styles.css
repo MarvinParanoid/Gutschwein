@@ -335,6 +335,9 @@ body.scrolled .topbar {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* Room to scroll the last card out from under the "+" button: it sits exactly
+     where that card's till button is (56 px + 16 px from the edge). */
+  padding-bottom: 64px;
 }
 
 .card {
@@ -744,9 +747,6 @@ body.scrolled .topbar {
   font-size: 14px;
 }
 
-.scan-empty .scan-code {
-  color: #000000;
-}
 
 .scan-code-row {
   display: flex;
@@ -766,7 +766,9 @@ body.scrolled .topbar {
   flex-wrap: wrap;
   justify-content: center;
   column-gap: 0.5em;
-  word-break: break-all;
+  /* At spaces first, so "Gutschein 2031-0042" never splits "2031"; a long run
+     without any still wraps rather than running off the screen. */
+  overflow-wrap: anywhere;
   user-select: text;
 }
 

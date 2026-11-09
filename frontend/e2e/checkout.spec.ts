@@ -214,3 +214,69 @@ test.describe('english', () => {
     await expect(page.getByRole('button', { name: 'Copy' })).toBeVisible()
   })
 })
+
+test('the till works from the keyboard: in, around, out, and back to where it was', async ({
+  page,
+  request,
+}) => {
+  const merchant = uniqueMerchant('Tastatur')
+  await createCard(request, { merchant, value_amount: '12', code: EAN13, barcode_format: 'EAN-13' })
+  const card = await findCard(page, merchant)
+  const till = page.locator('.card-row', { has: card }).locator('.card-till')
+
+  await till.focus()
+  await page.keyboard.press('Enter')
+  const dialog = page.getByRole('dialog', { name: merchant })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Готово' })).toBeFocused()
+
+  // Tab cycles inside the dialog, never to the list behind it.
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press('Tab')
+    expect(await page.evaluate(() => Boolean(document.activeElement?.closest('.scan')))).toBe(true)
+  }
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press('Shift+Tab')
+    expect(await page.evaluate(() => Boolean(document.activeElement?.closest('.scan')))).toBe(true)
+  }
+
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+  await expect(till).toBeFocused()
+})
+
+test('the last card’s till button is not hidden under the add button', async ({
+  page,
+  request,
+}) => {
+  // Enough cards to scroll, and the one under test sorted last (latest expiry).
+  const prefix = uniqueMerchant('Unten')
+  for (let i = 0; i < 6; i++) {
+    await createCard(request, {
+      merchant: `${prefix}-${i}`,
+      value_amount: '5',
+      code: `BOTTOM-${i}`,
+      valid_until: `2040-01-0${i + 1}`,
+    })
+  }
+  await page.setViewportSize({ width: 360, height: 640 })
+  await page.goto('/')
+  await page.getByPlaceholder('Поиск').fill(prefix)
+  await expect(page.locator('.card-row')).toHaveCount(6)
+
+  const last = page.locator('.card-row').last()
+  await expect(last).toContainText(`${prefix}-5`)
+  // Scrolled all the way down, as a thumb does: what is under the button's centre?
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  // The whole button, not just its middle: the "+" used to cover its lower half.
+  const hits = await last.locator('.card-till').evaluate((button) => {
+    const r = button.getBoundingClientRect()
+    return [0.2, 0.5, 0.9].map((share) => {
+      const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height * share)
+      return top === button || button.contains(top)
+    })
+  })
+  expect(hits).toEqual([true, true, true])
+  await last.locator('.card-till').click()
+  await expect(page.locator('.scan-merchant')).toHaveText(`${prefix}-5`)
+})

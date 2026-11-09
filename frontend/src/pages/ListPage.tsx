@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { api } from '../api'
 import MerchantMark from '../components/MerchantMark'
@@ -24,6 +24,7 @@ import {
   t,
 } from '../i18n'
 import { haptic, inTelegram } from '../telegram'
+import { useBackButton } from '../useBackButton'
 import { useOverlay } from '../useOverlay'
 import { useSheetDrag } from '../useSheetDrag'
 import type { Counts, MerchantStat, Voucher, VoucherStatus } from '../types'
@@ -69,6 +70,10 @@ export default function ListPage({
   const [shops, setShops] = useState<MerchantStat[]>([])
   // The card shown at the till straight from the list, without opening it first.
   const [atTill, setAtTill] = useState<Voucher | null>(null)
+  const closeTill = useCallback(() => setAtTill(null), [])
+  // The list has no back button of its own, so inside Telegram the hardware back
+  // would close the whole Mini App while the till is open. The till takes it.
+  useBackButton(atTill !== null, closeTill)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 250)
@@ -259,7 +264,7 @@ export default function ListPage({
         </div>
       )}
 
-      {atTill && <ScanOverlay voucher={atTill} onClose={() => setAtTill(null)} />}
+      {atTill && <ScanOverlay voucher={atTill} onClose={closeTill} />}
 
       <button className="fab" onClick={onCreate} aria-label={t.list.add}>
         +
