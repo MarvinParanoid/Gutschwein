@@ -145,7 +145,8 @@ class Voucher(Base):
     archived_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # Expiry date we already sent a reminder for, so we notify once per voucher.
+    # The expiry date a reminder was sent for (not the day it was sent): a card is
+    # due again whenever its valid_until differs, i.e. once per date (bot._due).
     reminded_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     created_by: Mapped[User] = relationship(foreign_keys=[created_by_id], lazy="joined")

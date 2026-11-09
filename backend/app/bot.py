@@ -20,8 +20,7 @@ from aiogram.types import (
     WebAppInfo,
 )
 from fastapi import HTTPException
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import or_, select, update
 
 from app import storage
 from app.auth import TelegramUser, upsert_user
@@ -311,52 +310,96 @@ def _expiry_message(voucher: Voucher, today: date) -> str:
     return group_t("notify.expiring", label=voucher_label(voucher), when=when, caveat=caveat)
 
 
-async def _remind_once(bot: Bot, session: AsyncSession, voucher: Voucher, today: date) -> None:
-    """Warn about one voucher, then record that it was warned about.
+def _due(today: date) -> tuple:
+    """Conditions for a card that should be warned about on `today`.
 
-    In that order, and committed per voucher. Marking the whole batch first and
-    sending afterwards loses every reminder after the first failed send: the rows
-    already say they were reminded, and `reminded_on` is the only thing keeping the
-    next pass from repeating. One timed-out Telegram call used to mean the rest of
-    the batch was never warned about at all — in an app whose whole purpose is to
-    warn about them.
+    `reminded_on` is the expiry date a reminder was sent *for*, not the day it was
+    sent. Selecting only cards with no reminder at all (as before) warned once per
+    card, ever: a corrected or extended date never got a warning of its own. Now a
+    card is due whenever the date it carries is not the one already announced —
+    so a moved date, either way, gets one reminder, and the same date never two.
+
+    The window is in UTC dates, like `Voucher.is_expired`: a card due "today" here
+    is not yet expired there, and the day turns at the same moment for both.
     """
-    # No app button: the family chat is a group, and a group rejects one.
-    await bot.send_message(settings.family_chat_id, _expiry_message(voucher, today))
-    voucher.reminded_on = today
-    await session.commit()
+    return (
+        Voucher.status == VoucherStatus.active,
+        Voucher.valid_until.is_not(None),
+        Voucher.valid_until >= today,
+        Voucher.valid_until <= today + timedelta(days=REMINDER_DAYS),
+        or_(Voucher.reminded_on.is_(None), Voucher.reminded_on != Voucher.valid_until),
+    )
+
+
+# One pass at a time. The loop is the only caller in production, but a pass that
+# overlapped another would read the same unreminded cards and send each twice.
+_reminding = asyncio.Lock()
+
+
+async def remind_expiring(bot: Bot, today: date | None = None) -> int:
+    """Warn the family chat about every card due today. Returns how many were sent.
+
+    Per card: read it, send, then record — never record first. A failed send leaves
+    the card due, so the next pass tries again; marking the whole batch up front used
+    to lose every warning after the first failure.
+
+    No database session is held across the Telegram call. The record is a
+    conditional update on the date that was announced: if the date was edited while
+    the message was on its way, the new date stays due rather than being marked as
+    already announced.
+    """
+    async with _reminding:
+        today = today or utcnow().date()
+        async with SessionLocal() as session:
+            ids = (await session.execute(select(Voucher.id).where(*_due(today)))).scalars().all()
+
+        sent = 0
+        for voucher_id in ids:
+            async with SessionLocal() as session:
+                # Again, one by one: deleted, used or edited since the list was read.
+                voucher = (
+                    (
+                        await session.execute(
+                            select(Voucher).where(Voucher.id == voucher_id, *_due(today))
+                        )
+                    )
+                    .unique()
+                    .scalar_one_or_none()
+                )
+                if voucher is None:
+                    continue
+                announced = voucher.valid_until
+                text = _expiry_message(voucher, today)
+            try:
+                # No app button: the family chat is a group, and a group rejects one.
+                await bot.send_message(settings.family_chat_id, text)
+            except asyncio.CancelledError:
+                raise
+            except Exception:  # noqa: BLE001 - one card must not cost the others
+                log.warning(
+                    "could not warn about voucher %s; will retry next pass",
+                    voucher_id,
+                    exc_info=True,
+                )
+                continue
+            async with SessionLocal() as session:
+                await session.execute(
+                    update(Voucher)
+                    .where(Voucher.id == voucher_id, Voucher.valid_until == announced)
+                    .values(reminded_on=announced)
+                )
+                await session.commit()
+            sent += 1
+        return sent
 
 
 async def expiry_reminder_loop(bot: Bot) -> None:
-    """Warn the family chat once about vouchers expiring within REMINDER_DAYS."""
+    """Warn the family chat about vouchers expiring within REMINDER_DAYS."""
     if settings.family_chat_id is None:
         return
     while True:
         try:
-            today = utcnow().date()
-            deadline = today + timedelta(days=REMINDER_DAYS)
-            async with SessionLocal() as session:
-                rows = await session.execute(
-                    select(Voucher).where(
-                        Voucher.status == VoucherStatus.active,
-                        Voucher.valid_until.is_not(None),
-                        Voucher.valid_until <= deadline,
-                        Voucher.valid_until >= today,
-                        Voucher.reminded_on.is_(None),
-                    )
-                )
-                for voucher in rows.unique().scalars().all():
-                    try:
-                        await _remind_once(bot, session, voucher, today)
-                    except asyncio.CancelledError:
-                        raise
-                    except Exception:  # noqa: BLE001 - one card must not cost the others
-                        await session.rollback()
-                        log.warning(
-                            "could not warn about voucher %s; will retry next pass",
-                            voucher.id,
-                            exc_info=True,
-                        )
+            await remind_expiring(bot)
         except asyncio.CancelledError:
             raise
         except Exception:  # noqa: BLE001 - the loop must survive any single failure

@@ -245,6 +245,13 @@ expires after 24 hours, the demo flag is a boolean, and the chosen language is a
 - The gift-card balance lives in `vouchers.balance_amount`; every change is an append-only
   `balance_updated` event carrying `{spent, remaining, note}`. There is no ledger table, so
   corrections are ordinary updates and past events are never rewritten.
+- An expiry reminder is due while `vouchers.reminded_on` differs from `valid_until`: the
+  column holds the expiry date a reminder was sent *for* (`bot._due`). A moved date gets one
+  reminder of its own, the same date never two; a failed send records nothing and is
+  retried on the next pass (every 6 h). Dates are UTC days, as for `is_expired`. Before
+  this, the column held the day of sending and was never cleared, so a card was reminded
+  once in its life; an install upgraded with such values may send one extra reminder for
+  a card that is inside its three-day window at that moment.
 - Uploads are two-step: `POST /api/uploads` returns an `image_id`, then the card is created
   or patched with it. A picture belongs to one card (a second claim is a 409), and nothing
   but the maintenance sweep deletes one: an abandoned form, a replaced picture and a
