@@ -38,10 +38,13 @@ s.setdefault("callers", []).append(os.environ.get("SSH_ORIGINAL_COMMAND", ""))
 args = sys.argv[1:]
 
 def save():
-    # Atomically: the tests read this file while a deployment is running.
-    with open(STATE + ".tmp", "w") as f:
+    # Atomically: the tests read this file while a deployment is running. One
+    # temporary file per process: two deployments at once used to write into the
+    # same one, and the interleaved JSON failed the next read ("Extra data").
+    tmp = f"{STATE}.{os.getpid()}.tmp"
+    with open(tmp, "w") as f:
         json.dump(s, f)
-    os.replace(STATE + ".tmp", STATE)
+    os.replace(tmp, STATE)
 
 def resolve(ref):
     if ref in s["images"]:
