@@ -4,9 +4,9 @@ import { api, barcodeUrl, imageUrl, svgSource } from '../../api'
 import { codeGroups } from '../../barcodeFormats'
 import { copyText } from '../../clipboard'
 import { isDemo } from '../../demo/session'
-import { cardTitle, isGiftCard, primaryAmount } from '../../format'
+import { cardTitle, codeUrl, isGiftCard, primaryAmount } from '../../format'
 import { t } from '../../i18n'
-import { alertMessage, haptic } from '../../telegram'
+import { alertMessage, haptic, openUrl } from '../../telegram'
 import type { Voucher } from '../../types'
 import { useOnline } from '../../useOnline'
 import { useOverlay } from '../../useOverlay'
@@ -66,8 +66,16 @@ export default function ScanOverlay({
   // agrees, so the original picture stays one tap away. A drawing that failed
   // falls back to the picture by itself.
   const [preferPhoto, setPreferPhoto] = useState(false)
-  const showPhoto = hasPhoto && (preferPhoto || bars.state === 'none' || bars.state === 'failed')
-  const src = showPhoto ? imageUrl(voucher.image_id!) : bars.state === 'ready' ? bars.src : null
+  // A card with a picture is handed its bars as an address, which is what lets the
+  // worker serve them offline — and means only the picture itself can report that
+  // they are not there. The server refuses to draw a pair it cannot (a card from an
+  // older version could keep the code of a replaced picture), and an <img> left to
+  // itself shows that refusal as a broken picture at the till. One failed load is
+  // enough: the card's own picture is what is left.
+  const [drawFailed, setDrawFailed] = useState(false)
+  const drawn = bars.state === 'ready' && !drawFailed
+  const showPhoto = hasPhoto && (preferPhoto || !drawn)
+  const src = showPhoto ? imageUrl(voucher.image_id!) : drawn ? bars.src : null
 
   useOverlay(onClose)
   const dialog = useRef<HTMLDivElement | null>(null)
@@ -102,11 +110,11 @@ export default function ScanOverlay({
   const amount = primaryAmount(voucher)
   const hint = showPhoto
     ? t.scan.hintPhoto
-    : bars.state === 'ready'
+    : drawn
       ? hasPhoto
         ? t.scan.hintBarcode
         : t.scan.hintTyped
-      : bars.state === 'failed'
+      : bars.state === 'failed' || drawFailed
         ? t.scan.drawFailed
         : bars.state === 'none'
           ? t.scan.noBarcode
@@ -139,6 +147,9 @@ export default function ScanOverlay({
           alt={showPhoto ? t.scan.photoAlt : t.scan.barcodeAlt}
           rotated={rotated}
           snapModules={!showPhoto}
+          // Only the drawing can be refused. A picture that will not load has
+          // nothing left to fall back to, so its error is not listened for.
+          onError={showPhoto ? undefined : () => setDrawFailed(true)}
         />
       ) : (
         <div className="scan-empty">{bars.state === 'loading' && t.scan.drawing}</div>
@@ -151,7 +162,9 @@ export default function ScanOverlay({
       {!src && <div className="scan-empty" aria-hidden="true" />}
 
       <div className="scan-actions">
-        {hasPhoto && bars.state === 'ready' && (
+        {/* Not while the drawing is missing: switching back to it would only show
+            the same refusal again. */}
+        {hasPhoto && drawn && (
           <button className="btn" onClick={() => setPreferPhoto(!preferPhoto)}>
             {showPhoto ? t.scan.code : t.scan.photo}
           </button>
@@ -176,6 +189,9 @@ export default function ScanOverlay({
 
 function CodeLine({ code, large }: { code: string; large: boolean }) {
   const [copied, setCopied] = useState(false)
+  // An address is opened, not read out to the cashier, so it is not grouped and
+  // not grown to the size the number is — but it still copies.
+  const href = codeUrl(code)
 
   async function copy() {
     if (await copyText(code)) {
@@ -189,13 +205,29 @@ function CodeLine({ code, large }: { code: string; large: boolean }) {
 
   return (
     <div className="scan-code-row">
-      {/* Groups are separate elements, not spaces: selecting or copying the text by
-          hand still gives the bare code. */}
-      <div className={`scan-code ${large ? 'large' : ''}`}>
-        {codeGroups(code).map((group, index) => (
-          <span key={index}>{group}</span>
-        ))}
-      </div>
+      {href ? (
+        <a
+          className="scan-code link"
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(event) => {
+            // Inside Telegram the client opens it; anywhere else the link itself
+            // does, and this leaves the click alone.
+            if (openUrl(href)) event.preventDefault()
+          }}
+        >
+          {code}
+        </a>
+      ) : (
+        /* Groups are separate elements, not spaces: selecting or copying the text
+           by hand still gives the bare code. */
+        <div className={`scan-code ${large ? 'large' : ''}`}>
+          {codeGroups(code).map((group, index) => (
+            <span key={index}>{group}</span>
+          ))}
+        </div>
+      )}
       <button className="btn scan-copy" onClick={copy}>
         {copied ? t.scan.copied : t.scan.copy}
       </button>

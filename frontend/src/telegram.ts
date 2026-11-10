@@ -27,6 +27,7 @@ interface TelegramWebApp {
   showConfirm(message: string, cb: (confirmed: boolean) => void): void
   showAlert(message: string, cb?: () => void): void
   openTelegramLink(url: string): void
+  openLink(url: string): void
   onEvent(event: string, handler: () => void): void
 }
 
@@ -92,6 +93,27 @@ export function confirmAction(message: string): Promise<boolean> {
   return new Promise<boolean>((resolve) => native.showConfirm(message, resolve)).catch(() =>
     window.confirm(message),
   )
+}
+
+/**
+ * Opens an address outside the app, the way the host wants it done. True when
+ * Telegram took it.
+ *
+ * A plain <a> would be enough in a browser, but inside Telegram it navigates the
+ * Mini App's own webview — and that has no back button, so the shop's page would
+ * replace the cards with no way home. The SDK hands the link to the client
+ * instead, which opens its in-app browser. An old client, and a browser, where the
+ * SDK answers 6.0 and throws on interactive methods, does not know the method at
+ * all: false tells the caller to let the anchor do its own thing.
+ */
+export function openUrl(url: string): boolean {
+  if (!inTelegram || !tg) return false
+  try {
+    tg.openLink(url)
+    return true
+  } catch {
+    return false
+  }
 }
 
 export function alertMessage(message: string): void {

@@ -15,6 +15,12 @@ interface Props {
   rotated: boolean
   className?: string
   /**
+   * The picture did not load. A card's bars are handed over as an address and
+   * nothing checks it first, so this is how the caller hears about a drawing the
+   * server refuses.
+   */
+  onError?: () => void
+  /**
    * The picture is a barcode drawn one SVG unit per module: fit it so every module
    * is a whole number of device pixels. At a fractional scale the narrow bars came
    * out one pixel here and two there — or grey — and a long Code 128 stopped
@@ -34,7 +40,14 @@ const clamp = (value: number, min: number, max: number) =>
  * Gestures are handled here with pointer events and `touch-action: none`, which
  * also stops Telegram from reading a drag as swipe-to-close.
  */
-export default function ZoomableImage({ src, alt, rotated, className, snapModules }: Props) {
+export default function ZoomableImage({
+  src,
+  alt,
+  rotated,
+  className,
+  onError,
+  snapModules,
+}: Props) {
   const [scale, setScale] = useState(1)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [frame, setFrame] = useState({ width: 0, height: 0 })
@@ -192,6 +205,7 @@ export default function ZoomableImage({ src, alt, rotated, className, snapModule
           src={src}
           alt={alt}
           draggable={false}
+          onError={onError}
           onLoad={(e) =>
             setNatural({
               width: e.currentTarget.naturalWidth,

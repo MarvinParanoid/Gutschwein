@@ -180,6 +180,17 @@ the till that differ from the printed number. The check runs only when a member 
 the code or the format; a decoded format beside a typed code is left as it was. A picture
 with nothing readable in it no longer clears the format.
 
+**Replacing a picture re-reads the card.** The code is decoded once and kept, so a new
+picture is the only chance to correct it — and until `apply_replaced_picture()` existed the
+old picture's code stayed beside the new picture's format: a Rossmann QR (an address) inside
+an EAN-13 card asked the till for bars of that address as EAN-13, and the refusal showed as a
+broken picture. The picture being replaced is therefore decoded as well, while it is still on
+disk (only the sweep deletes), and a code that matches its reading is the picture's own to
+replace. A code that does not match was typed and stays, exactly as when a picture is first
+attached to one. The scan screen does not trust a drawing blindly either: the bars of a card
+with a picture are handed to `<img>` as an address, so a failed load falls back to the
+picture, and `python -m app.rescan --repair --apply` mends a pair that cannot be drawn at all.
+
 **Bars are drawn on whole device pixels.** The SVG is one unit per module with
 `shape-rendering="crispEdges"`, and the till screen fits it so that every module is a whole
 number of device pixels (`ZoomableImage`'s `snapModules`). At a fractional scale the narrow

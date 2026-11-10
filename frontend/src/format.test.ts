@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   balanceRatio,
+  codeUrl,
   expiryInfo,
   isPartlySpent,
   money,
@@ -93,5 +94,42 @@ describe('expiryInfo', () => {
   it('marks a guessed date so it never reads as printed', () => {
     const guessed = expiryInfo(card({ valid_until: '2030-01-01', days_left: 300, expiry_estimated: true }))
     expect(guessed?.text.startsWith('≈')).toBe(true)
+  })
+})
+
+describe('a code that is an address', () => {
+  it('is the link, exactly as it was typed', () => {
+    // The Rossmann case: the coupon is an address, and opening it is the point.
+    const coupon = 'https://coupons.rossmann.de/appcoupon/xJ3-abc?src=app'
+    expect(codeUrl(coupon)).toBe(coupon)
+    expect(codeUrl('http://shop.example/card?id=7')).toBe('http://shop.example/card?id=7')
+  })
+
+  it('drops what a paste brings along, like the form does', () => {
+    expect(codeUrl('  https://shop.example/abc\n')).toBe('https://shop.example/abc')
+  })
+
+  it.each([
+    ['6036001234567890123'], // a card number
+    ['GUT-2031-XYZ'],
+    ['coupons.rossmann.de/abc'], // no scheme: as likely a code as a link
+    ['shop.example'], // and a bare host least of all
+    [''],
+    ['   '],
+    ['https://'], // a scheme with nothing behind it
+  ])('leaves %j as plain text', (code) => {
+    expect(codeUrl(code)).toBeNull()
+  })
+
+  it('has nothing to link when there is no code at all', () => {
+    expect(codeUrl(null)).toBeNull()
+    expect(codeUrl(undefined)).toBeNull()
+  })
+
+  it('refuses anything that is not a web address', () => {
+    // A card is data, and data does not get to run.
+    expect(codeUrl('javascript:alert(1)')).toBeNull()
+    expect(codeUrl('data:text/html,<script>alert(1)</script>')).toBeNull()
+    expect(codeUrl('tg://resolve?domain=someone')).toBeNull()
   })
 })

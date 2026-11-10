@@ -305,11 +305,18 @@ stored pictures again:
 docker compose exec app python -m app.rescan           # what would change, writes nothing
 docker compose exec app python -m app.rescan --apply   # write it
 docker compose exec app python -m app.rescan --all --apply
+docker compose exec app python -m app.rescan --repair --apply
 ```
 
 Without `--all` it only looks at vouchers that have no barcode yet. It never overwrites a
 code someone typed, and a picture that still refuses keeps whatever it had — a rescan may
 only add. Run it after an update that touches `app/barcode.py`.
+
+`--repair` is the one exception, and it has to be asked for: a card whose stored code and
+format cannot be drawn at all — a picture replaced while the old code stayed, which versions
+before `apply_replaced_picture()` left behind — takes the picture's reading instead. Until
+that is done the till has no bars for such a card; it shows the picture and says the drawing
+failed. Replacing the picture again from the app does the same thing for one card.
 
 ## Members without Telegram
 

@@ -15,11 +15,13 @@ function webApp({ initData, colorScheme = 'light', supported }: {
   supported: boolean
 }) {
   const shown: string[] = []
+  const opened: string[] = []
   const unsupported = () => {
     throw new Error('WebAppMethodUnsupported')
   }
   return {
     shown,
+    opened,
     app: {
       initData,
       colorScheme,
@@ -30,6 +32,11 @@ function webApp({ initData, colorScheme = 'light', supported }: {
         impactOccurred: supported ? () => undefined : unsupported,
         notificationOccurred: supported ? () => undefined : unsupported,
       },
+      openLink: supported
+        ? (url: string) => {
+            opened.push(url)
+          }
+        : unsupported,
       showConfirm: supported
         ? (message: string, cb: (confirmed: boolean) => void) => {
             shown.push(message)
@@ -96,6 +103,12 @@ describe('outside Telegram, where the SDK is present but the host is not', () =>
     const { haptic } = await load(sdk().app)
     expect(() => haptic('success')).not.toThrow()
   })
+
+  it('leaves an outside link to the browser itself', async () => {
+    const { openUrl } = await load(sdk().app)
+    // false: the caller's <a> does the opening, which is right out here.
+    expect(openUrl('https://coupons.rossmann.de/abc')).toBe(false)
+  })
 })
 
 describe('inside Telegram', () => {
@@ -114,6 +127,14 @@ describe('inside Telegram', () => {
     initTelegram()
     expect(dataset.tgTheme).toBe('dark')
   })
+
+  it('hands an outside link to the client, not to its own webview', async () => {
+    const { openUrl } = await load(sdk.app)
+    // True: the caller then holds the click back, or the shop's page would replace
+    // the Mini App in a webview that has no back button.
+    expect(openUrl('https://coupons.rossmann.de/abc')).toBe(true)
+    expect(sdk.opened).toEqual(['https://coupons.rossmann.de/abc'])
+  })
 })
 
 describe('inside an old Telegram client', () => {
@@ -125,5 +146,10 @@ describe('inside an old Telegram client', () => {
     alertMessage('boom')
     expect(browser.confirm).toEqual(['удалить?'])
     expect(browser.alert).toEqual(['boom'])
+  })
+
+  it('falls back to the link itself rather than losing the page', async () => {
+    const { openUrl } = await load(sdk().app)
+    expect(openUrl('https://coupons.rossmann.de/abc')).toBe(false)
   })
 })

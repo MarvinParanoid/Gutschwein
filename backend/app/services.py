@@ -165,6 +165,33 @@ def apply_barcode(
         voucher.code = found.text[:128]
 
 
+def apply_replaced_picture(
+    voucher: Voucher,
+    found: barcode.Decoded | None,
+    outgoing: barcode.Decoded | None,
+    *,
+    keep_format: bool = False,
+) -> None:
+    """A new picture on a card that already had one.
+
+    The question is whose code the card is carrying. The picture being replaced is
+    decoded as well (`outgoing`), and a code that matches its reading is the card's
+    own picture talking: replacing that picture re-reads the card, so the code comes
+    from the new one too. A code that does not match was typed by a member, and it
+    stays — exactly as it does when a picture is first attached to it, where the
+    format beside it is the picture's word unless a member names one.
+
+    Keeping a code the discarded picture produced is what put a Rossmann URL inside
+    an EAN-13 card: the till then asked for `that URL as EAN-13`, the writer refused,
+    and a broken picture stood where the barcode should be.
+    """
+    if found is None:
+        return
+    if not voucher.code or (outgoing is not None and voucher.code == outgoing.text):
+        voucher.code = found.text[:128]
+    apply_barcode(voucher, found, keep_format=keep_format)
+
+
 def format_amount(value: Decimal) -> str:
     """Money for humans: "10", "12.5", never Decimal.normalize()'s "1E+1".
 

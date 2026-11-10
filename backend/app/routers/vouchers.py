@@ -38,8 +38,8 @@ from app.schemas import (
     VoucherUpdate,
 )
 from app.services import (
-    apply_barcode,
     apply_expiry_rule,
+    apply_replaced_picture,
     attach_barcode,
     comment_counts,
     counts_as_spending,
@@ -366,6 +366,10 @@ async def update_voucher(
     if new_image:
         image_id = _resolve_image(image_id)
     found = await read_barcode(image_id) if new_image else None
+    # The picture being replaced is decoded too, while it is still on disk — only the
+    # sweep deletes. It is the witness for whose code the card carries: the picture's
+    # own reading, or one a member typed. Both decodes stay out of the lock below.
+    outgoing = await read_barcode(seen.image_path) if found is not None else None
 
     # The reload replaces `seen`'s attributes in place: nothing has been set on it.
     voucher = await lock_voucher_or_404(session, voucher_id)
@@ -392,7 +396,7 @@ async def update_voucher(
         # was lost for good when the commit then failed. Once nothing points at it,
         # the maintenance sweep removes it.
         voucher.image_path = image_id
-        apply_barcode(voucher, found, keep_format="barcode_format" in wanted)
+        apply_replaced_picture(voucher, found, outgoing, keep_format="barcode_format" in wanted)
         record_event(session, voucher, user, EventKind.image_replaced)
 
     # A code or a format changed by hand has to make bars that match it. Under the
