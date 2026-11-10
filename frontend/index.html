@@ -3,9 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <!-- Colours the browser/OS chrome around the installed app. -->
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f1f2f6" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121a22" />
+    <!-- Colours the browser/OS chrome around the installed app. Two, so the system's
+         own setting is honoured with no script; theme.ts gives them ids and re-points
+         them when somebody has picked light or dark by hand. -->
+    <meta id="theme-color-light" name="theme-color" media="(prefers-color-scheme: light)" content="#f1f2f6" />
+    <meta id="theme-color-dark" name="theme-color" media="(prefers-color-scheme: dark)" content="#121a22" />
     <link rel="icon" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <title>Gutschwein</title>

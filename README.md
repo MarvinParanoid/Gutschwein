@@ -27,6 +27,7 @@ Runs as an installable **PWA**, with **optional Telegram integration**.
 - ⏰ Expiry reminders
 - 🐳 Docker image on GHCR
 - 🌍 English, German and Russian
+- 🌗 Light, dark, or whatever the system prefers
 
 <img src="docs/demo.gif" alt="Finding a card, showing it at the till, writing down what is left" width="300">
 

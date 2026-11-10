@@ -63,6 +63,14 @@ export const ru = {
     cardFallback: (id: number) => `Купон #${id}`,
   },
 
+  theme: {
+    auto: 'авто',
+    light: 'светлая',
+    dark: 'тёмная',
+    // The switch's accessible name: the mode it is in, lowercase inside the sentence.
+    label: (current: string) => `Тема: ${current}`,
+  },
+
   empty: {
     active: 'Пока пусто. Пришлите фото купона боту или добавьте вручную.',
     draft: 'Черновиков нет. Отправьте боту скрин — он появится здесь.',

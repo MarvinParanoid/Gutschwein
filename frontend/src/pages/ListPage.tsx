@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { api } from '../api'
 import MerchantMark from '../components/MerchantMark'
+import ThemeToggle from '../components/ThemeToggle'
 import ScanOverlay from '../components/voucher/ScanOverlay'
 import {
   STATUS_TABS,
@@ -133,6 +134,8 @@ export default function ListPage({
             than an emoji, which is drawn differently on every platform. */}
         {!inTelegram && <img className="mark" src="/icon-192.png" alt="" />}
         <h1>{currentLabel}</h1>
+        {/* Outside Telegram only: in the Mini App the client's theme is the app's. */}
+        {!inTelegram && <ThemeToggle />}
         <button
           className="burger"
           onClick={() => {

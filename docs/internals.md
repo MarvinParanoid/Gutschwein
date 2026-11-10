@@ -55,6 +55,28 @@ in the menu (*🌐 Language*: Auto, Русский, Deutsch, English):
   background jobs know it without an incoming message. The family chat has no single
   reader, so its messages use `DEFAULT_LANGUAGE`.
 
+## Theme
+
+Light, dark, or the system's own setting — the last is the default. In a browser or the
+installed PWA the switch is the circle to the left of the burger on the list screen; one
+tap walks system → light → dark. Like the language, the choice belongs to the **device**:
+`localStorage["gutschwein-theme"]`, *System* removes the key, an unknown stored value counts
+as *System*, and nothing is sent to the server.
+
+- **Inside Telegram there is no switch at all.** The client's theme *is* the app's theme
+  (`--tg-theme-*`, and `<html data-tg-theme>` for the status colours), so a second opinion
+  could only argue with the host — `applyTheme()` refuses to stamp anything while inside,
+  even if the device picked a mode in the PWA earlier.
+- A hand-picked mode needs no reload, unlike the language: nothing about the theme is baked
+  in at module level. `applyStoredTheme()` runs from `main.tsx` before the first render, so
+  a dark device does not see the light palette first (an inline script in `index.html` would
+  be a hair earlier still, at the cost of the key living in two places).
+- The stylesheet keys on `:root[data-theme='light'|'dark']`, whose values are the same
+  hexes as the `prefers-color-scheme` fallbacks — an explicit choice must not fall back to
+  the client's palette. The two `theme-color` metas are re-pointed by the same module, so
+  the browser's own chrome matches the app rather than the OS.
+- The scan screen stays light in both modes, by design: a scanner needs a bright screen.
+
 ## Shop tiles
 
 The square in front of a card carries the shop's colours and two or three letters, never the

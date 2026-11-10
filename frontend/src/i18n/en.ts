@@ -62,6 +62,13 @@ export const en: Dictionary = {
     cardFallback: (id: number) => `Card #${id}`,
   },
 
+  theme: {
+    auto: 'system',
+    light: 'light',
+    dark: 'dark',
+    label: (current: string) => `Theme: ${current}`,
+  },
+
   empty: {
     active: 'Nothing here yet. Send the bot a photo of a card, or add one by hand.',
     draft: 'No drafts. Send the bot a screenshot and it will show up here.',

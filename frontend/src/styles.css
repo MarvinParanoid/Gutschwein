@@ -54,6 +54,35 @@
   --success: #3aa76d;
 }
 
+/* A mode picked by hand in the browser or the installed PWA (src/theme.ts). It beats
+   the media query above — one attribute selector against one root — and the Telegram
+   tokens are not there to fight it: the switch only exists outside the Mini App, and
+   theme.ts refuses to stamp there. The colours are the fallbacks above, written out
+   because an explicit choice must not fall back to the client's palette. */
+:root[data-theme='light'] {
+  --bg: #ffffff;
+  --secondary-bg: #f1f2f6;
+  --text: #16181c;
+  --hint: #8a8f98;
+  --link: #2f7de1;
+  --accent-ink: #c9356f;
+  --danger: #e05252;
+  --warning: #d99a2b;
+  --success: #3aa76d;
+}
+
+:root[data-theme='dark'] {
+  --bg: #1c2733;
+  --secondary-bg: #121a22;
+  --text: #eef2f6;
+  --hint: #93a1b0;
+  --link: #6ab3f3;
+  --accent-ink: #f78ab4;
+  --danger: #ff7b7b;
+  --warning: #efb54c;
+  --success: #57c98f;
+}
+
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -136,6 +165,20 @@ body.scrolled .topbar {
   height: 38px;
   border-radius: 50%;
   font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* The light/dark switch, one circle to the left of the burger — outside Telegram
+   only, so it needs no room on a narrow screen inside the Mini App. */
+.theme-toggle {
+  border: 0;
+  background: var(--bg);
+  color: var(--text);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 17px;
   line-height: 1;
   flex-shrink: 0;
 }

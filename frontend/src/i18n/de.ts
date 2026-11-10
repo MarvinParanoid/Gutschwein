@@ -65,6 +65,13 @@ export const de: Dictionary = {
     cardFallback: (id: number) => `Karte #${id}`,
   },
 
+  theme: {
+    auto: 'automatisch',
+    light: 'hell',
+    dark: 'dunkel',
+    label: (current: string) => `Design: ${current}`,
+  },
+
   empty: {
     active: 'Noch nichts da. Schick dem Bot ein Foto der Karte oder leg sie von Hand an.',
     draft: 'Keine Entwürfe. Schick dem Bot einen Screenshot, dann taucht er hier auf.',
