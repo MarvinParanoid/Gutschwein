@@ -777,6 +777,17 @@ body.scrolled .topbar {
   font-size: clamp(28px, 9vw, 40px);
 }
 
+/* The same code as an address: nobody reads one out at a till, so it stays at
+   reading size instead of growing to the size of a number — but it is what the
+   card is for, so it is the link it looks like. Blue is fixed here, like the rest
+   of this white overlay: the theme's link colour can be too light on white. */
+.scan-code.link {
+  font-size: 17px;
+  letter-spacing: 0;
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
 .scan .scan-copy {
   background: #eceff3;
   color: #000000;
@@ -882,6 +893,13 @@ body.scrolled .topbar {
 .code .btn {
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+/* A code that is an address rather than a number — Rossmann hands out coupons that
+   way — is a link, and reads as one. */
+.code a {
+  color: var(--link);
+  text-decoration: underline;
 }
 
 .actions {

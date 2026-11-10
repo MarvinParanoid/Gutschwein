@@ -68,6 +68,29 @@ export function cardSubtitle(voucher: Voucher): string {
   return parts.join(' · ')
 }
 
+/**
+ * The code as a link, when it is one; null when it is just a code.
+ *
+ * Some shops hand out a coupon as an address rather than a number — Rossmann does,
+ * and there the address *is* the coupon: it has to be opened, not read out. Only a
+ * spelled-out http(s) scheme counts. Without one, `coupons.rossmann.de/abc` is as
+ * likely a code typed off a card as a link, and a link that goes nowhere is worse
+ * than text that still copies — while a bare `javascript:` must never become one,
+ * since a card is data and data does not get to run.
+ */
+export function codeUrl(code: string | null | undefined): string | null {
+  const value = (code ?? '').trim()
+  if (!/^https?:\/\//i.test(value)) return null
+  // A scheme is not an address by itself: `https://` alone parses as nothing, and
+  // what the anchor is handed has to be something the browser can follow.
+  try {
+    new URL(value)
+  } catch {
+    return null
+  }
+  return value
+}
+
 export function formatDate(iso: string | null): string {
   if (!iso) return '—'
   // Numeric: "25.07.2029" fits a badge, where "25 июл. 2029 г." wraps and the

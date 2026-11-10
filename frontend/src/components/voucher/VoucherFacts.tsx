@@ -1,9 +1,9 @@
 import { useState } from 'react'
 
 import { copyText } from '../../clipboard'
-import { expiryInfo, formatDate, isGiftCard, valueLabel } from '../../format'
+import { codeUrl, expiryInfo, formatDate, isGiftCard, valueLabel } from '../../format'
 import { t } from '../../i18n'
-import { alertMessage, haptic } from '../../telegram'
+import { alertMessage, haptic, openUrl } from '../../telegram'
 import type { Voucher } from '../../types'
 
 /** Everything the card says about itself. Empty fields are not rendered at all. */
@@ -79,6 +79,9 @@ function Row({ label, children }: { label: React.ReactNode; children: React.Reac
 
 function CodeBlock({ code }: { code: string }) {
   const [copied, setCopied] = useState(false)
+  // Some codes are addresses (Rossmann hands out coupons that way): those open,
+  // the rest are read out or copied like before.
+  const href = codeUrl(code)
 
   async function copy() {
     if (await copyText(code)) {
@@ -92,7 +95,22 @@ function CodeBlock({ code }: { code: string }) {
 
   return (
     <div className="code" style={{ marginTop: 12 }}>
-      <span>{code}</span>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(event) => {
+            // Inside Telegram the client opens it; anywhere else the link itself
+            // does, and this leaves the click alone.
+            if (openUrl(href)) event.preventDefault()
+          }}
+        >
+          {code}
+        </a>
+      ) : (
+        <span>{code}</span>
+      )}
       <button className="btn link" onClick={copy}>
         {copied ? t.card.copied : t.card.copy}
       </button>

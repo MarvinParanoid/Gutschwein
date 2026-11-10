@@ -94,3 +94,29 @@ test('a card without a readable barcode falls back to the photo', async ({ page,
   await expect(page.locator('.scan-image')).toHaveAttribute('src', /\/api\/images\//)
   await expect(page.getByRole('button', { name: 'Фото' })).toHaveCount(0)
 })
+
+test('a drawing the server refuses falls back to the picture, not a broken image', async ({
+  page,
+  request,
+}) => {
+  // An older version could leave a card with the code of a picture it no longer
+  // has, and the bars it asks for cannot be drawn: /api/barcodes then answers 404.
+  // The till used to hand that address straight to <img> and show a broken picture.
+  const upload = await request.post('/api/uploads', {
+    multipart: { file: { name: 'card.png', mimeType: 'image/png', buffer: readFileSync(FIXTURE) } },
+  })
+  const { image_id: imageId } = await upload.json()
+  const merchant = uniqueMerchant('Kaputt')
+  await createCard(request, { merchant, value_amount: '15', image_id: imageId })
+
+  await openCard(page, merchant)
+  await page.route('**/api/barcodes/**', (route) => route.fulfill({ status: 404, body: '{}' }))
+  await page.locator('.hero-button').click()
+
+  // The picture the member actually attached, and no toggle leading back to the
+  // drawing that is not there.
+  await expect(page.locator('.scan-image')).toHaveAttribute('src', /\/api\/images\//)
+  await expect(page.getByRole('button', { name: 'Фото' })).toHaveCount(0)
+  // The number is still there to read out or copy.
+  await expect(page.locator('.scan-code')).toHaveText(CARD_NUMBER)
+})
