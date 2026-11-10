@@ -1,8 +1,9 @@
 name: CI
 
 # Any branch: a solo repo pushes straight to main, and a feature branch should
-# still be checked before it gets there. A push checks and, on main, publishes an
-# image — it never deploys. Production is rolled out by hand from deploy.yml.
+# still be checked before it gets there. A push checks, and one to dev or main
+# publishes an image as well (`:dev`, `:latest`) — it never deploys. Production is
+# rolled out by hand from deploy.yml.
 on: push
 
 # A new push supersedes the previous run on the same branch.
@@ -92,7 +93,17 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Build image
-        run: docker build -t gutschwein:ci .
+        run: |
+          # Built for the server, not for the runner: amd64 is asked for by name so a
+          # runner of another architecture cannot quietly produce an image that will
+          # not start there. The labels travel into the registry with the image: where
+          # it comes from, which commit it is, and that it is still MIT.
+          docker build \
+            --platform=linux/amd64 \
+            --label org.opencontainers.image.source="https://github.com/Slothoncrack/Gutschwein" \
+            --label org.opencontainers.image.revision="$GITHUB_SHA" \
+            --label org.opencontainers.image.licenses="MIT" \
+            -t gutschwein:ci .
 
       # The image build and startup are what broke twice in real deployment
       # (unparsable FAMILY_CHAT_ID, silenced logs), so CI starts it for real.
@@ -149,31 +160,58 @@ jobs:
             test "$code" = "404" || { echo "$path answered $code, expected 404"; exit 1; }
           done
 
-      # Published only after the smoke test above has run the thing: whatever is
-      # on :latest has answered /healthz, served the app and refused an
+      # Published only after the smoke test above has run the thing: whatever is on
+      # :dev (or :latest) has answered /healthz, served the app and refused an
       # unauthenticated request at least once.
+      #
+      # The registry is pushed to with the workflow's own token — `packages: write`
+      # on this job is the whole of the grant, so no personal access token is needed.
+      # A fork's registry belongs to the fork, which is why the repository is named:
+      # this publishes from Slothoncrack/Gutschwein and nothing else. A pull request
+      # is out by the same line — the token it gets is read-only anyway, but a gate
+      # that says so is one fewer thing to remember.
       - name: Publish to ghcr.io
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        if: >-
+          github.event_name == 'push' &&
+          github.repository == 'Slothoncrack/Gutschwein' &&
+          (github.ref == 'refs/heads/dev' ||
+           github.ref == 'refs/heads/main' ||
+           startsWith(github.ref, 'refs/tags/v'))
         run: |
+          # The build asks for amd64; this refuses to publish anything else, so an
+          # image the server cannot run never gets a tag in the first place.
+          platform=$(docker image inspect --format '{{.Os}}/{{.Architecture}}' gutschwein:ci)
+          test "$platform" = "linux/amd64" || { echo "built $platform, not linux/amd64"; exit 1; }
+
           echo "${{ github.token }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           image=ghcr.io/${{ github.repository_owner }}/gutschwein
           # Lowercase: registries reject capitals in a repository name.
           image=$(echo "$image" | tr '[:upper:]' '[:lower:]')
 
-          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
-            # :latest tracks main, and a sha tag is what a rollback needs — "the
-            # one from before" by name rather than by rebuilding it.
-            docker tag gutschwein:ci "$image:latest"
-            docker tag gutschwein:ci "$image:${GITHUB_SHA::12}"
-            docker push "$image:latest"
-            docker push "$image:${GITHUB_SHA::12}"
-          else
-            # A release tag gets its own name and deliberately does not move
-            # :latest, which belongs to main.
-            version=${GITHUB_REF#refs/tags/}
-            docker tag gutschwein:ci "$image:$version"
-            docker push "$image:$version"
-          fi
+          case "$GITHUB_REF" in
+            refs/heads/dev)
+              # :dev moves with the branch, and the sha tag is what a rollback needs —
+              # "the one from before" by name rather than by rebuilding it.
+              docker tag gutschwein:ci "$image:dev"
+              docker tag gutschwein:ci "$image:${GITHUB_SHA::12}"
+              docker push "$image:dev"
+              docker push "$image:${GITHUB_SHA::12}"
+              ;;
+            refs/heads/main)
+              # :latest tracks main.
+              docker tag gutschwein:ci "$image:latest"
+              docker tag gutschwein:ci "$image:${GITHUB_SHA::12}"
+              docker push "$image:latest"
+              docker push "$image:${GITHUB_SHA::12}"
+              ;;
+            *)
+              # A release tag gets its own name and deliberately does not move
+              # :latest, which belongs to main.
+              version=${GITHUB_REF#refs/tags/}
+              docker tag gutschwein:ci "$image:$version"
+              docker push "$image:$version"
+              ;;
+          esac
 
       - name: Container logs
         if: always()
